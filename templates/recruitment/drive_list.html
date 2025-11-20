@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+  <div class="bg-white rounded-lg shadow-md p-6">
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-800">
+          <i class="fas fa-briefcase text-theme-primary mr-3"></i>Recruitment Drives
+        </h1>
+        <p class="text-gray-600 mt-2">Manage all your hiring campaigns</p>
+      </div>
+      <a href="{% url 'drive_create' %}" 
+         class="bg-theme-primary text-white px-6 py-3 rounded-lg hover:bg-theme-dark transition-all">
+        <i class="fas fa-plus mr-2"></i>New Drive
+      </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex gap-4 mb-6">
+      <select onchange="filterDrives(this.value)" 
+              class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-theme-primary">
+        <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Status</option>
+        <option value="open" {% if selected_status == 'open' %}selected{% endif %}>Open</option>
+        <option value="in_progress" {% if selected_status == 'in_progress' %}selected{% endif %}>In Progress</option>
+        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Completed</option>
+        <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>Draft</option>
+      </select>
+    </div>
+
+    <!-- Drives List -->
+    <div class="space-y-4">
+      {% for drive in drives %}
+      <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-all duration-200">
+        <div class="flex justify-between items-start">
+          <div class="flex-grow">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="px-3 py-1 text-xs font-semibold rounded-full
+                {% if drive.drive_status == 'OPEN' %}bg-green-100 text-green-700
+                {% elif drive.drive_status == 'IN_PROGRESS' %}bg-blue-100 text-blue-700
+                {% elif drive.drive_status == 'COMPLETED' %}bg-gray-100 text-gray-700
+                {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                {{ drive.get_drive_status_display }}
+              </span>
+              <h3 class="text-xl font-bold text-gray-800">{{ drive.title }}</h3>
+            </div>
+            
+            <p class="text-gray-700 mb-3">{{ drive.position }}</p>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div class="text-sm">
+                <p class="text-gray-500">Applications</p>
+                <p class="font-semibold text-lg">{{ drive.application_count }}</p>
+              </div>
+              <div class="text-sm">
+                <p class="text-gray-500">Hired</p>
+                <p class="font-semibold text-lg text-green-600">{{ drive.filled_positions }}/{{ drive.total_positions }}</p>
+              </div>
+              <div class="text-sm">
+                <p class="text-gray-500">Start Date</p>
+                <p class="font-semibold">{{ drive.application_start_date|date:"M d, Y" }}</p>
+              </div>
+              <div class="text-sm">
+                <p class="text-gray-500">End Date</p>
+                <p class="font-semibold">{{ drive.application_end_date|date:"M d, Y" }}</p>
+              </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+              <div class="bg-theme-primary h-2.5 rounded-full" 
+                   style="width: {{ drive.hiring_progress_percentage }}%"></div>
+            </div>
+            <p class="text-xs text-gray-500">{{ drive.hiring_progress_percentage }}% positions filled</p>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="flex flex-col gap-2 ml-6">
+            <a href="{% url 'drive_detail' drive.id %}" 
+               class="bg-theme-primary text-white px-4 py-2 rounded-lg text-center hover:bg-theme-dark">
+              View Details
+            </a>
+            <a href="{% url 'drive_candidates' drive.id %}" 
+               class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-center hover:bg-gray-300">
+              Candidates
+            </a>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="text-center py-12 bg-gray-50 rounded-lg">
+        <i class="fas fa-briefcase text-6xl text-gray-300 mb-4"></i>
+        <p class="text-gray-500 text-lg mb-4">No drives found</p>
+        <a href="{% url 'drive_create' %}" class="text-theme-primary hover:underline font-semibold">
+          Create your first recruitment drive
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if drives.has_other_pages %}
+    <div class="flex justify-center mt-8">
+      <nav class="flex gap-2">
+        {% if drives.has_previous %}
+        <a href="?page={{ drives.previous_page_number }}&status={{ selected_status }}" 
+           class="px-4 py-2 border rounded-lg hover:bg-gray-50">Previous</a>
+        {% endif %}
+        
+        <span class="px-4 py-2 border rounded-lg bg-theme-primary text-white">
+          Page {{ drives.number }} of {{ drives.paginator.num_pages }}
+        </span>
+        
+        {% if drives.has_next %}
+        <a href="?page={{ drives.next_page_number }}&status={{ selected_status }}" 
+           class="px-4 py-2 border rounded-lg hover:bg-gray-50">Next</a>
+        {% endif %}
+      </nav>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function filterDrives(status) {
+  window.location.href = `?status=${status}`;
+}
+</script>
+
+<style>
+.bg-theme-primary { background-color: #6366f1; }
+.text-theme-primary { color: #6366f1; }
+.hover\:bg-theme-dark:hover { background-color: #4f46e5; }
+</style>
+{% endblock %}

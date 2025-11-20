@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apply - {{ drive.title }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-indigo-100 min-h-screen py-8 px-4">
+  
+  <div class="max-w-3xl mx-auto">
+    
+    <!-- Header Card -->
+    <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+      <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-8 text-white">
+        <h1 class="text-3xl font-bold mb-2">{{ drive.title }}</h1>
+        <p class="text-lg text-purple-100">{{ drive.position }}</p>
+        {% if drive.department %}
+        <p class="text-purple-200 text-sm mt-2">
+          <i class="fas fa-building mr-2"></i>{{ drive.department.name }}
+        </p>
+        {% endif %}
+      </div>
+      
+      <div class="p-6">
+        <h3 class="font-semibold text-gray-900 mb-2">Job Description</h3>
+        <p class="text-gray-700 text-sm whitespace-pre-line">{{ drive.description }}</p>
+        
+        <div class="mt-4 pt-4 border-t flex items-center justify-between text-sm">
+          <div>
+            <span class="text-gray-600">Positions Available:</span>
+            <span class="font-semibold text-gray-900 ml-2">{{ drive.positions_remaining }}/{{ drive.total_positions }}</span>
+          </div>
+          <div>
+            <span class="text-gray-600">Apply by:</span>
+            <span class="font-semibold text-gray-900 ml-2">{{ drive.application_end_date|date:"M d, Y" }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Application Form -->
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      <h2 class="text-2xl font-bold text-gray-900 mb-6">
+        <i class="fas fa-file-alt text-purple-600 mr-2"></i>Application Form
+      </h2>
+
+      <form method="post" enctype="multipart/form-data" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Full Name -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Full Name <span class="text-red-500">*</span>
+          </label>
+          <input type="text" 
+                 name="full_name" 
+                 required
+                 class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+        </div>
+
+        <!-- Email -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Email Address <span class="text-red-500">*</span>
+          </label>
+          <input type="email" 
+                 name="email" 
+                 required
+                 class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+        </div>
+
+        <!-- Phone -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Phone Number <span class="text-red-500">*</span>
+          </label>
+          <input type="tel" 
+                 name="phone_number" 
+                 required
+                 class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+        </div>
+
+        <!-- Resume Upload -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Resume/CV <span class="text-red-500">*</span>
+          </label>
+          <input type="file" 
+                 name="resume_file" 
+                 accept=".pdf,.doc,.docx"
+                 required
+                 class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+          <p class="text-xs text-gray-500 mt-1">Accepted formats: PDF, DOC, DOCX (Max 5MB)</p>
+        </div>
+
+        <!-- Cover Letter -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Cover Letter (Optional)
+          </label>
+          <textarea name="cover_letter" 
+                    rows="5"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-y"
+                    placeholder="Tell us why you're a great fit for this role..."></textarea>
+        </div>
+
+        <!-- Terms -->
+        <div class="flex items-start">
+          <input type="checkbox" 
+                 name="terms_accepted" 
+                 required
+                 class="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+          <label class="ml-3 text-sm text-gray-700">
+            I agree to the terms and conditions and consent to the processing of my personal data for recruitment purposes.
+          </label>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" 
+                class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg font-semibold text-lg">
+          <i class="fas fa-paper-plane mr-2"></i>Submit Application
+        </button>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center mt-8 text-sm text-gray-600">
+      <p>Questions? Contact us at <a href="mailto:hr@company.com" class="text-purple-600 hover:underline">hr@company.com</a></p>
+    </div>
+  </div>
+
+</body>
+</html>
