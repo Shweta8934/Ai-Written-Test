@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drive Closed</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-times-circle text-red-600 text-3xl"></i>
+      </div>
+
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">Drive Closed</h1>
+
+      {% if reason %}
+      <p class="text-gray-600 mb-4">{{ reason }}</p>
+      {% else %}
+      <p class="text-gray-600 mb-4">This recruitment drive is not accepting applications.</p>
+      {% endif %}
+
+      <div class="bg-gray-50 rounded-lg p-4 mb-6">
+        <h2 class="font-semibold text-gray-900 mb-2">{{ drive.title }}</h2>
+        <p class="text-sm text-gray-600">{{ drive.position }}</p>
+
+        {% if drive.link_expiry_date %}
+        <p class="text-xs text-gray-500 mt-2">
+          Link expired on: {{ drive.link_expiry_date|date:"M d, Y" }}
+        </p>
+        {% endif %}
+
+      </div>
+
+      <a href="/" class="inline-block bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+        Go to Homepage
+      </a>
+    </div>
+  </div>
+</body>
+
+</html>
