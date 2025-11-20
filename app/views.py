@@ -1,7 +1,7 @@
 # app/views.py
 
 import json
-from openai import OpenAI  # Import OpenAI instead of google.generativeai
+from openai import OpenAI  
 import re
 import google.generativeai as genai
 from django.contrib.auth import login, logout
@@ -227,6 +227,7 @@ def generate_questions(request):
                 * **If `{seniority}` is Senior (6+ yrs)**: The focus is on depth, design, and complex problem-solving. This section **MUST be overwhelmingly dominated by challenging `CODE` problems**. The number of `CODE` questions must constitute the **vast majority** of the section's total, with any remaining `MCQ` or `SA` questions being highly advanced, focusing on architectural trade-offs or subtle language features, not basics.
 
             5.  **Answer Formatting**: The format of the question and answer depends strictly on its `type`.
+                * For any section with a title containing **'Aptitude' or 'Logical'**: Generate questions purely on **Mathematics, Logical Reasoning, Data Interpretation, and General Problem Solving**, **NEVER** technical skills like React or Python.
                 * For **`MCQ` and `SA`** questions: The `answer` must be concise (a word, phrase, or single line of code).
                 * For **`CODE`** questions: The `text` must be a full problem description (task, input, expected output). The `answer` must be a complete, multi-line code solution, formatted as a single JSON string with `\\n` for newlines.
 
@@ -264,7 +265,27 @@ def generate_questions(request):
                 json_text = json_text[:-3]
 
             generated_paper = json.loads(json_text)
-
+            # ✅ CRITICAL DEFENSIVE FIX: Ensure question types match client-side expectations
+            if generated_paper.get('sections'):
+                for section in generated_paper['sections']:
+                    if section.get('questions'):
+                        for question in section['questions']:
+                            # Convert common AI outputs to required format
+                            if question.get('type'):
+                                q_type = question['type'].upper().strip()
+                                if q_type in ('SHORT ANSWER', 'SA', 'SUBJECTIVE'):
+                                    question['type'] = 'Short Answer'
+                                elif q_type in ('CODE', 'CODING', 'PROGRAMMING'):
+                                    question['type'] = 'CODE'
+                                elif q_type in ('MCQ', 'MULTIPLE CHOICE'):
+                                    question['type'] = 'MCQ'
+                                # If none of the above, it remains whatever it was (or will be set below)
+                                
+                            # Ensure 'options' key exists for non-MCQ types (Python safety, even if redundant for display)
+                            if question.get('type') != 'MCQ' and 'options' not in question:
+                                question['options'] = []
+            
+            # --- Continue with the rest of the function ---
             return JsonResponse(generated_paper)
         except json.JSONDecodeError as e:
 
