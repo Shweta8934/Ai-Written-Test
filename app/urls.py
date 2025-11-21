@@ -120,4 +120,7 @@ path('api/skills/search/', views.search_skills_with_suggestions, name='search_sk
     path('drives/<int:drive_id>/analytics/', views.drive_analytics_view, name='drive_analytics'),
     path('drives/<int:drive_id>/export/', views.export_drive_data, name='export_drive_data'),
 path('generator/questions/paper_details/<int:paper_id>/', views.get_paper_details_json, name='paper_details_json'),
+
+
+path('generator/interview/create/', views.create_interview_round, name='create_interview_round'),
 ]

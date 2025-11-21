@@ -63,19 +63,31 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "shweta.ladne.averybit@gmail.com"
 EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "written_test_ydbx",
-        "USER": "written_test_ydbx_user",
-        "PASSWORD": "9DDegu2JdEFSW9Qw5MiTcLCZT1Mqh690",
-        "HOST": "dpg-d4arav9e2q1c73b72klg-a.oregon-postgres.render.com",
+        "NAME": "aiTest",
+        "USER": "postgres",
+        "PASSWORD": "12345",
+        "HOST": "localhost",
         "PORT": "5432",
-        "OPTIONS": {
-            "sslmode": "require",
-        },
     }
 }
+
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": "written_test_ydbx",
+#         "USER": "written_test_ydbx_user",
+#         "PASSWORD": "9DDegu2JdEFSW9Qw5MiTcLCZT1Mqh690",
+#         "HOST": "dpg-d4arav9e2q1c73b72klg-a.oregon-postgres.render.com",
+#         "PORT": "5432",
+#         "OPTIONS": {
+#             "sslmode": "require",
+#         },
+#     }
+# }
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.1.10", "10.0.0.42"]
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

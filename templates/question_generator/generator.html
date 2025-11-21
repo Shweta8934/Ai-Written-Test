@@ -316,10 +316,13 @@
                             </div>
                             <div id="existingPaperError" class="text-red-500 text-sm mt-2"></div>
                         </div>
-                        <h3 class="text-lg font-semibold text-slate-800">
+                        <!-- <h3 class="text-lg font-semibold text-slate-800">
                             Number of Questions
-                        </h3>
-
+                        </h3> -->
+<h3 class="text-lg font-semibold text-slate-800">
+            Number of Questions & Weightage
+        </h3> <div id="sections-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      
                         <p class="text-sm text-slate-500 mt-1 mb-6">
                             Set the question count for each section of the test.
                         </p>
@@ -1070,47 +1073,88 @@
             }
         }
 
-        function buildSectionsHTML(sections) {
+        // function buildSectionsHTML(sections) {
 
-            const container = document.getElementById("sections-container");
+        //     const container = document.getElementById("sections-container");
 
-            container.innerHTML = "";
+        //     container.innerHTML = "";
 
-            if (!sections || sections.length === 0) {
+        //     if (!sections || sections.length === 0) {
 
-                container.innerHTML = '<p class="text-slate-500 col-span-2">No sections found for this department.</p>';
+        //         container.innerHTML = '<p class="text-slate-500 col-span-2">No sections found for this department.</p>';
 
-                return;
+        //         return;
 
-            }
+        //     }
 
-            sections.forEach((sectionName) => {
+        //     sections.forEach((sectionName) => {
 
-                const count = formData.sections?.[sectionName] !== undefined ? formData.sections[sectionName] : 1;
+        //         const count = formData.sections?.[sectionName] !== undefined ? formData.sections[sectionName] : 1;
 
-                const sectionHTML = `
+        //         const sectionHTML = `
 
-                <div data-section="${sectionName}" class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        //         <div data-section="${sectionName}" class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between">
 
-                    <label class="font-medium text-slate-700">${sectionName} <span class="text-red-500">*</span></label>
+        //             <label class="font-medium text-slate-700">${sectionName} <span class="text-red-500">*</span></label>
 
-                    <div class="flex items-center border border-slate-300 rounded-lg bg-white w-fit mt-2 sm:mt-0">
+        //             <div class="flex items-center border border-slate-300 rounded-lg bg-white w-fit mt-2 sm:mt-0">
 
+        //                 <button onclick="updateCount(this, -1)" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-l-lg transition-colors">-</button>
+
+        //                 <input type="number" value="${count}" readonly class="w-16 text-center font-semibold text-lg text-[#736b8e] border-l border-r py-1.5 focus:outline-none bg-transparent cursor-default" />
+
+        //                 <button onclick="updateCount(this, 1)" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-r-lg transition-colors">+</button>
+
+        //             </div>
+
+        //         </div>`;
+
+        //         container.insertAdjacentHTML("beforeend", sectionHTML);
+
+        //     });
+        // }
+// generator.html - <script> section ke andar
+
+// generator.html - <script> section ke andar
+
+function buildSectionsHTML(sections) {
+    const container = document.getElementById("sections-container");
+    container.innerHTML = "";
+    if (!sections || sections.length === 0) {
+        container.innerHTML =
+            '<p class="text-slate-500 col-span-2">No sections found for this department.</p>';
+        return;
+    }
+
+    sections.forEach((sectionName) => {
+        // ✅ FIX: Count value load karein
+        const count = formData.sections?.[sectionName] !== undefined ? formData.sections[sectionName] : 1;
+        // ✅ FIX: Weightage value load karein (default to empty string taaki placeholder dikhe)
+        // Note: Agar formData.sectionWeights mein value nahi hai, toh empty string ('') use karein
+        const weight = formData.sectionWeights && formData.sectionWeights[sectionName] !== undefined ? formData.sectionWeights[sectionName] : ''; 
+
+        const sectionHTML = `
+            <div data-section="${sectionName}" class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <label class="font-medium text-slate-700">${sectionName} <span class="text-red-500">*</span></label>
+                <div class="flex items-center gap-4 mt-2 sm:mt-0">
+                    <div class="flex items-center border border-slate-300 rounded-lg bg-white w-fit py-1 px-2">
                         <button onclick="updateCount(this, -1)" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-l-lg transition-colors">-</button>
-
+                        
                         <input type="number" value="${count}" readonly class="w-16 text-center font-semibold text-lg text-[#736b8e] border-l border-r py-1.5 focus:outline-none bg-transparent cursor-default" />
-
+                        
                         <button onclick="updateCount(this, 1)" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-r-lg transition-colors">+</button>
-
                     </div>
-
-                </div>`;
-
-                container.insertAdjacentHTML("beforeend", sectionHTML);
-
-            });
-        }
-
+                    
+                    <input type="number" min="0" max="100" step="0.1" placeholder="Weight %" 
+                            value="${weight}"
+                            oninput="collectStepData(2)"
+                            class="weightage-input w-20 px-2 py-1 border border-gray-300 rounded text-center" />
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML("beforeend", sectionHTML);
+    });
+}
         function deselectSkill(skill) {
             selectedSkills = selectedSkills.filter((s) => s !== skill);
             renderTags();
@@ -1150,40 +1194,142 @@
             }
         }
 
-        function collectStepData(step) {
-            if (step === 1) {
-                formData.jobTitle = document.getElementById("jobTitle").value;
+//         function collectStepData(step) {
+//             if (step === 1) {
+//                 formData.jobTitle = document.getElementById("jobTitle").value;
 
-                formData.jobLocation = document.getElementById("jobLocation").value;
-                formData.jobType = document.getElementById("jobType").value;
-                formData.positions = document.getElementById("positions").value;
-                formData.rounds = document.getElementById("rounds").value;
-                formData.payScale = document.getElementById("payScale").value;
-                formData.endDate = document.getElementById("endDate").value;
+//                 formData.jobLocation = document.getElementById("jobLocation").value;
+//                 formData.jobType = document.getElementById("jobType").value;
+//                 formData.positions = document.getElementById("positions").value;
+//                 formData.rounds = document.getElementById("rounds").value;
+//                 formData.payScale = document.getElementById("payScale").value;
+//                 formData.endDate = document.getElementById("endDate").value;
 
-                const deptSelect = document.getElementById("department");
-                formData.departmentId = deptSelect.value;
-                formData.departmentName = deptSelect.selectedIndex > 0 ? deptSelect.options[deptSelect.selectedIndex].text : "";
-                formData.skills = document.getElementById("skills-hidden-input").value;
-                formData.minExp = document.getElementById("minExp").value;
-                formData.maxExp = document.getElementById("maxExp").value;
-            } else if (step === 2) {
-                formData.sections = {};
-                document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
-                    const sectionName = div.dataset.section;
-                    const count = div.querySelector("input").value;
-                    if (parseInt(count, 10) > 0) {
-                        formData.sections[sectionName] = parseInt(count, 10);
-                    }
-                });
-                const durationSelect = document.getElementById("duration");
-                formData.duration = parseInt(durationSelect.value, 10) || 0;
-                formData.durationText = durationSelect.selectedIndex > 0 ? durationSelect.options[durationSelect.selectedIndex].text : "";
-                formData.cutoffScore = document.getElementById("cutoffScore").value;
+//                 const deptSelect = document.getElementById("department");
+//                 formData.departmentId = deptSelect.value;
+//                 formData.departmentName = deptSelect.selectedIndex > 0 ? deptSelect.options[deptSelect.selectedIndex].text : "";
+//                 formData.skills = document.getElementById("skills-hidden-input").value;
+//                 formData.minExp = document.getElementById("minExp").value;
+//                 formData.maxExp = document.getElementById("maxExp").value;
+//        } else if (step === 2) {
+//         formData.sections = {};
+// formData.sectionWeights = {}; // ✅ NAYA: Weightage store karne ke liye
+//         document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
+//             const sectionName = div.dataset.section.trim();
+//             const countInput = div.querySelector('input[type="number"]');
+            
+//             // ✅ FIX 1: Weightage input field ko select karein
+//             const weightInput = div.querySelector('.weightage-input');
+
+//             const count = parseInt(countInput.value, 10);
+//             // ✅ FIX 2: Weightage value ko parse karein
+//             const weight = parseFloat(weightInput?.value) || 0.0; 
+
+//             if (count > 0) {
+//                 formData.sections[sectionName] = count;
+//             }
+            
+//             // ✅ FIX 3: Weightage ko store karein
+//             formData.sectionWeights[sectionName] = weight;
+//         });
+        
+//         const durationSelect = document.getElementById("duration");
+//         formData.duration = parseInt(durationSelect.value, 10) || 0;
+//         formData.durationText =
+//           durationSelect.selectedIndex > 0
+//             ? durationSelect.options[durationSelect.selectedIndex].text
+//             : "";
+//         formData.cutoffScore = document.getElementById("cutoffScore").value;
+        
+//         // Step 4/Save ke liye fullPaperPayload mein weightage inject karein (Generate hone ke baad)
+//         if (fullPaperPayload.sections && formData.sectionWeights) {
+//             fullPaperPayload.sections.forEach(section => {
+//                 const title = section.title.trim();
+//                 const weight = formData.sectionWeights[title];
+//                 if (weight !== undefined) {
+//                     section.weightage = parseFloat(weight);
+//                 }
+//             });
+//         }
+//     }
+//     // ... (rest of the function is fine) ...
+//     saveToSessionStorage();
+// }
+
+
+
+                //     } else if (step === 2) {
+        
+                //         formData.sections = {};
+        //         document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
+        //             const sectionName = div.dataset.section;
+        //             const count = div.querySelector("input").value;
+        //             if (parseInt(count, 10) > 0) {
+        //                 formData.sections[sectionName] = parseInt(count, 10);
+        //             }
+        //         });
+        //         const durationSelect = document.getElementById("duration");
+        //         formData.duration = parseInt(durationSelect.value, 10) || 0;
+        //         formData.durationText = durationSelect.selectedIndex > 0 ? durationSelect.options[durationSelect.selectedIndex].text : "";
+        //         formData.cutoffScore = document.getElementById("cutoffScore").value;
+        //     }
+        //     saveToSessionStorage();
+        // }
+// Function to collect data from Step 1 and Step 2 fields
+function collectStepData(step) {
+    if (step === 1) {
+        formData.jobTitle = document.getElementById("jobTitle").value;
+        formData.jobLocation = document.getElementById("jobLocation").value;
+        formData.jobType = document.getElementById("jobType").value;
+        formData.positions = document.getElementById("positions").value;
+        formData.rounds = document.getElementById("rounds").value;
+        formData.payScale = document.getElementById("payScale").value;
+        formData.endDate = document.getElementById("endDate").value;
+
+        const deptSelect = document.getElementById("department");
+        formData.departmentId = deptSelect.value;
+        formData.departmentName = deptSelect.selectedIndex > 0 ? deptSelect.options[deptSelect.selectedIndex].text : "";
+        formData.skills = document.getElementById("skills-hidden-input").value;
+        formData.minExp = document.getElementById("minExp").value;
+        formData.maxExp = document.getElementById("maxExp").value;
+    } else if (step === 2) {
+        formData.sections = {};
+        formData.sectionWeights = {}; // ✅ NAYA: Weightage store karne ke liye
+
+        document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
+            const sectionName = div.dataset.section.trim();
+            const countInput = div.querySelector('input[type="number"]');
+            
+            // ✅ FIX 1: Weightage input field ko select karein
+            const weightInput = div.querySelector('.weightage-input');
+
+            const count = parseInt(countInput.value, 10);
+            // ✅ FIX 2: Weightage value ko parse karein
+            // Note: Optional chaining operator (?) se crash avoid hoga agar field na mile
+            const weight = parseFloat(weightInput?.value) || 0.0; 
+
+            if (count > 0) {
+                formData.sections[sectionName] = count;
             }
-            saveToSessionStorage();
-        }
-
+            
+            // ✅ FIX 3: Weightage ko store karein
+            formData.sectionWeights[sectionName] = weight;
+        });
+        
+        const durationSelect = document.getElementById("duration");
+        formData.duration = parseInt(durationSelect.value, 10) || 0;
+        formData.durationText =
+          durationSelect.selectedIndex > 0
+            ? durationSelect.options[durationSelect.selectedIndex].text
+            : "";
+        formData.cutoffScore = document.getElementById("cutoffScore").value;
+        
+        // ❌ REMOVED: fullPaperPayload injection logic is removed from here. 
+        // It should only run inside generatePaper() after AI response.
+    }
+    // ... (rest of the function is fine) ...
+    saveToSessionStorage();
+}
         async function renderSections(departmentId) {
             const container = document.getElementById("sections-container");
             if (!container || !departmentId) {
@@ -2138,78 +2284,176 @@ function displayGeneratedPaper(paperData) {
         });
     }
 }
-        async function generatePaper() {
-            const generateButton = document.querySelector('#step-3 button[onclick="generatePaper()"]');
-            generateButton.disabled = true;
-            generateButton.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Generating...
-                `;
 
-            const aiPostData = {
-                job_title: formData.jobTitle,
-                min_exp: formData.minExp,
-                max_exp: formData.maxExp,
-                skills: formData.skills,
-                sections: formData.sections,
-                job_location: formData.jobLocation,
-                job_type: formData.jobType,
-                positions: formData.positions
-            };
 
-            try {
-                const response = await fetch("{% url 'generate_questions' %}", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": getCookie("csrftoken"),
-                    },
-                    body: JSON.stringify(aiPostData),
-                });
+        // async function generatePaper() {
+        //     const generateButton = document.querySelector('#step-3 button[onclick="generatePaper()"]');
+        //     generateButton.disabled = true;
+        //     generateButton.innerHTML = `
+        //         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        //             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        //             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        //         </svg>
+        //         Generating...
+        //         `;
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Server error: ${response.status}. Response: ${errorText}`);
-                }
-                const paperData = await response.json();
-                if (paperData.error) throw new Error(paperData.error);
+        //     const aiPostData = {
+        //         job_title: formData.jobTitle,
+        //         min_exp: formData.minExp,
+        //         max_exp: formData.maxExp,
+        //         skills: formData.skills,
+        //         sections: formData.sections,
+        //         job_location: formData.jobLocation,
+        //         job_type: formData.jobType,
+        //         positions: formData.positions
+        //     };
 
-                fullPaperPayload = {
-                    job_title: formData.jobTitle,
-                    department: formData.departmentName,
-                    skills: formData.skills,
-                    min_exp: formData.minExp,
-                    max_exp: formData.maxExp,
-                    duration: formData.duration,
-                    durationText: formData.durationText,
-                    cutoff_score: formData.cutoffScore,
-                    title: paperData.title,
-                    sections: paperData.sections,
-                    job_location: formData.jobLocation,
-                    job_type: formData.jobType,
-                    positions: formData.positions,
-                    rounds: formData.rounds,
-                    pay_scale: formData.payScale,
-                    end_date: formData.endDate
-                };
+        //     try {
+        //         const response = await fetch("{% url 'generate_questions' %}", {
+        //             method: "POST",
+        //             headers: {
+        //                 "Content-Type": "application/json",
+        //                 "X-CSRFToken": getCookie("csrftoken"),
+        //             },
+        //             body: JSON.stringify(aiPostData),
+        //         });
 
-                sessionStorage.removeItem("assessmentDraft");
-                displayGeneratedPaper(fullPaperPayload);
-                currentStep = 4;
-                showStep(currentStep);
-                showToast("Paper generated!", "success");
+        //         if (!response.ok) {
+        //             const errorText = await response.text();
+        //             throw new Error(`Server error: ${response.status}. Response: ${errorText}`);
+        //         }
+        //         const paperData = await response.json();
+        //         if (paperData.error) throw new Error(paperData.error);
 
-            } catch (error) {
-                console.error("Failed to generate paper:", error);
-                showToast(`An error occurred: ${error.message}`, "error");
-            } finally {
-                generateButton.disabled = false;
-                generateButton.innerHTML = "Generate";
-            }
+        //         fullPaperPayload = {
+        //             job_title: formData.jobTitle,
+        //             department: formData.departmentName,
+        //             skills: formData.skills,
+        //             min_exp: formData.minExp,
+        //             max_exp: formData.maxExp,
+        //             duration: formData.duration,
+        //             durationText: formData.durationText,
+        //             cutoff_score: formData.cutoffScore,
+        //             title: paperData.title,
+        //             sections: paperData.sections,
+        //             job_location: formData.jobLocation,
+        //             job_type: formData.jobType,
+        //             positions: formData.positions,
+        //             rounds: formData.rounds,
+        //             pay_scale: formData.payScale,
+        //             end_date: formData.endDate
+        //         };
+
+        //         sessionStorage.removeItem("assessmentDraft");
+        //         displayGeneratedPaper(fullPaperPayload);
+        //         currentStep = 4;
+        //         showStep(currentStep);
+        //         showToast("Paper generated!", "success");
+
+        //     } catch (error) {
+        //         console.error("Failed to generate paper:", error);
+        //         showToast(`An error occurred: ${error.message}`, "error");
+        //     } finally {
+        //         generateButton.disabled = false;
+        //         generateButton.innerHTML = "Generate";
+        //     }
+        // }
+// Function to generate the paper and inject the final weightage
+async function generatePaper() {
+    const generateButton = document.querySelector('#step-3 button[onclick="generatePaper()"]');
+    generateButton.disabled = true;
+    generateButton.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Generating...
+        `;
+
+    // Ensure Step 2 data is collected one last time before sending
+    collectStepData(2);
+
+    const aiPostData = {
+        job_title: formData.jobTitle,
+        min_exp: formData.minExp,
+        max_exp: formData.maxExp,
+        skills: formData.skills,
+        sections: formData.sections,
+        job_location: formData.jobLocation,
+        job_type: formData.jobType,
+        positions: formData.positions
+        // Note: formData.sections mein sirf count hai, weightage nahi.
+    };
+
+    try {
+        const response = await fetch("{% url 'generate_questions' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify(aiPostData),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server error: ${response.status}. Response: ${errorText}`);
         }
+        const paperData = await response.json();
+        if (paperData.error) throw new Error(paperData.error);
+
+        // 1. fullPaperPayload ko AI generated data se populate karein
+        fullPaperPayload = {
+            job_title: formData.jobTitle,
+            department: formData.departmentName,
+            skills: formData.skills,
+            min_exp: formData.minExp,
+            max_exp: formData.maxExp,
+            duration: formData.duration,
+            durationText: formData.durationText,
+            cutoff_score: formData.cutoffScore,
+            title: paperData.title,
+            sections: paperData.sections, // AI generated sections (without weightage initially)
+            job_location: formData.jobLocation,
+            job_type: formData.jobType,
+            positions: formData.positions,
+            rounds: formData.rounds,
+            pay_scale: formData.payScale,
+            end_date: formData.endDate
+        };
+
+        // 2. ✅ CRITICAL FIX: AI generated sections mein user defined weightage inject karein
+        if (fullPaperPayload.sections && formData.sectionWeights) {
+            fullPaperPayload.sections.forEach(section => {
+                const title = section.title.trim();
+                const weight = formData.sectionWeights[title];
+                
+                // Weightage ko section object mein add karein
+                if (weight !== undefined) {
+                    section.weightage = parseFloat(weight); 
+                } else {
+                    // Fallback agar AI section name match na ho paye (unlikely but safe)
+                    section.weightage = 0.0; 
+                }
+            });
+        }
+        // Ab fullPaperPayload mein sections ke saath weightage bhi hai, aur yeh save_paper ko jayega.
+
+        sessionStorage.removeItem("assessmentDraft");
+        displayGeneratedPaper(fullPaperPayload);
+        currentStep = 4;
+        showStep(currentStep);
+        showToast("Paper generated!", "success");
+
+    } catch (error) {
+        console.error("Failed to generate paper:", error);
+        showToast(`An error occurred: ${error.message}`, "error");
+    } finally {
+        generateButton.disabled = false;
+        generateButton.innerHTML = "Generate";
+    }
+}
+
 
         document.addEventListener("DOMContentLoaded", function () {
             // ... (rest of DOMContentLoaded event listener)

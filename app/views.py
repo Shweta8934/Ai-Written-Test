@@ -190,7 +190,12 @@ def generate_questions(request):
             skills_raw = data.get("skills")
             sections_data = data.get("sections", {})
             total_questions = sum(sections_data.values())
-
+            # Department ID ko Department Name mein convert karein
+            try:
+                department_name = Department.objects.get(id=data.get("departmentId")).name
+            except Department.DoesNotExist:
+                # Fallback to a default name if not found
+                department_name = "N/A"
             seniority = "Junior"
             if int(max_exp) > 5:
                 seniority = "Senior"
@@ -397,6 +402,74 @@ from .models import QuestionPaper, PaperSection, Question
 
 
 
+# @require_POST
+# @transaction.atomic
+# def save_paper(request):
+#     try:
+#         data = json.loads(request.body)
+#         sections_data = data.get("sections", [])
+#         total_questions_count = 0
+        
+#         # --- DEBUGGING PRINT (Aap ise baad mein hata sakte hain) ---
+#         print("-------------- DEBUG: DATA RECEIVED ----------- ---")
+#         print(data)
+        
+#         # Create the main QuestionPaper object
+#         paper = QuestionPaper.objects.create(
+#             created_by=request.user,
+#             title=data.get("title", ""),
+          
+#             job_title=data.get("job_title", ""), # 'job_title'
+#             department_name=data.get("department", ""),
+#             min_exp=data.get("min_exp", 0),       # 'min_exp'
+#             max_exp=data.get("max_exp", 0),       # 'max_exp'
+#             duration=data.get("duration", 0),
+#             skills_list=data.get("skills", ""),
+#             is_active=True,
+#             is_public_active=False,
+#             is_private_link_active=False,
+#             cutoff_score=data.get("cutoff_score", 20) # 'cutoff_score'  # <-- FIX: "cutoffscore" -> "cutoff_score"
+#         )
+        
+#         # Create sections and questions
+#         for section_index, section_data in enumerate(sections_data):
+#             section = PaperSection.objects.create(
+#                 question_paper=paper,
+#                 title=section_data.get("title", f"Section {section_index}"),
+#                 order=section_index,
+#                 weightage=section_weightage,         
+#                )
+            
+#             questions = section_data.get("questions", [])
+#             total_questions_count += len(questions)
+            
+#             for q_index, question_data in enumerate(questions):
+#                 Question.objects.create(
+#                     section=section,
+#                     text=question_data.get("text", ""),
+#                     answer=question_data.get("answer", ""),
+#                     options=question_data.get("options", None),
+#                     order=q_index,
+#                     question_type=question_data.get("type", "MCQ")
+#                 )
+        
+#         # Update total_questions count
+#         paper.total_questions = total_questions_count
+#         paper.save(update_fields=["total_questions"])
+        
+#         return JsonResponse({
+#             "success": True,
+#             "message": "Paper saved successfully!",
+#             "redirect_url": "/dashboard"
+#         })
+#     except Exception as e:
+        
+#         print(f"Error saving paper: {str(e)}")
+#         return JsonResponse({
+#             "success": False,
+#             "error": str(e)
+#         }, status=400)
+
 @require_POST
 @transaction.atomic
 def save_paper(request):
@@ -406,38 +479,55 @@ def save_paper(request):
         total_questions_count = 0
         
         # --- DEBUGGING PRINT (Aap ise baad mein hata sakte hain) ---
-        print("-------------- DEBUG: DATA RECEIVED ----------- ---")
+        print("-------------- DEBUG: DATA RECEIVED ---------------")
         print(data)
         
         # Create the main QuestionPaper object
         paper = QuestionPaper.objects.create(
             created_by=request.user,
             title=data.get("title", ""),
-            # 👇️ इन keys को ठीक करें:
-            job_title=data.get("job_title", ""), # 'job_title'
+            job_title=data.get("job_title", ""),
             department_name=data.get("department", ""),
-            min_exp=data.get("min_exp", 0),       # 'min_exp'
-            max_exp=data.get("max_exp", 0),       # 'max_exp'
+            min_exp=data.get("min_exp", 0),
+            max_exp=data.get("max_exp", 0),
             duration=data.get("duration", 0),
             skills_list=data.get("skills", ""),
             is_active=True,
             is_public_active=False,
             is_private_link_active=False,
-            cutoff_score=data.get("cutoff_score", 20) # 'cutoff_score'  # <-- FIX: "cutoffscore" -> "cutoff_score"
+            cutoff_score=data.get("cutoff_score", 20),
+            # ✅ FIX: ADDED MISSING FIELDS FROM THE PAYLOAD
+            job_location=data.get("job_location", ""), # <-- ADD THIS
+            job_type=data.get("job_type", ""),         # <-- ADD THIS
+            positions=data.get("positions", ""),       # <-- ADD THIS
+            rounds=data.get("rounds", ""),             # <-- ADD THIS
+            pay_scale=data.get("pay_scale", ""),       # <-- ADD THIS
+            end_date=data.get("end_date", None),       # <-- ADD THIS (Keep None for DateField if blank allowed)
         )
         
-        # Create sections and questions
+        # ✅ FIXED: Create sections and questions with proper weightage handling
         for section_index, section_data in enumerate(sections_data):
+            # Extract and validate section weightage
+            section_weightage = 0.0
+            try:
+                weightage_raw = section_data.get("weightage", 0.0)
+                section_weightage = float(weightage_raw)
+            except (ValueError, TypeError) as e:
+                print(f"Weightage conversion error for section {section_index}: {e}")
+                section_weightage = 0.0
+            
+            # ✅ FIX: weightage parameter ko add kiya gaya hai
             section = PaperSection.objects.create(
                 question_paper=paper,
                 title=section_data.get("title", f"Section {section_index}"),
                 order=section_index,
-                weightage=section_data.get("weightage", 0.0),  # Yeh line pehle se sahi thi
+                weightage=section_weightage  # ✅ YEH LINE MISSING THI
             )
             
             questions = section_data.get("questions", [])
             total_questions_count += len(questions)
             
+            # Create questions for this section
             for q_index, question_data in enumerate(questions):
                 Question.objects.create(
                     section=section,
@@ -447,7 +537,7 @@ def save_paper(request):
                     order=q_index,
                     question_type=question_data.get("type", "MCQ")
                 )
-        
+
         # Update total_questions count
         paper.total_questions = total_questions_count
         paper.save(update_fields=["total_questions"])
@@ -457,11 +547,14 @@ def save_paper(request):
             "message": "Paper saved successfully!",
             "redirect_url": "/dashboard"
         })
+        
     except Exception as e:
-        print(f"Error saving paper: {str(e)}")
+        # Server-side error logging
+        print(f"Error saving paper: {str(e)}") 
+        
         return JsonResponse({
             "success": False,
-            "error": str(e)
+            "error": f"Failed to save paper: {str(e)}"
         }, status=400)
 
 
@@ -754,7 +847,7 @@ def paper_edit_view(request, paper_id):
                         new_weightage = float(request.POST[weightage_key] or 0.0)
                         section.weightage = new_weightage
                         # Section ko database mein save karein
-                        section.save(update_fields=["weightage"]) 
+                        section.save(update_fields=["weightage"]) # <--- यह सेव कर रहा है
                     except (ValueError, TypeError):
                         # Agar koi galat value (jaise text) daalta hai, toh use ignore karein
                         pass
@@ -3017,3 +3110,79 @@ def get_paper_details_json(request, paper_id):
         return JsonResponse({"status": "error", "message": "Paper not found."}, status=404)
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+
+
+# app/views.py
+
+# ... (Existing imports and functions above)
+
+# @login_required
+@require_POST
+@transaction.atomic
+def create_interview_round(request):
+    """
+    Creates a placeholder entry in QuestionPaper for an Interview Round
+    and returns a unique shareable link (using paper_id).
+    """
+    try:
+        data = json.loads(request.body)
+        rounds_raw = data.get("rounds")
+        round_title = 'Interview Round'
+        
+        # Determine the round title based on the selected value
+        if rounds_raw == '2': round_title = 'Technical Interview (R1)'
+        elif rounds_raw == '3': round_title = 'Technical Interview (R2)'
+        elif rounds_raw == '4': round_title = 'HR Round (Final)'
+        elif rounds_raw == '1': 
+             # Should ideally not happen if client side logic is correct
+             return JsonResponse({"status": "error", "message": "Assessment rounds must use generate_questions endpoint."}, status=400)
+        else: round_title = f'Round {rounds_raw}'
+        
+        # Get Department Name from ID
+        department_name = Department.objects.get(id=data.get("departmentId")).name
+        
+        # Placeholder QuestionPaper object create karein (All assessment fields are set to 0/N/A)
+        paper = QuestionPaper.objects.create(
+            created_by=request.user,
+            title=f"{data.get('job_title', 'N/A')} - {round_title}",
+            job_title=data.get("job_title", ""),
+            department_name=department_name,
+            min_exp=data.get("min_exp", 0),
+            max_exp=data.get("max_exp", 0),
+            duration=0, 
+            is_active=True,
+            is_public_active=False,
+            is_private_link_active=False,
+            cutoff_score=0, 
+            skills_list=data.get("skills", ""),
+            total_questions=0,
+            # Added Logistic fields
+            job_location=data.get("job_location", ""), 
+            job_type=data.get("job_type", ""),
+            positions=data.get("positions", ""),
+            rounds=data.get("rounds", ""),
+            pay_scale=data.get("pay_scale", ""),
+            end_date=data.get("end_date", None),
+        )
+
+        # Unique Link generate karein (paper_detail link, which the user can share with interviewers)
+        share_link_url = request.build_absolute_uri(
+            reverse("paper_detail", kwargs={"paper_id": paper.id})
+        )
+        
+        # Success response wapas bhej dein
+        return JsonResponse({
+            "status": "success",
+            "title": paper.title, 
+            "paper_id": paper.id,
+            "share_link": share_link_url,
+            "message": "Interview round created successfully."
+        }, status=201)
+
+    except Department.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Invalid Department ID."}, status=400)
+    except Exception as e:
+        print(f"Error creating interview round: {str(e)}")
+        return JsonResponse({"status": "error", "message": f"Server Error: {str(e)}"}, status=500)
