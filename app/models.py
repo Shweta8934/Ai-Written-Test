@@ -99,7 +99,7 @@ class QuestionPaper(models.Model):
     is_active = models.BooleanField(default=False)
     is_public_active = models.BooleanField(null=True, blank=True)
     is_private_link_active = models.BooleanField(default=False) # <--- ADD default=False
-  
+    job_location = models.CharField(max_length=50, null=True, blank=True)
     recruitment_drive = models.ForeignKey(
         'RecruitmentDrive',
         on_delete=models.SET_NULL,
@@ -107,6 +107,18 @@ class QuestionPaper(models.Model):
         blank=True,
         related_name='assessment_rounds'
     )
+    # ✅ ADD THESE MISSING FIELDS:
+    job_location = models.CharField(max_length=100, blank=True, default="")
+    job_type = models.CharField(
+        max_length=50, 
+        choices=[('Full Time', 'Full Time'), ('Part Time', 'Part Time'), ('Contract', 'Contract'), ('Internship', 'Internship')], 
+        blank=True, 
+        default=""
+    )
+    positions = models.IntegerField(default=1) 
+    rounds = models.CharField(max_length=100, blank=True, default="")
+    pay_scale = models.CharField(max_length=100, blank=True, default="")
+    end_date = models.DateField(null=True, blank=True) # Assuming it's a date field
     round_number = models.PositiveIntegerField(default=1, help_text="Which round is this test? (1, 2, 3...)")
 
     def __str__(self):
