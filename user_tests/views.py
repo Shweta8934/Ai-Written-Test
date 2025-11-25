@@ -151,12 +151,89 @@ def get_time_remaining_api(request, link_id):
 # --- VIEWS START HERE ---
 
 
+# def user_register_view(request, link_id):
+#     """Handles test taker registration."""
+
+#     # ... (rest of user_register_view remains unchanged) ...
+
+#     # --- FLOW CHECK ---
+#     redirect_response = check_flow_and_redirect(request, link_id, "user_register_link")
+#     if redirect_response:
+#         return redirect_response
+#     # --- END FLOW CHECK ---
+
+#     try:
+#         paper_id = int(link_id)
+#         # Check that the paper exists AND is public
+#         paper = get_object_or_404(QuestionPaper, pk=paper_id, is_public_active=True)
+#     except (ValueError, QuestionPaper.DoesNotExist):
+#         messages.error(request, "The test link is invalid or deactivated.")
+#         return redirect("home")
+
+#     # Previous logic to check existing session registration ID and redirect to instructions.
+#     registration_id = request.session.get("current_registration_id")
+#     if registration_id:
+#         try:
+#             # Check if registration exists and is NOT completed
+#             reg = TestRegistration.objects.get(
+#                 pk=registration_id, question_paper=paper, is_completed=False
+#             )
+#             return redirect("test:user_instructions", link_id=link_id)
+#         except TestRegistration.DoesNotExist:
+#             pass
+
+#     if request.method == "POST":
+#         form = TestRegistrationForm(request.POST)
+#         if form.is_valid():
+#             try:
+#                 registration = form.save(commit=False)
+#                 registration.question_paper = paper
+#                 registration.save()
+
+#                 # Set Session for BOTH registration ID and flow status
+#                 request.session["current_registration_id"] = registration.id
+#                 request.session[get_session_key(link_id)] = "registered"
+#                 request.session.modified = True
+
+#                 messages.success(
+#                     request, "Registration successful. Please read instructions."
+#                 )
+
+#                 return redirect("test:user_instructions", link_id=link_id)
+
+#             except IntegrityError:
+#                 # Already registered with this email for this paper
+#                 messages.error(
+#                     request,
+#                     "You have already registered for this test with this email address.",
+#                 )
+#                 return redirect("test:user_register_link", link_id=link_id)
+
+#     else:
+#         form = TestRegistrationForm()
+
+#     context = {
+#         "form": form,
+#         "link_id": link_id,
+#         "paper_title": paper.title,
+#     }
+#     response = render(request, "user_test/register.html", context)
+#     # ************************************************
+#     # * NEW: AGGRESSIVE CACHING HEADERS ADDED HERE *
+#     # ************************************************
+#     response["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+#     response["Pragma"] = "no-cache"
+#     response["Expires"] = "0"
+
+#     return response
+
+# user_tests/views.py
+
 def user_register_view(request, link_id):
-    """Handles test taker registration."""
+    """Handles test taker registration, checking for existing registrations 
+    (complete or incomplete) before attempting a new save."""
 
-    # ... (rest of user_register_view remains unchanged) ...
-
-    # --- FLOW CHECK ---
+    # --- FLOW CHECK (High Priority) ---
     redirect_response = check_flow_and_redirect(request, link_id, "user_register_link")
     if redirect_response:
         return redirect_response
@@ -170,7 +247,7 @@ def user_register_view(request, link_id):
         messages.error(request, "The test link is invalid or deactivated.")
         return redirect("home")
 
-    # Previous logic to check existing session registration ID and redirect to instructions.
+    # --- Session-based Check (If user has current_registration_id) ---
     registration_id = request.session.get("current_registration_id")
     if registration_id:
         try:
@@ -178,16 +255,56 @@ def user_register_view(request, link_id):
             reg = TestRegistration.objects.get(
                 pk=registration_id, question_paper=paper, is_completed=False
             )
+            # If a session-backed incomplete registration is found, redirect to instructions
             return redirect("test:user_instructions", link_id=link_id)
         except TestRegistration.DoesNotExist:
+            # If session ID leads to a completed/missing registration, flow check will handle it.
             pass
 
     if request.method == "POST":
         form = TestRegistrationForm(request.POST)
         if form.is_valid():
+            email = form.cleaned_data.get('email') # Get email for pre-save check
+            
+            # --- NEW: Check for existing registration object by email/paper ---
+            try:
+                # Use email__iexact for case-insensitive matching (recommended)
+                existing_reg = TestRegistration.objects.get(
+                    email__iexact=email, 
+                    question_paper=paper
+                )
+                
+                # If existing registration is found:
+                request.session["current_registration_id"] = existing_reg.id
+                
+                if existing_reg.is_completed:
+                    # Case 1: Already completed the test
+                    request.session[get_session_key(link_id)] = "submitted"
+                    messages.info(request, "You have already completed this test.")
+                    request.session.modified = True
+                    return redirect("test:user_already_submitted")
+                else:
+                    # Case 2: Incomplete registration found, push to instructions
+                    request.session[get_session_key(link_id)] = "registered"
+                    messages.info(request, "Registration found. Please proceed to instructions.")
+                    request.session.modified = True
+                    return redirect("test:user_instructions", link_id=link_id)
+
+            except TestRegistration.DoesNotExist:
+                # Case 3: No existing registration found, proceed to save new one
+                pass
+            # --- END NEW CHECK ---
+            
+            # --- Save New Registration (If no existing one was found) ---
             try:
                 registration = form.save(commit=False)
                 registration.question_paper = paper
+                
+                # Set start_time explicitly if your model doesn't use auto_now_add
+                # (Based on the model snippet, it should be set here)
+                if not registration.start_time:
+                    registration.start_time = timezone.now()
+                
                 registration.save()
 
                 # Set Session for BOTH registration ID and flow status
@@ -202,10 +319,12 @@ def user_register_view(request, link_id):
                 return redirect("test:user_instructions", link_id=link_id)
 
             except IntegrityError:
-                # Already registered with this email for this paper
+                # This catches a rare race condition where two people submit the same 
+                # email simultaneously, or if the unique_together constraint is somehow
+                # still triggered despite the check above.
                 messages.error(
                     request,
-                    "You have already registered for this test with this email address.",
+                    "A record for this email already exists in the database. If you haven't completed the test, please check your instructions page.",
                 )
                 return redirect("test:user_register_link", link_id=link_id)
 
@@ -217,17 +336,14 @@ def user_register_view(request, link_id):
         "link_id": link_id,
         "paper_title": paper.title,
     }
+    
+    # --- Caching Headers ---
     response = render(request, "user_test/register.html", context)
-    # ************************************************
-    # * NEW: AGGRESSIVE CACHING HEADERS ADDED HERE *
-    # ************************************************
     response["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
     response["Expires"] = "0"
 
     return response
-
-
 def user_instruction_view(request, link_id):
     """Shows test details and instructions before starting."""
 
