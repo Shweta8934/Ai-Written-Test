@@ -99,7 +99,7 @@ class QuestionPaper(models.Model):
     is_active = models.BooleanField(default=False)
     is_public_active = models.BooleanField(null=True, blank=True)
     is_private_link_active = models.BooleanField(default=False) # <--- ADD default=False
-  
+    job_location = models.CharField(max_length=50, null=True, blank=True)
     recruitment_drive = models.ForeignKey(
         'RecruitmentDrive',
         on_delete=models.SET_NULL,
@@ -107,8 +107,23 @@ class QuestionPaper(models.Model):
         blank=True,
         related_name='assessment_rounds'
     )
+    # ✅ ADD THESE MISSING FIELDS:
+    job_location = models.CharField(max_length=100, blank=True, default="")
+    job_type = models.CharField(
+        max_length=50, 
+        choices=[('Full Time', 'Full Time'), ('Part Time', 'Part Time'), ('Contract', 'Contract'), ('Internship', 'Internship')], 
+        blank=True, 
+        default=""
+    )
+    positions = models.IntegerField(default=1) 
+    rounds = models.CharField(max_length=100, blank=True, default="")
+    pay_scale = models.CharField(max_length=100, blank=True, default="")
+    end_date = models.DateField(null=True, blank=True) # Assuming it's a date field
     round_number = models.PositiveIntegerField(default=1, help_text="Which round is this test? (1, 2, 3...)")
-
+    is_interview_round = models.BooleanField(
+        default=False,
+        help_text="True if this is an Interview Round (no auto-assessment)"
+    )
     def __str__(self):
         return f"{self.title} for {self.job_title}"
 
@@ -166,6 +181,56 @@ class Question(models.Model):
         return f"Q: {self.text[:50]}..."
 
 
+# class TestRegistration(models.Model):
+#     email = models.EmailField(max_length=255)
+#     phone_number = models.CharField(max_length=15)
+#     address = models.TextField(null=True, blank=True)
+#     start_time = models.DateTimeField()
+#     is_completed = models.BooleanField(default=False)
+#     question_paper = models.ForeignKey(QuestionPaper, on_delete=models.CASCADE)
+#     score = models.FloatField(null=True, blank=True)
+#     is_shortlisted = models.BooleanField(default=False)
+    
+#     recruitment_drive = models.ForeignKey(
+#         'RecruitmentDrive',  # String reference - will be resolved later
+#         on_delete=models.SET_NULL,
+#         null=True,
+#         blank=True,
+#         related_name='test_attempts'
+#     )
+#     candidate_application = models.ForeignKey(
+#         'CandidateApplication',  # String reference - will be resolved later
+#         on_delete=models.CASCADE,
+#         null=True,
+#         blank=True,
+#         related_name='app_test_attempts'
+#     )
+#     candidate_stage = models.CharField(
+#         max_length=20,
+#         null=True,
+#         blank=True,
+#         # ✅ FIX: Use hardcoded choices instead of CandidateApplication.CandidateStage.choices
+#         choices=[
+#             ('APPLIED', 'Applied'),
+#             ('SCREENING', 'Under Screening'),
+#             ('ROUND_1', 'Round 1 (Test)'),
+#             ('ROUND_2', 'Round 2 (Interview)'),
+#             ('FINAL_ROUND', 'Final Round'),
+#             ('HIRED', 'Hired'),
+#             ('REJECTED', 'Rejected'),
+#             ('WITHDRAWN', 'Withdrawn'),
+#         ]
+#     )
+    
+#     class Meta:
+#         db_table = "app_testregistration"
+#         managed = False  # Keep this as-is
+ 
+   
+  
+#     def __str__(self):
+#         return f"{self.email} - Paper ID: {self.question_paper.id}"
+# ...existing code...
 class TestRegistration(models.Model):
     email = models.EmailField(max_length=255)
     phone_number = models.CharField(max_length=15)
@@ -177,45 +242,18 @@ class TestRegistration(models.Model):
     is_shortlisted = models.BooleanField(default=False)
     
     recruitment_drive = models.ForeignKey(
-        'RecruitmentDrive',  # String reference - will be resolved later
+        'RecruitmentDrive',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='test_attempts'
     )
-    candidate_application = models.ForeignKey(
-        'CandidateApplication',  # String reference - will be resolved later
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='test_attempts'
-    )
-    candidate_stage = models.CharField(
-        max_length=20,
-        null=True,
-        blank=True,
-        # ✅ FIX: Use hardcoded choices instead of CandidateApplication.CandidateStage.choices
-        choices=[
-            ('APPLIED', 'Applied'),
-            ('SCREENING', 'Under Screening'),
-            ('ROUND_1', 'Round 1 (Test)'),
-            ('ROUND_2', 'Round 2 (Interview)'),
-            ('FINAL_ROUND', 'Final Round'),
-            ('HIRED', 'Hired'),
-            ('REJECTED', 'Rejected'),
-            ('WITHDRAWN', 'Withdrawn'),
-        ]
-    )
-    
+    # candidate_stage field removed to match existing DB schema
+    # ...existing code...
     class Meta:
         db_table = "app_testregistration"
         managed = False  # Keep this as-is
- 
-   
-  
-    def __str__(self):
-        return f"{self.email} - Paper ID: {self.question_paper.id}"
-
+# ...existing code...
 
 class UserResponse(models.Model):
     user_answer = models.TextField()
@@ -390,16 +428,81 @@ class CandidateApplication(models.Model):
         REJECTED = 'REJECTED', 'Rejected'
         WITHDRAWN = 'WITHDRAWN', 'Withdrawn'
     
-    # Core fields
-    recruitment_drive = models.ForeignKey(
-        RecruitmentDrive,
-        on_delete=models.CASCADE,
-        related_name='applications'
-    )
+    
+    recruitment_drive = models.ForeignKey(RecruitmentDrive, on_delete=models.SET_NULL, null=True, blank=True)
     email = models.EmailField()
     phone_number = models.CharField(max_length=15)
     full_name = models.CharField(max_length=255)
+    # ⭐ NEW FIELDS FOR APPLICATION FORM ⭐
+    is_experienced = models.BooleanField(
+        default=False, 
+        help_text="True if candidate is Experienced (based on candidateType radio button)"
+    )
+    total_experience = models.FloatField(
+        null=True, 
+        blank=True, 
+        help_text="Total years of experience (0 for Fresher)"
+    )
+    current_ctc = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True
+    )
+    expected_ctc = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True
+    )
+    current_ctc_rate = models.CharField(
+        max_length=50, 
+        null=True, 
+        blank=True,
+        help_text="Unit for Current CTC (e.g., LPA, PM)"
+    ) 
+    expected_ctc_rate = models.CharField(
+        max_length=50, 
+        null=True, 
+        blank=True,
+        help_text="Unit for Expected CTC (e.g., LPA, PM)"
+    )
+    notice_period = models.CharField(
+        max_length=100, 
+        null=True, 
+        blank=True
+    )
+    skills = models.TextField(
+        null=True, 
+        blank=True,
+        help_text="Your Skills (comma separated)"
+    )
+    current_location = models.CharField(
+        max_length=100, 
+        null=True, 
+        blank=True
+    )
+    referral_source = models.CharField(
+        max_length=255, 
+        null=True, 
+        blank=True,
+        help_text="From where did you hear about us?"
+    )
+    photo_file = models.FileField(
+        upload_to='photos/', 
+        null=True, 
+        blank=True,
+        help_text="Candidate Photo"
+    ) 
     
+    # Add Foreign Key to QuestionPaper (for Interview Applications)
+    linked_paper = models.ForeignKey(
+        'QuestionPaper',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='applications_received'
+    )
     # Stage tracking
     current_stage = models.CharField(
         max_length=20,
@@ -426,7 +529,7 @@ class CandidateApplication(models.Model):
     cover_letter = models.TextField(null=True, blank=True)
     notes = models.TextField(blank=True)
     rejection_reason = models.TextField(blank=True)
-    
+    recruitment_drive = models.ForeignKey(RecruitmentDrive, on_delete=models.SET_NULL, null=True, blank=True)
     # Metadata
     stage_updated_at = models.DateTimeField(null=True, blank=True)
     stage_updated_by = models.ForeignKey(
@@ -438,11 +541,14 @@ class CandidateApplication(models.Model):
     )
     
     class Meta:
-        unique_together = ['recruitment_drive', 'email']
+        # unique_together = ['recruitment_drive', 'email']
         ordering = ['-applied_at']
     
     def __str__(self):
-        return f"{self.full_name} ({self.email}) - {self.recruitment_drive.title}"
+        if self.linked_paper:
+             return f"{self.full_name} ({self.email}) - {self.linked_paper.title}"
+        return f"{self.full_name} ({self.email})"
+        # return f"{self.full_name} ({self.email}) - {self.recruitment_drive.title}"
     
     def get_all_test_scores(self):
         """Get scores from all test rounds"""

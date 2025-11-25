@@ -1,12 +1,9 @@
 # user_tests/forms.py
 
 from django import forms
-# TestRegistration model isi app se import hoga
 from .models import TestRegistration 
 
-# NOTE: Agar aapko styling classes (INPUT_CLASSES, TEXTAREA_CLASSES) chahiye, 
-# toh aapko unhein yahan bhi define karna padega ya unhein ek common file se import karna hoga. 
-# Filhaal main unhein yahan define kar raha hoon jaisa aapke original code mein tha.
+
 
 INPUT_CLASSES = (
     "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm "
@@ -44,9 +41,14 @@ class TestRegistrationForm(forms.ModelForm):
 
     class Meta:
         model = TestRegistration
-        # Fields jinhe user bharega
+        
         fields = ['name', 'email', 'phone_number', 'address'] 
         
         labels = {
             'phone_number': 'Phone Number',
         }
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if not email or email.strip() == "":
+            raise forms.ValidationError("Email address cannot be empty.")
+        return email.strip()

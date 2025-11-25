@@ -120,4 +120,30 @@ path('api/skills/search/', views.search_skills_with_suggestions, name='search_sk
     path('drives/<int:drive_id>/analytics/', views.drive_analytics_view, name='drive_analytics'),
     path('drives/<int:drive_id>/export/', views.export_drive_data, name='export_drive_data'),
 path('generator/questions/paper_details/<int:paper_id>/', views.get_paper_details_json, name='paper_details_json'),
+
+
+      
+    #  path('interview/apply/<int:paper_id>/', views.interview_candidate_apply_view, name='interview_candidate_apply'),
+path('generator/interview/create/', views.create_interview_round, name='create_interview_round'),
+
+
+path('interview/apply/<int:paper_id>/', views.interview_candidate_apply_view, name='interview_candidate_apply'),
+
+
+    
+    # View applications for a paper
+    path('paper/<int:paper_id>/applications/', 
+         views.paper_applications_view, 
+         name='paper_applications'),
+    
+    # View single application detail
+    path('application/<int:application_id>/', 
+         views.application_detail_view, 
+         name='application_detail'),
+    
+    # Export applications as CSV
+    path('paper/<int:paper_id>/applications/export/', 
+         views.export_paper_applications_csv, 
+         name='export_paper_applications'),
+path('submit-application/<int:paper_id>/', views.submit_personal_info_application, name='submit_application'),
 ]
