@@ -181,6 +181,56 @@ class Question(models.Model):
         return f"Q: {self.text[:50]}..."
 
 
+# class TestRegistration(models.Model):
+#     email = models.EmailField(max_length=255)
+#     phone_number = models.CharField(max_length=15)
+#     address = models.TextField(null=True, blank=True)
+#     start_time = models.DateTimeField()
+#     is_completed = models.BooleanField(default=False)
+#     question_paper = models.ForeignKey(QuestionPaper, on_delete=models.CASCADE)
+#     score = models.FloatField(null=True, blank=True)
+#     is_shortlisted = models.BooleanField(default=False)
+    
+#     recruitment_drive = models.ForeignKey(
+#         'RecruitmentDrive',  # String reference - will be resolved later
+#         on_delete=models.SET_NULL,
+#         null=True,
+#         blank=True,
+#         related_name='test_attempts'
+#     )
+#     candidate_application = models.ForeignKey(
+#         'CandidateApplication',  # String reference - will be resolved later
+#         on_delete=models.CASCADE,
+#         null=True,
+#         blank=True,
+#         related_name='app_test_attempts'
+#     )
+#     candidate_stage = models.CharField(
+#         max_length=20,
+#         null=True,
+#         blank=True,
+#         # ✅ FIX: Use hardcoded choices instead of CandidateApplication.CandidateStage.choices
+#         choices=[
+#             ('APPLIED', 'Applied'),
+#             ('SCREENING', 'Under Screening'),
+#             ('ROUND_1', 'Round 1 (Test)'),
+#             ('ROUND_2', 'Round 2 (Interview)'),
+#             ('FINAL_ROUND', 'Final Round'),
+#             ('HIRED', 'Hired'),
+#             ('REJECTED', 'Rejected'),
+#             ('WITHDRAWN', 'Withdrawn'),
+#         ]
+#     )
+    
+#     class Meta:
+#         db_table = "app_testregistration"
+#         managed = False  # Keep this as-is
+ 
+   
+  
+#     def __str__(self):
+#         return f"{self.email} - Paper ID: {self.question_paper.id}"
+# ...existing code...
 class TestRegistration(models.Model):
     email = models.EmailField(max_length=255)
     phone_number = models.CharField(max_length=15)
@@ -192,45 +242,18 @@ class TestRegistration(models.Model):
     is_shortlisted = models.BooleanField(default=False)
     
     recruitment_drive = models.ForeignKey(
-        'RecruitmentDrive',  # String reference - will be resolved later
+        'RecruitmentDrive',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='test_attempts'
     )
-    candidate_application = models.ForeignKey(
-        'CandidateApplication',  # String reference - will be resolved later
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='test_attempts'
-    )
-    candidate_stage = models.CharField(
-        max_length=20,
-        null=True,
-        blank=True,
-        # ✅ FIX: Use hardcoded choices instead of CandidateApplication.CandidateStage.choices
-        choices=[
-            ('APPLIED', 'Applied'),
-            ('SCREENING', 'Under Screening'),
-            ('ROUND_1', 'Round 1 (Test)'),
-            ('ROUND_2', 'Round 2 (Interview)'),
-            ('FINAL_ROUND', 'Final Round'),
-            ('HIRED', 'Hired'),
-            ('REJECTED', 'Rejected'),
-            ('WITHDRAWN', 'Withdrawn'),
-        ]
-    )
-    
+    # candidate_stage field removed to match existing DB schema
+    # ...existing code...
     class Meta:
         db_table = "app_testregistration"
         managed = False  # Keep this as-is
- 
-   
-  
-    def __str__(self):
-        return f"{self.email} - Paper ID: {self.question_paper.id}"
-
+# ...existing code...
 
 class UserResponse(models.Model):
     user_answer = models.TextField()
