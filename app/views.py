@@ -138,6 +138,18 @@ def dashboard(request):
                 When(is_interview_round=False, then=F('testregistration')),
                 output_field=IntegerField()
             )
+        ),
+        participant_count=Count(
+            Case(
+                # Case 1: Interview Round -> Count CandidateApplications
+                # ✅ FIX 1: Using the correct reverse relation name 'applications_received'
+                When(is_interview_round=True, then=F('applications_received')), 
+                
+                # Case 2: Written Test -> Count TestRegistrations
+                # ✅ FIX 2: Using the correct reverse relation name 'testregistration'
+                When(is_interview_round=False, then=F('testregistration')),
+                output_field=IntegerField()
+            )
         )
     ).order_by('-created_at')
     
@@ -201,80 +213,6 @@ def dashboard(request):
     
     return render(request, 'dashboard.html', context)
 
-# @login_required
-# def dashboard(request):
-#     """
-#     Main dashboard showing question papers and recruitment drives
-#     """
-#     # Get filters from request
-#     status_filter = request.GET.get('status', 'all')
-#     experience_filter = request.GET.get('experience', 'all')
-    
-#     # Query question papers
-#     papers_query = QuestionPaper.objects.filter(
-#         created_by=request.user,
-#         is_active=True
-#     ).annotate(
-#         participant_count=Count('testregistration')
-#     ).order_by('-created_at')
-    
-#     # Apply status filter
-#     if status_filter == 'active':
-#         papers_query = papers_query.filter(is_public_active=True)
-#     elif status_filter == 'inactive':
-#         papers_query = papers_query.filter(is_public_active=False)
-    
-#     # Apply experience filter
-#     if experience_filter != 'all':
-#         # Assuming you have experience_level field
-#         papers_query = papers_query.filter(experience_level=experience_filter)
-    
-#     # Pagination for papers
-#     paginator = Paginator(papers_query, 10)
-#     page_number = request.GET.get('page')
-#     papers = paginator.get_page(page_number)
-    
-#     # Recruitment drives data
-#     from .models import RecruitmentDrive, CandidateApplication
-    
-#     recent_drives = RecruitmentDrive.objects.filter(
-#         created_by=request.user
-#     ).annotate(
-#         application_count=Count('applications')
-#     ).order_by('-created_at')[:3]
-    
-#     active_drives_count = RecruitmentDrive.objects.filter(
-#         created_by=request.user,
-#         drive_status='OPEN'
-#     ).count()
-    
-#     total_applications = CandidateApplication.objects.filter(
-#         recruitment_drive__created_by=request.user
-#     ).count()
-    
-#     in_progress_count = CandidateApplication.objects.filter(
-#         recruitment_drive__created_by=request.user,
-#         overall_status='ACTIVE'
-#     ).count()
-    
-#     hired_count = CandidateApplication.objects.filter(
-#         recruitment_drive__created_by=request.user,
-#         overall_status='HIRED'
-#     ).count()
-    
-#     context = {
-#         'papers': papers,
-#         'recent_drives': recent_drives,
-#         'active_drives_count': active_drives_count,
-#         'total_applications': total_applications,
-#         'in_progress_count': in_progress_count,
-#         'hired_count': hired_count,
-#         'status_filter': status_filter,
-#         'experience_filter': experience_filter,
-#         'title': 'Dashboard'
-#     }
-    
-#     return render(request, 'dashboard.html', context)
 
 @login_required
 def generate_questions(request):
