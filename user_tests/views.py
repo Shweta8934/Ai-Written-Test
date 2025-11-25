@@ -3,17 +3,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import IntegrityError, transaction
-from django.http import HttpResponse, JsonResponse  # <-- JsonResponse imported
-from django.utils import timezone  # <-- timezone imported
-from datetime import timedelta  # <-- timedelta imported
-
-# IMPORTS
+from django.http import HttpResponse, JsonResponse 
+from django.utils import timezone  
+from datetime import timedelta  
 from app.models import QuestionPaper, Question
 from .models import TestRegistration, UserResponse
 from .forms import TestRegistrationForm
-from django.urls import reverse  # Required for redirecting using named URLs
-
-# --- HELPER FUNCTION FOR FLOW CONTROL ---
+from django.urls import reverse  
 
 
 def get_session_key(link_id):
@@ -35,8 +31,7 @@ def check_flow_and_redirect(request, link_id, current_stage_name):
     session_key = get_session_key(link_id)
     session_status = request.session.get(session_key, "not_started")
 
-    # Define the strict flow map: where should the user be coming from?
-    # Key: Current view name, Value: Required session status to be here
+    
     FLOW_SEQUENCE = [
         "user_register_link",  # not_started
         "user_instructions",  # registered
@@ -148,15 +143,11 @@ def get_time_remaining_api(request, link_id):
     return JsonResponse({"remaining_seconds": remaining_seconds, "time_up": False})
 
 
-# --- VIEWS START HERE ---
-
-
 def user_register_view(request, link_id):
-    """Handles test taker registration."""
-
-    # ... (rest of user_register_view remains unchanged) ...
-
-    # --- FLOW CHECK ---
+    """
+    Handles test taker registration using a robust get_or_create logic within a transaction.
+    """
+    # --- FLOW CHECK (High Priority) ---
     redirect_response = check_flow_and_redirect(request, link_id, "user_register_link")
     if redirect_response:
         return redirect_response
@@ -170,7 +161,7 @@ def user_register_view(request, link_id):
         messages.error(request, "The test link is invalid or deactivated.")
         return redirect("home")
 
-    # Previous logic to check existing session registration ID and redirect to instructions.
+    # --- Session-based Check (If user has current_registration_id) ---
     registration_id = request.session.get("current_registration_id")
     if registration_id:
         try:
@@ -181,51 +172,81 @@ def user_register_view(request, link_id):
             return redirect("test:user_instructions", link_id=link_id)
         except TestRegistration.DoesNotExist:
             pass
-
+            
+    # --------------------------------------------------------------------------
+    # CORE REGISTRATION LOGIC: Use get_or_create for robust, atomic handling
+    # --------------------------------------------------------------------------
     if request.method == "POST":
         form = TestRegistrationForm(request.POST)
         if form.is_valid():
+            email = form.cleaned_data.get('email')
+            
+            if not email:
+                 messages.error(request, "Email address is required.")
+                 return redirect("test:user_register_link", link_id=link_id)
+            # Prepare data for new registration
+            defaults = {
+                'name': form.cleaned_data.get('name'),
+                'phone_number': form.cleaned_data.get('phone_number'),
+                'address': form.cleaned_data.get('address'),
+                'start_time': timezone.now(), # Start time is set only on creation/retrieval
+            }
+            
             try:
-                registration = form.save(commit=False)
-                registration.question_paper = paper
-                registration.save()
+                with transaction.atomic():
+                    registration, created = TestRegistration.objects.get_or_create(
+                        email=email,              # yahan __iexact hatao
+                        question_paper=paper,
+                        defaults=defaults
+                    )
 
-                # Set Session for BOTH registration ID and flow status
+                # Set Session regardless of creation status
                 request.session["current_registration_id"] = registration.id
-                request.session[get_session_key(link_id)] = "registered"
                 request.session.modified = True
 
-                messages.success(
-                    request, "Registration successful. Please read instructions."
-                )
+                if registration.is_completed:
+                    # Case 1: Already completed the test
+                    request.session[get_session_key(link_id)] = "submitted"
+                    messages.info(request, "You have already completed this test.")
+                    return redirect("test:user_already_submitted")
+                
+                else:
+                    # Case 2: New registration OR Incomplete registration found
+                    request.session[get_session_key(link_id)] = "registered"
+                    
+                    if created:
+                        messages.success(request, "Registration successful. Please read instructions.")
+                    else:
+                        messages.info(request, "Registration found. Please proceed to instructions.")
+                        
+                    return redirect("test:user_instructions", link_id=link_id)
 
-                return redirect("test:user_instructions", link_id=link_id)
-
-            except IntegrityError:
-                # Already registered with this email for this paper
+            except Exception as e:
+                # Catch any unexpected DB errors (like connection issues)
+                print(f"Unexpected DB Error during get_or_create: {e}")
                 messages.error(
                     request,
-                    "You have already registered for this test with this email address.",
+                    "Registration failed due to an unexpected database issue. Please check your network and try again.",
                 )
                 return redirect("test:user_register_link", link_id=link_id)
 
     else:
         form = TestRegistrationForm()
 
+    # --- Initial GET Request Context ---
     context = {
         "form": form,
         "link_id": link_id,
         "paper_title": paper.title,
     }
+    
     response = render(request, "user_test/register.html", context)
-    # ************************************************
-    # * NEW: AGGRESSIVE CACHING HEADERS ADDED HERE *
-    # ************************************************
     response["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
     response["Expires"] = "0"
 
     return response
+
 
 
 def user_instruction_view(request, link_id):

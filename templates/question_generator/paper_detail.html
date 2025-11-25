@@ -1,4 +1,5 @@
 <!-- {% load static %}
+{% load humanize %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -10,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <script>
     tailwind.config = {
       theme: {
@@ -39,6 +41,30 @@
       {% include 'partials/header.html' with page_title="" %}
 
       <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+
+        {% if paper.recruitment_drive %}
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-lg shadow-lg p-6 mb-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <i class="fas fa-link text-2xl"></i>
+                <span class="text-sm font-semibold uppercase tracking-wide opacity-90">Linked to Drive</span>
+              </div>
+              <h3 class="text-2xl font-bold mb-1">{{ paper.recruitment_drive.title }}</h3>
+              <p class="text-purple-100">
+                <i class="fas fa-user-tie mr-2"></i>{{ paper.recruitment_drive.position }}
+                <span class="mx-2">•</span>
+                <i class="fas fa-layer-group mr-2"></i>Round {{ paper.round_number }}
+              </p>
+            </div>
+            <a href="{% url 'drive_detail' paper.recruitment_drive.id %}"
+              class="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all shadow-md">
+              View Drive <i class="fas fa-arrow-right ml-2"></i>
+            </a>
+          </div>
+        </div>
+        {% endif %}
+
         <div class="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
           <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 pb-4 border-b">
             <div>
@@ -51,135 +77,334 @@
               class="w-full sm:w-auto bg-theme-primary text-white text-center font-semibold py-2 px-4 rounded-lg hover:bg-theme-dark transition-colors">
               Edit
             </a>
+
           </div>
+
+          {# 💡 START: CONDITIONAL DETAILS SECTION #}
+          {% if paper.is_interview_round %}
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-6 border-b">
-    
-    <div>
-      <label class="text-sm font-medium text-gray-500">Department</label>
-      <p class="text-base font-semibold text-gray-900 mt-1">
-        {{ paper.department_name }}
-      </p>
-    </div>
-    
-    <div>
-      <label class="text-sm font-medium text-gray-500">Duration</label>
-      <p class="text-base font-semibold text-gray-900 mt-1">
-        {{ paper.duration }} Minute
-      </p>
-    </div>
-    
-    <div>
-      <label class="text-sm font-medium text-gray-500">Cutoff Score</label>
-      <p class="text-base font-semibold text-gray-900 mt-1">
-        {{ paper.cutoff_score }}%
-      </p>
-    </div>
-    
-    <div>
-      <label class="text-sm font-medium text-gray-500">Experience</label>
-      <p class="text-base font-semibold text-gray-900 mt-1">
-        {{ paper.min_exp }} - {{ paper.max_exp }} yr
-      </p>
-    </div>
-    
-    <div class="lg:col-span-2"> 
-        <label class="text-sm font-medium text-gray-500">Skills</label>
-      <div id="skills-display-container" class="flex flex-wrap gap-2 mt-2">
-      </div>
-      <script id="skills-data" type="application/json">
-        {{ skills|safe }}
-      </script>
-    </div>
-    
-    </div>
+            
+            {# 1. Role #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Title / Department</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_title }} / {{ paper.department_name }}
+              </p>
+            </div>
 
-       <div class="pt-6">
-    <h3 class="text-xl font-bold text-gray-800 mb-4">Questions:</h3>
-    <div class="space-y-6">
-        {% for section in paper.paper_sections.all %}
-        <div class="section-container">
-            <h4 class="text-lg font-semibold text-theme-primary mb-3">
-                {{ section.title }}
-            </h4>
-            <div class="space-y-4">
-                {% for question in section.questions.all %}
-                <div class="question-item pl-4 border-l-2 border-theme-primary">
-                    
-                    <p class="font-semibold text-gray-800 mb-2">
-                        Q{{ forloop.counter }}. {{ question.text|safe }}
-                    </p>
-                    {% comment %}
-IMPROVED MCQ DISPLAY - Matches answer with actual option content
-{% endcomment %}
+            {# 2. Job Type #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Type</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_type|default:"Full Time" }}
+              </p>
+            </div>
 
-{% if question.question_type == 'MCQ' %}
-<div class="space-y-2 mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
-    {% comment %} Normalize answer for matching {% endcomment %}
-    {% with answer_clean=question.answer|striptags|lower %}
-    
-    {% for option in question.options %}
-        {% comment %} Normalize option for comparison {% endcomment %}
-        {% with option_clean=option|striptags|lower %}
-        
-        <div class="flex items-start p-3 rounded-md 
-            {% if option_clean == answer_clean %}
-                /* Correct Answer Highlight */
-                bg-green-100 border-2 border-green-500 text-green-900 font-semibold
-            {% else %}
-                /* Default/Wrong Answer Style */
-                text-gray-800 border border-gray-300 bg-white
-            {% endif %}
-        ">
-            <span class="w-5 h-5 mr-3 mt-0.5 flex-shrink-0">
-                {% if option_clean == answer_clean %}
-                    <svg class="w-full h-full fill-current text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.857a.75.75 0 00-1.214-.872l-3.323 3.51-1.666-1.667a.75.75 0 10-1.06 1.06l2.25 2.25a.75.75 0 001.082-.016l3.75-4z" clip-rule="evenodd" />
-                    </svg>
+            {# 3. Work Experience #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Work Experience</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {% if paper.min_exp or paper.max_exp %}
+                  {{ paper.min_exp|default:"0" }} - {{ paper.max_exp|default:"0" }} yr
                 {% else %}
-                    <svg class="w-full h-full fill-current text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <circle cx="10" cy="10" r="10"/>
-                    </svg>
+                  Fresher
                 {% endif %}
-            </span>
-            <span class="text-sm">
-                {{ option|striptags }}
-            </span>
-        </div>
-        {% endwith %}
-    {% endfor %}
-    
-    {% endwith %}
-</div>
+              </p>
+            </div>
 
-<p class="mt-4 pt-3 border-t text-sm text-gray-800 bg-theme-light p-3 rounded-md">
-    <span class="font-bold text-theme-dark">Correct Answer:</span>
-    <span class="text-green-700 font-semibold">{{ question.answer|striptags }}</span>
-</p>
+            {# 4. Job Location #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Location</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_location|default:"N/A" }}
+              </p>
+            </div>
 
-{% else %}
-<p class="mt-2 text-sm text-gray-800 bg-theme-light p-3 rounded-md">
-    <span class="font-bold text-theme-dark">Answer:</span>
-    {{ question.answer }}
-</p>
-{% endif %}
+            {# 5. Positions #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Open Positions</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.positions|default:"N/A" }}
+              </p>
+            </div>
 
-                </div>
-                {% endfor %}
+            {# 6. Rounds #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Recruitment Round</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.rounds|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 7. Pay Scale #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Pay Scale</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.pay_scale|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 8. End Date #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">End Date</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.end_date|date:"j M Y"|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 9. Placeholder for Salary (Using Min/Max if available) #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Min/Max Salary</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {% if paper.min_salary and paper.max_salary %}
+                  ₹{{ paper.min_salary|floatformat:0|intcomma }} - ₹{{ paper.max_salary|floatformat:0|intcomma }}
+                {% else %}
+                  — N/A
+                {% endif %}
+              </p>
+            </div>
+
+
+            {# 10. Skills (Spanning multiple columns) #}
+            <div class="lg:col-span-3">
+              <label class="text-sm font-medium text-gray-500">Skills</label>
+              <div id="skills-display-container" class="flex flex-wrap gap-2 mt-2">
+                {# Skills rendered by JS #}
+              </div>
+            </div>
+            
+          </div>
+          
+          {# Existing Interview Round Manual Assessment Block #}
+          <div class="pt-6 text-center bg-blue-50 border border-blue-300 rounded-lg p-8 mt-6">
+            <i class="fas fa-comments fa-3x text-blue-500 mb-4"></i>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Manual Interview Round</h3>
+            <p class="text-gray-600 max-w-lg mx-auto">
+              This round is for **manual assessment** by an interviewer. The system is used to generate the job details, track candidate registration, and record the final round outcome.
+            </p>
+            <div class="mt-4 flex flex-wrap justify-center gap-4 text-sm font-medium">
+                <span class="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-full">Duration: N/A</span>
+                <span class="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-full">Cutoff: N/A</span>
+                <span class="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-full">Created: {{ paper.created_at|date:"j M Y" }}</span>
             </div>
           </div>
-          {% empty %}
-          <p class="text-gray-500">
-            This paper has no sections or questions.
-          </p>
-          {% endfor %}
-    </div>
-</div>
+          
+          {% else %}
+          {# ORIGINAL/EXPANDED TEST-SPECIFIC DETAILS SECTION (when NOT an interview round) #}
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-6 border-b">
+             
+            {# 1. Paper Type/Round #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Paper Type / Round</label>
+              <p class="text-base font-semibold mt-1 text-purple-600">
+                WRITTEN TEST / {{ paper.rounds|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 2. Department #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Department</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.department_name }}
+              </p>
+            </div>
+
+            {# 3. Duration #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Duration</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.duration }} Minute
+              </p>
+            </div>
+
+            {# 4. Cutoff Score #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Cutoff Score</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.cutoff_score }}%
+              </p>
+            </div>
+            
+            {# 5. Experience #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Experience</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.min_exp|default:"0" }} - {{ paper.max_exp|default:"0" }} yr
+              </p>
+            </div>
+            
+            {# 6. Job Type #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Type</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_type|default:"Full Time" }}
+              </p>
+            </div>
+
+            {# 7. Job Location #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Location</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_location|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 8. Open Positions #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Open Positions</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.positions|default:"N/A" }}
+              </p>
+            </div>
+
+            {# 9. End Date #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">End Date</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.end_date|date:"j M Y"|default:"N/A" }}
+              </p>
+            </div>
+
+
+            <div class="lg:col-span-3">
+              <label class="text-sm font-medium text-gray-500">Skills</label>
+              <div id="skills-display-container" class="flex flex-wrap gap-2 mt-2">
+              </div>
+              <script id="skills-data" type="application/json">
+        {{ skills|safe }}
+      </script>
+            </div>
+
+          </div>
+          
+          {% endif %}
+          {# 💡 END: CONDITIONAL DETAILS SECTION #}
+
+          {# This block should only appear if NOT an interview round #}
+          {% if not paper.is_interview_round %}
+          <div class="pt-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Questions: ({{ paper.total_questions }})</h3>
+            <div class="space-y-6">
+              {% for section in paper.paper_sections.all %}
+              <div class="section-container">
+                <div class="flex justify-between items-center mb-3">
+
+                  <h4 class="text-lg font-semibold text-theme-primary">
+                    {{ section.title }}
+                  </h4>
+
+                  {% if section.weightage and section.weightage > 0 %}
+                  <span
+                    class="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1 rounded-full border border-gray-300">
+                    Weightage: {{ section.weightage|floatformat:0 }}%
+                  </span>
+                  {% endif %}
+
+                </div>
+                <div class="space-y-4">
+                  {% for question in section.questions.all %}
+                  <div class="question-item pl-4 border-l-2 border-theme-primary">
+
+                    <p class="font-semibold text-gray-800 mb-2">
+                      Q{{ forloop.parentloop.counter }}.{{ forloop.counter }}. {{ question.text|safe }}
+                    </p>
+
+                    {% if question.question_type == 'MCQ' %}
+
+                    {# Normalize answer for matching (Using striptags and lower for robust comparison) #}
+                    {% with answer_clean=question.answer|striptags|lower %}
+
+                    {# Find the full correct option text to display in the summary #}
+                    {% with correct_option_text=None %}
+                    {% for option in question.options %}
+                    {% with option_clean=option|striptags|lower %}
+                    {% if option_clean == answer_clean %}
+                    {# Save the full, raw option text #}
+                    {% with option as correct_option_text %}{% endwith %}
+                    {% endif %}
+                    {% endwith %}
+                    {% endfor %}
+                    {% endwith %}
+
+                    <div class="space-y-2 mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+                      {% for option in question.options %}
+                      {# Normalize option for comparison #}
+                      {% with option_clean=option|striptags|lower %}
+
+                      <div class="flex items-start p-3 rounded-md
+                {% if option_clean == answer_clean %}
+                    /* Correct Answer Highlight */
+                    bg-green-100 border-2 border-green-500 text-green-900 font-semibold
+                {% else %}
+                    /* Default/Wrong Answer Style */
+                    text-gray-800 border border-gray-300 bg-white
+                {% endif %}
+            ">
+                        <span class="w-5 h-5 mr-3 mt-0.5 flex-shrink-0">
+                          {% if option_clean == answer_clean %}
+                          <svg class="w-full h-full fill-current text-green-600" xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.857a.75.75 0 00-1.214-.872l-3.323 3.51-1.666-1.667a.75.75 0 10-1.06 1.06l2.25 2.25a.75.75 0 001.082-.016l3.75-4z"
+                              clip-rule="evenodd" />
+                          </svg>
+                          {% else %}
+                          <svg class="w-full h-full fill-current text-gray-400" xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20" fill="currentColor">
+                            <circle cx="10" cy="10" r="10" />
+                          </svg>
+                          {% endif %}
+                        </span>
+                        <span class="text-sm">
+                          {{ option|striptags }}
+                        </span>
+                      </div>
+                      {% endwith %}
+                      {% endfor %}
+
+                    </div>
+
+                    <p class="mt-4 pt-3 border-t text-sm text-gray-800 bg-theme-light p-3 rounded-md">
+                      <span class="font-bold text-theme-dark">Correct Answer:</span>
+                      <span class="text-green-700 font-semibold">
+                        {# Display the actual correct option text, or fallback to the original answer string #}
+                        {% if correct_option_text %}
+                        {{ correct_option_text|striptags }}
+                        {% else %}
+                        {{ question.answer|striptags }}
+                        {% endif %}
+                      </span>
+                    </p>
+
+                    {% endwith %}
+
+                    {% else %}
+                    <p class="mt-2 text-sm text-gray-800 bg-theme-light p-3 rounded-md">
+                      <span class="font-bold text-theme-dark">Answer:</span>
+                      {{ question.answer }}
+                    </p>
+                    {% endif %}
+
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% empty %}
+              <p class="text-gray-500">
+                This paper has no sections or questions.
+              </p>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          
           <div class="pt-6 mt-6 border-t">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-xl font-bold text-gray-800">Participants</h3>
 
               <div class="flex items-center gap-4">
-                <form method="GET" action="" class="flex items-center">
+                <form method="GET" action="" class="flex items-center gap-2">
+                  {% if not paper.is_interview_round %}
                   <select name="status" onchange="this.form.submit()"
                     class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-theme-primary focus:border-theme-primary block w-full p-2">
                     <option value="all" {% if selected_status == 'all' %}selected{% endif %}>Show All</option>
@@ -187,6 +412,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                     <option value="fail" {% if selected_status == 'fail' %}selected{% endif %}>Failed</option>
                     <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
                   </select>
+                  {% endif %}
 
                   <select name="shortlist_status" onchange="this.form.submit()"
                     class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-theme-primary focus:border-theme-primary block w-full p-2">
@@ -194,10 +420,11 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                     </option>
                     <option value="shortlisted" {% if selected_shortlist_status == 'shortlisted' %}selected{% endif %}>
                       Shortlisted</option>
-                                    <option value="not_shortlisted" {% if selected_shortlist_status == 'not_shortlisted' %}selected{% endif %}>Not Shortlisted</option>
+                    <option value="not_shortlisted"
+                      {% if selected_shortlist_status == 'not_shortlisted' %}selected{% endif %}>Not Shortlisted</option>
 
-           </select>
-                   
+                  </select>
+
                 </form>
                 <a href="{% url 'export_participants_csv' paper.id %}"
                   class="bg-theme-primary text-white font-semibold py-2 px-4 rounded-lg hover:bg-theme-dark transition-colors text-sm whitespace-nowrap">
@@ -260,8 +487,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                       {% if registration.status == 'pending' %}
                       <span class="text-gray-400 cursor-not-allowed">Not available</span>
                       {% else %}
-                      <a href="{% url 'test_report' registration.id %}"
-                        class="text-theme-primary hover:text-theme-dark">
+                      <a href="{% url 'test_report' registration.id %}" class="text-theme-primary hover:text-theme-dark">
                         View Report
                       </a>
                       {% endif %}
@@ -331,7 +557,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
     }
 
     /**
-     * Renders the skills in the designated container based on the current state.
+     * Re-renders the skills in the designated container based on the current state.
      */
     function renderSkillsDisplay() {
       const container = document.getElementById("skills-display-container");
@@ -429,7 +655,9 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
 </body>
 
 </html> -->
+
 {% load static %}
+{% load humanize %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -441,6 +669,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <script>
     tailwind.config = {
       theme: {
@@ -471,29 +700,28 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
 
       <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
 
-        <!-- ✨ NEW: Drive Linkage Banner - Add after <main> tag, before paper details card -->
-{% if paper.recruitment_drive %}
-<div class="bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-lg shadow-lg p-6 mb-6">
-  <div class="flex items-center justify-between">
-    <div>
-      <div class="flex items-center gap-2 mb-2">
-        <i class="fas fa-link text-2xl"></i>
-        <span class="text-sm font-semibold uppercase tracking-wide opacity-90">Linked to Drive</span>
-      </div>
-      <h3 class="text-2xl font-bold mb-1">{{ paper.recruitment_drive.title }}</h3>
-      <p class="text-purple-100">
-        <i class="fas fa-user-tie mr-2"></i>{{ paper.recruitment_drive.position }}
-        <span class="mx-2">•</span>
-        <i class="fas fa-layer-group mr-2"></i>Round {{ paper.round_number }}
-      </p>
-    </div>
-    <a href="{% url 'drive_detail' paper.recruitment_drive.id %}" 
-       class="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all shadow-md">
-      View Drive <i class="fas fa-arrow-right ml-2"></i>
-    </a>
-  </div>
-</div>
-{% endif %}
+        {% if paper.recruitment_drive %}
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-lg shadow-lg p-6 mb-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <i class="fas fa-link text-2xl"></i>
+                <span class="text-sm font-semibold uppercase tracking-wide opacity-90">Linked to Drive</span>
+              </div>
+              <h3 class="text-2xl font-bold mb-1">{{ paper.recruitment_drive.title }}</h3>
+              <p class="text-purple-100">
+                <i class="fas fa-user-tie mr-2"></i>{{ paper.recruitment_drive.position }}
+                <span class="mx-2">•</span>
+                <i class="fas fa-layer-group mr-2"></i>Round {{ paper.round_number }}
+              </p>
+            </div>
+            <a href="{% url 'drive_detail' paper.recruitment_drive.id %}"
+              class="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all shadow-md">
+              View Drive <i class="fas fa-arrow-right ml-2"></i>
+            </a>
+          </div>
+        </div>
+        {% endif %}
 
         <div class="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
           <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 pb-4 border-b">
@@ -507,11 +735,131 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
               class="w-full sm:w-auto bg-theme-primary text-white text-center font-semibold py-2 px-4 rounded-lg hover:bg-theme-dark transition-colors">
               Edit
             </a>
+
+          </div>
+
+          {# 💡 START: CONDITIONAL DETAILS SECTION #}
+          {% if paper.is_interview_round %}
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-6 border-b">
+            
+            {# 1. Role #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Title / Department</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_title }} / {{ paper.department_name }}
+              </p>
+            </div>
+
+            {# 2. Job Type #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Type</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_type|default:"Full Time" }}
+              </p>
+            </div>
+
+            {# 3. Work Experience #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Work Experience</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {% if paper.min_exp or paper.max_exp %}
+                  {{ paper.min_exp|default:"0" }} - {{ paper.max_exp|default:"0" }} yr
+                {% else %}
+                  Fresher
+                {% endif %}
+              </p>
+            </div>
+
+            {# 4. Job Location #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Location</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_location|default:"N/A" }}
+              </p>
+            </div>
+
+            {# 5. Positions #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Open Positions</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.positions|default:"N/A" }}
+              </p>
+            </div>
+
+            {# 6. Rounds #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Recruitment Round</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.rounds|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 7. Pay Scale #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Pay Scale</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.pay_scale|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 8. End Date #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">End Date</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.end_date|date:"j M Y"|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 9. Placeholder for Salary (Using Min/Max if available) #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Min/Max Salary</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {% if paper.min_salary and paper.max_salary %}
+                  ₹{{ paper.min_salary|floatformat:0|intcomma }} - ₹{{ paper.max_salary|floatformat:0|intcomma }}
+                {% else %}
+                  — N/A
+                {% endif %}
+              </p>
+            </div>
+
+
+            {# 10. Skills (Spanning multiple columns) #}
+            <div class="lg:col-span-3">
+              <label class="text-sm font-medium text-gray-500">Skills</label>
+              <div id="skills-display-container" class="flex flex-wrap gap-2 mt-2">
+                {# Skills rendered by JS #}
+              </div>
+            </div>
             
           </div>
           
+          {# Existing Interview Round Manual Assessment Block #}
+          <div class="pt-6 text-center bg-blue-50 border border-blue-300 rounded-lg p-8 mt-6">
+            <i class="fas fa-comments fa-3x text-blue-500 mb-4"></i>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Manual Interview Round</h3>
+            <p class="text-gray-600 max-w-lg mx-auto">
+              This round is for **manual assessment** by an interviewer. The system is used to generate the job details, track candidate registration, and record the final round outcome.
+            </p>
+            <div class="mt-4 flex flex-wrap justify-center gap-4 text-sm font-medium">
+                <span class="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-full">Duration: N/A</span>
+                <span class="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-full">Cutoff: N/A</span>
+                <span class="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-full">Created: {{ paper.created_at|date:"j M Y" }}</span>
+            </div>
+          </div>
+          
+          {% else %}
+          {# ORIGINAL/EXPANDED TEST-SPECIFIC DETAILS SECTION (when NOT an interview round) #}
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-6 border-b">
-
+             
+            {# 1. Paper Type/Round #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Paper Type / Round</label>
+              <p class="text-base font-semibold mt-1 text-purple-600">
+                WRITTEN TEST / {{ paper.rounds|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 2. Department #}
             <div>
               <label class="text-sm font-medium text-gray-500">Department</label>
               <p class="text-base font-semibold text-gray-900 mt-1">
@@ -519,6 +867,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
               </p>
             </div>
 
+            {# 3. Duration #}
             <div>
               <label class="text-sm font-medium text-gray-500">Duration</label>
               <p class="text-base font-semibold text-gray-900 mt-1">
@@ -526,64 +875,94 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
               </p>
             </div>
 
+            {# 4. Cutoff Score #}
             <div>
               <label class="text-sm font-medium text-gray-500">Cutoff Score</label>
               <p class="text-base font-semibold text-gray-900 mt-1">
                 {{ paper.cutoff_score }}%
               </p>
             </div>
-
+            
+            {# 5. Experience #}
             <div>
               <label class="text-sm font-medium text-gray-500">Experience</label>
               <p class="text-base font-semibold text-gray-900 mt-1">
-                {{ paper.min_exp }} - {{ paper.max_exp }} yr
+                {{ paper.min_exp|default:"0" }} - {{ paper.max_exp|default:"0" }} yr
+              </p>
+            </div>
+            
+            {# 6. Job Type #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Type</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_type|default:"Full Time" }}
               </p>
             </div>
 
-            <div class="lg:col-span-2">
+            {# 7. Job Location #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Job Location</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.job_location|default:"N/A" }}
+              </p>
+            </div>
+            
+            {# 8. Open Positions #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">Open Positions</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.positions|default:"N/A" }}
+              </p>
+            </div>
+
+            {# 9. End Date #}
+            <div>
+              <label class="text-sm font-medium text-gray-500">End Date</label>
+              <p class="text-base font-semibold text-gray-900 mt-1">
+                {{ paper.end_date|date:"j M Y"|default:"N/A" }}
+              </p>
+            </div>
+
+
+            <div class="lg:col-span-3">
               <label class="text-sm font-medium text-gray-500">Skills</label>
               <div id="skills-display-container" class="flex flex-wrap gap-2 mt-2">
+                {# Skills rendered by JS #}
               </div>
-              <script id="skills-data" type="application/json">
-        {{ skills|safe }}
-      </script>
             </div>
 
           </div>
+          
+          {% endif %}
+          {# 💡 END: CONDITIONAL DETAILS SECTION #}
 
+          {# This block should only appear if NOT an interview round #}
+          {% if not paper.is_interview_round %}
           <div class="pt-6">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Questions:</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Questions: ({{ paper.total_questions }})</h3>
             <div class="space-y-6">
               {% for section in paper.paper_sections.all %}
               <div class="section-container">
                 <div class="flex justify-between items-center mb-3">
-  
-  <h4 class="text-lg font-semibold text-theme-primary">
-    {{ section.title }}
-  </h4>
-  
-  {% if section.weightage and section.weightage > 0 %}
-  <span class="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1 rounded-full border border-gray-300">
-    Weightage: {{ section.weightage|floatformat:0 }}%
-  </span>
-  {% endif %}
 
-</div>
-                <!-- <h4 class="text-lg font-semibold text-theme-primary mb-3">
-                  {{ section.title }}
-                </h4>
-                {% if section.weightage and section.weightage > 0 %}
-                <span
-                  class="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1 rounded-full border border-gray-300">
-                  Weightage: {{ section.weightage|floatformat:0 }}%
-                </span>
-                {% endif %} -->
+                  <h4 class="text-lg font-semibold text-theme-primary">
+                    {{ section.title }}
+                  </h4>
+
+                  {% if section.weightage and section.weightage > 0 %}
+                  <span
+                    class="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1 rounded-full border border-gray-300">
+                    Weightage: {{ section.weightage|floatformat:0 }}%
+                  </span>
+                  {% endif %}
+
+                </div>
                 <div class="space-y-4">
                   {% for question in section.questions.all %}
                   <div class="question-item pl-4 border-l-2 border-theme-primary">
 
                     <p class="font-semibold text-gray-800 mb-2">
-                      Q{{ forloop.counter }}. {{ question.text|safe }}
+                      Q{{ forloop.parentloop.counter }}.{{ forloop.counter }}. {{ question.text|safe }}
                     </p>
 
                     {% if question.question_type == 'MCQ' %}
@@ -591,7 +970,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                     {# Normalize answer for matching (Using striptags and lower for robust comparison) #}
                     {% with answer_clean=question.answer|striptags|lower %}
 
-                    {# 💡 FIX START: Find the full correct option text to display in the summary #}
+                    {# Find the full correct option text to display in the summary #}
                     {% with correct_option_text=None %}
                     {% for option in question.options %}
                     {% with option_clean=option|striptags|lower %}
@@ -602,14 +981,13 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                     {% endwith %}
                     {% endfor %}
                     {% endwith %}
-                    {# 💡 FIX END #}
 
                     <div class="space-y-2 mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
                       {% for option in question.options %}
                       {# Normalize option for comparison #}
                       {% with option_clean=option|striptags|lower %}
 
-                      <div class="flex items-start p-3 rounded-md 
+                      <div class="flex items-start p-3 rounded-md
                 {% if option_clean == answer_clean %}
                     /* Correct Answer Highlight */
                     bg-green-100 border-2 border-green-500 text-green-900 font-semibold
@@ -645,7 +1023,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                     <p class="mt-4 pt-3 border-t text-sm text-gray-800 bg-theme-light p-3 rounded-md">
                       <span class="font-bold text-theme-dark">Correct Answer:</span>
                       <span class="text-green-700 font-semibold">
-                        {# ✅ FIX: Display the actual correct option text, or fallback to the original answer string #}
+                        {# Display the actual correct option text, or fallback to the original answer string #}
                         {% if correct_option_text %}
                         {{ correct_option_text|striptags }}
                         {% else %}
@@ -674,12 +1052,15 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
               {% endfor %}
             </div>
           </div>
+          {% endif %}
+          
           <div class="pt-6 mt-6 border-t">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-xl font-bold text-gray-800">Participants</h3>
 
               <div class="flex items-center gap-4">
-                <form method="GET" action="" class="flex items-center">
+                <form method="GET" action="" class="flex items-center gap-2">
+                  {% if not paper.is_interview_round %}
                   <select name="status" onchange="this.form.submit()"
                     class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-theme-primary focus:border-theme-primary block w-full p-2">
                     <option value="all" {% if selected_status == 'all' %}selected{% endif %}>Show All</option>
@@ -687,6 +1068,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                     <option value="fail" {% if selected_status == 'fail' %}selected{% endif %}>Failed</option>
                     <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
                   </select>
+                  {% endif %}
 
                   <select name="shortlist_status" onchange="this.form.submit()"
                     class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-theme-primary focus:border-theme-primary block w-full p-2">
@@ -694,7 +1076,8 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                     </option>
                     <option value="shortlisted" {% if selected_shortlist_status == 'shortlisted' %}selected{% endif %}>
                       Shortlisted</option>
-                    <option value="not_shortlisted" {% if selected_shortlist_status == 'not_shortlisted' %}selected{% endif %}>Not Shortlisted</option>
+                    <option value="not_shortlisted"
+                      {% if selected_shortlist_status == 'not_shortlisted' %}selected{% endif %}>Not Shortlisted</option>
 
                   </select>
 
@@ -760,8 +1143,7 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
                       {% if registration.status == 'pending' %}
                       <span class="text-gray-400 cursor-not-allowed">Not available</span>
                       {% else %}
-                      <a href="{% url 'test_report' registration.id %}"
-                        class="text-theme-primary hover:text-theme-dark">
+                      <a href="{% url 'test_report' registration.id %}" class="text-theme-primary hover:text-theme-dark">
                         View Report
                       </a>
                       {% endif %}
@@ -779,6 +1161,12 @@ IMPROVED MCQ DISPLAY - Matches answer with actual option content
             {% endif %}
           </div>
         </div>
+        
+        {# 💡 FIX: Place the skills data script tag here, outside the if/else block #}
+        <script id="skills-data" type="application/json">
+          {{ skills|safe }}
+        </script>
+
       </main>
     </div>
   </div>
