@@ -1,6 +1,8 @@
 # app/views.py
 
 import json
+import re
+from typing import Optional, Dict, Any
 from openai import OpenAI  
 import re
 import google.generativeai as genai
@@ -784,8 +786,7 @@ def paper_detail_view(request, paper_id):
             TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
         )
         
-        # Apply the existing weighted scoring logic for written tests
-        from .utils import evaluate_answer_with_ai # Assuming utility is in .utils or adjust import
+        
         
         for p in all_participants:
             if p.is_completed:
@@ -1953,7 +1954,9 @@ def evaluate_answer_with_ai(
         # Extract content
         cleaned_text = response.choices[0].message.content.strip()
         result = json.loads(cleaned_text)
-
+# fallback heuristic
+        q_tokens = set(re.findall(r"\w+", (question_text or "").lower()))
+        a_tokens = set(re.findall(r"\w+", ua))
         is_correct = result.get("is_correct", False)
         return is_correct, result
 
