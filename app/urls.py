@@ -156,5 +156,8 @@ path(
     name="download_resume",
 ),
 path('recruiter/application/<int:application_id>/', views.application_detail_view, name='application_detail_view'),
+   
+   path('applications/kanban/', views.kanban_view, name='kanban_view'),
+   path('applications/kanban/update/', views.kanban_update_stage, name='kanban_update_stage'),
     # path('application/detail/<int:application_id>/', views.application_detail_view_candidate, name='candidate_app_detail'),
 ]
