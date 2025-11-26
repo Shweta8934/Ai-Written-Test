@@ -2616,12 +2616,117 @@ from django.urls import reverse
 from urllib.parse import urlencode  
 
 
+# @login_required
+# @require_POST
+# def invite_candidate(request):
+#     """
+#     Handles the AJAX request to invite a candidate via email.
+#     FIXED: Now adds email parameter to the link.
+#     """
+#     try:
+#         data = json.loads(request.body)
+#     except json.JSONDecodeError:
+#         return JsonResponse(
+#             {"status": "error", "message": "Invalid JSON data."}, status=400
+#         )
+
+#     form = InviteCandidateForm(data)
+
+#     if form.is_valid():
+#         candidate_email = form.cleaned_data["email"]
+#         paper_id = form.cleaned_data["paper_id"]
+
+#         try:
+#             paper = QuestionPaper.objects.get(pk=paper_id, created_by=request.user)
+#         except QuestionPaper.DoesNotExist:
+#             return JsonResponse(
+#                 {"status": "error", "message": "Paper not found or unauthorized."},
+#                 status=404,
+#             )
+
+#         if not paper.is_public_active:
+#             paper.is_public_active = True
+#             paper.save(update_fields=["is_public_active"])
+#             messages.info(
+#                 request, f"Public link for '{paper.title}' was automatically activated."
+#             )
+
+#         registration_url = reverse(
+#             "test:user_register_link", kwargs={"link_id": str(paper.id)}
+#         )
+
+#         query_string = urlencode({"email": candidate_email})
+#         test_link = request.build_absolute_uri(f"{registration_url}?{query_string}")
+
+#         context = {
+#             "paper_title": paper.title,
+#             "job_title": paper.job_title,
+#             "recruiter_name": request.user.get_full_name() or request.user.username,
+#             "test_link": test_link,  
+#             "duration": paper.duration,
+#             "total_questions": paper.total_questions,
+#             "skills_list": paper.skills_list.split(","),
+#         }
+
+       
+#         html_message = render_to_string("emails/candidate_invite.html", context)
+#         plain_message = strip_tags(html_message)
+
+#         try:
+#             send_mail(
+#                 subject=f"Invitation to Take Assessment: {paper.title} for {paper.job_title}",
+#                 message=plain_message,
+#                 from_email=settings.DEFAULT_FROM_EMAIL,
+#                 recipient_list=[candidate_email],
+#                 html_message=html_message,
+#                 fail_silently=False,
+#             )
+#             return JsonResponse(
+#                 {
+#                     "status": "success",
+#                     "message": f"Invitation sent successfully to {candidate_email}!",
+#                     "is_public_active": paper.is_public_active,
+#                 },
+#                 status=200,
+#             )
+
+#         except Exception as e:
+#             logger.error(f"Error sending email to {candidate_email}: {e}")
+#             return JsonResponse(
+#                 {
+#                     "status": "error",
+#                     "message": "Email sending failed. Please check server logs.",
+#                 },
+#                 status=500,
+#             )
+#     else:
+#         return JsonResponse(
+#             {
+#                 "status": "error",
+#                 "message": "Form validation failed.",
+#                 "errors": form.errors,
+#             },
+#             status=400,
+#         )
+
+
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from .forms import InviteCandidateForm # Ensure this is imported
+from django.urls import reverse
+from urllib.parse import urlencode
+import logging
+
+logger = logging.getLogger(__name__)
+# ... (Other imports at the top of your views.py file)
+
 @login_required
 @require_POST
 def invite_candidate(request):
     """
     Handles the AJAX request to invite a candidate via email.
-    FIXED: Now adds email parameter to the link.
+    FIXED: Implemented error handling for email sending to prevent 500 server errors (timeouts).
     """
     try:
         data = json.loads(request.body)
@@ -2652,10 +2757,13 @@ def invite_candidate(request):
             )
 
         registration_url = reverse(
+            # NOTE: यहाँ 'test:user_register_link' URL name का उपयोग हो रहा है, 
+            # जो आपकी urls.py में होना चाहिए।
             "test:user_register_link", kwargs={"link_id": str(paper.id)}
         )
 
         query_string = urlencode({"email": candidate_email})
+        # 💡 FIX: request.build_absolute_uri का उपयोग करके पूर्ण URL बनाएं
         test_link = request.build_absolute_uri(f"{registration_url}?{query_string}")
 
         context = {
@@ -2668,18 +2776,19 @@ def invite_candidate(request):
             "skills_list": paper.skills_list.split(","),
         }
 
-       
+        
         html_message = render_to_string("emails/candidate_invite.html", context)
         plain_message = strip_tags(html_message)
 
         try:
+            # Email sending attempt
             send_mail(
                 subject=f"Invitation to Take Assessment: {paper.title} for {paper.job_title}",
                 message=plain_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[candidate_email],
                 html_message=html_message,
-                fail_silently=False,
+                fail_silently=False, 
             )
             return JsonResponse(
                 {
@@ -2691,13 +2800,15 @@ def invite_candidate(request):
             )
 
         except Exception as e:
-            logger.error(f"Error sending email to {candidate_email}: {e}")
+            # 🛑 CRITICAL FIX: Email failure does not crash the worker
+            logger.error(f"FATAL EMAIL ERROR in invite_candidate for {candidate_email}: {e}")
             return JsonResponse(
                 {
-                    "status": "error",
-                    "message": "Email sending failed. Please check server logs.",
+                    "status": "warning", 
+                    "message": "Paper activated, but **Email sending failed** (Server Logged Error).",
+                    "is_public_active": paper.is_public_active,
                 },
-                status=500,
+                status=200, # Still return 200 OK because DB change (is_public_active=True) was successful
             )
     else:
         return JsonResponse(
@@ -2708,7 +2819,6 @@ def invite_candidate(request):
             },
             status=400,
         )
-
 
 
 @login_required
@@ -3772,12 +3882,195 @@ def create_interview_round(request):
         return JsonResponse({"status": "error", "message": f"Server Error: {str(e)}"}, status=500)
 
 
-@transaction.atomic 
+# @transaction.atomic 
+# def interview_candidate_apply_view(request, paper_id):
+#     """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
+    
+#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
+    
+#     if not paper.is_interview_round:
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
+        
+#     if not paper.is_public_active:
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
+
+#     if request.method == 'POST':
+#         # 💡 IMPORTANT: request.POST को mutable बनाने की ज़रूरत नहीं, सीधे form में पास करें
+        
+#         # CandidateApplicationForm को request.POST और request.FILES के साथ instantiate करें
+#         # Note: 'initial' सिर्फ GET request के लिए होता है, POST के लिए नहीं
+#         form = CandidateApplicationForm(request.POST, request.FILES) 
+        
+#         if form.is_valid():
+#             email = form.cleaned_data['email']
+
+#             # Duplicate Check: Check for application with same email linked to this paper
+#             if CandidateApplication.objects.filter(email__iexact=email, linked_paper=paper).exists():
+#                  messages.error(request, "An application with this email already exists for this interview round.")
+#                  return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
+
+
+#             application = form.save(commit=False)
+            
+#             # ⭐ CRITICAL FIX: QuestionPaper (Interview Round) को CandidateApplication से लिंक करें
+#             application.linked_paper = paper
+            
+#             # Initial stage set करें (Optional, पर अच्छा है)
+#             application.current_stage = CandidateApplication.CandidateStage.APPLIED
+#             application.overall_status = CandidateApplication.ApplicationStatus.ACTIVE
+            
+#             application.save()
+#             form.save_m2m() # M2M data (agar form mein ho) save karein
+            
+#             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
+            
+#             # Success screen dikhayen
+#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
+#         else:
+#             # Form validation fail hone par error message dikhayen
+#             messages.error(request, "Please correct the errors below.")
+            
+#     else:
+#         # GET request: Form को initialize करे
+#         form = CandidateApplicationForm(initial={
+#             'full_name': request.GET.get('full_name', ''),
+#             'email': request.GET.get('email', '') 
+#         })
+
+#     context = {
+#         'paper': paper,
+#         'form': form,
+#         'title': f'Apply: {paper.job_title}'
+#     }
+#     return render(request, 'recruitment/interview_application_form.html', context)
+#     """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
+    
+#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
+    
+#     # ... (Error checks for paper.is_interview_round and paper.is_public_active remain the same) ...
+#     if not paper.is_interview_round:
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
+        
+#     if not paper.is_public_active:
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
+
+#     if request.method == 'POST':
+#         # 💡 IMPORTANT: request.POST ko mutable banao tak ki hum data modify kar sakein
+#         post_data = request.POST.copy()
+        
+#         # 💡 HTML Form fields ko Model fields se map karein
+#         # HTML: fullName -> Model: full_name
+#         # HTML: mobile -> Model: phone_number
+#         post_data['full_name'] = post_data.get('fullName')
+#         post_data['phone_number'] = post_data.get('mobile')
+        
+#         # HTML: resume -> Model: resume_file
+#         # HTML: photo (IGNORED)
+        
+#         # CandidateApplicationForm ko prepare kiye gaye data ke saath instantiate karein
+#         # 'recruitment_drive' field ko exclude kar rahe hain kyunki QuestionPaper se link kar rahe hain
+#         form = CandidateApplicationForm(post_data, request.FILES) 
+        
+#         if form.is_valid():
+#             # Check for duplicate application (optional but recommended)
+#             if CandidateApplication.objects.filter(email=form.cleaned_data['email']).exists():
+#                  messages.error(request, "An application with this email already exists.")
+#                  return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
+
+#             application = form.save(commit=False)
+            
+#             # 💡 CRITICAL: Recruitment Drive ya Question Paper ko link karein
+#             # Hum yahan QuestionPaper ko link kar rahe hain (agar model mein field ho)
+#             # Lekin CandidateApplication model mein QuestionPaper ke liye koi FK nahi hai.
+#             # Isliye, hum sirf data save kar rahe hain. 
+#             # Agar RecruitmentDrive se link karna ho toh pehle drive banana hoga.
+
+#             # Safest option: Sirf data save karein
+#             application.save()
+            
+#             # CRITICAL: Is user ko TestRegistration mein bhi save karna hoga agar baad mein is user ko test dena ho.
+#             # Filhaal, hum TestRegistration ko bypass kar rahe hain kyonki yeh interview round hai.
+#             # Agar future mein QuestionPaper se link karna ho, toh CandidateApplication model mein ek FK field add karein.
+            
+#             # Success screen dikhayen
+#             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
+            
+#             # Reload page to show success screen (like the HTML does)
+#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
+#         else:
+#             # Form validation fail hone par error message dikhayen
+#             messages.error(request, "Please correct the errors below.")
+
+#     else:
+#         # GET request: Form ko initialize karein
+#         form = CandidateApplicationForm(initial={
+#             'full_name': request.GET.get('full_name', ''), # Agar URL mein koi prefill ho
+#             'email': request.GET.get('email', '') 
+#         })
+
+#     context = {
+#         'paper': paper,
+#         'form': form,
+#         'title': f'Apply: {paper.job_title}'
+#     }
+#     return render(request, 'recruitment/interview_application_form.html', context)
+#     """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
+    
+#     # Paper ko fetch karein aur ensure karein ki yeh interview round hai
+#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
+    
+#     if not paper.is_interview_round:
+#         # Agar galti se written test ka link use kiya, toh error de dein
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
+        
+#     # Check if the public link is active (optional, but good practice)
+#     if not paper.is_public_active:
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
+
+#     if request.method == 'POST':
+#         # CandidateApplicationForm mein paper_id ko pass karne ke liye
+#         form = CandidateApplicationForm(request.POST, request.FILES, initial={'paper_id': paper.id})
+        
+#         if form.is_valid():
+#             application = form.save(commit=False)
+            
+#             # Note: Assuming CandidateApplication model has fields to store data.
+#             # Agar CandidateApplication ko QuestionPaper se link karna hai, toh model mein field add karein.
+#             # Filhaal, hum sirf form fill karwa rahe hain.
+            
+#             application.save()
+            
+#             messages.success(request, f"Application for {paper.job_title} submitted successfully!")
+#             # Assuming a success template exists
+#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success'})
+#     else:
+#         # Form ko initialize karein
+#         form = CandidateApplicationForm(initial={'job_title': paper.job_title})
+
+#     context = {
+#         'paper': paper,
+#         'form': form,
+#         'title': f'Apply: {paper.job_title}'
+#     }
+#     return render(request, 'recruitment/interview_application_form.html', context) 
+
+# app/views.py
+
+from django.db import transaction
+from django.shortcuts import get_object_or_404, render, redirect # Ensure redirect is imported
+# ... (Other imports at the top)
+
+@transaction.atomic
 def interview_candidate_apply_view(request, paper_id):
-    """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
-    
-    paper = get_object_or_404(QuestionPaper, pk=paper_id)
-    
+    """
+    Public page for candidates to apply based on a QuestionPaper link (Interview).
+    FIXED: Correctly handles form validation, sets is_experienced, and prevents crashes on errors.
+    """
+    try:
+        paper = get_object_or_404(QuestionPaper, pk=paper_id)
+    except Http404:
+        return render(request, 'recruitment/drive_closed.html', {'message': 'The specified job posting was not found.'}, status=404)
+        
     if not paper.is_interview_round:
         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
         
@@ -3785,39 +4078,44 @@ def interview_candidate_apply_view(request, paper_id):
         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
 
     if request.method == 'POST':
-        # 💡 IMPORTANT: request.POST को mutable बनाने की ज़रूरत नहीं, सीधे form में पास करें
-        
-        # CandidateApplicationForm को request.POST और request.FILES के साथ instantiate करें
-        # Note: 'initial' सिर्फ GET request के लिए होता है, POST के लिए नहीं
-        form = CandidateApplicationForm(request.POST, request.FILES) 
+        form = CandidateApplicationForm(request.POST, request.FILES)  
         
         if form.is_valid():
             email = form.cleaned_data['email']
 
             # Duplicate Check: Check for application with same email linked to this paper
             if CandidateApplication.objects.filter(email__iexact=email, linked_paper=paper).exists():
-                 messages.error(request, "An application with this email already exists for this interview round.")
-                 return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
+                messages.error(request, "An application with this email already exists for this interview round.")
+                return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
 
-
+            # --- CRITICAL FIX: Manually set is_experienced and clear dependent fields ---
             application = form.save(commit=False)
+            candidate_type = request.POST.get('candidateType') # Access raw POST data
+            is_experienced_candidate = (candidate_type == 'experienced')
+            application.is_experienced = is_experienced_candidate
             
-            # ⭐ CRITICAL FIX: QuestionPaper (Interview Round) को CandidateApplication से लिंक करें
+            # Clear experienced-only fields if candidate is a Fresher
+            if not is_experienced_candidate:
+                application.total_experience = None
+                application.current_ctc = None
+                application.current_ctc_rate = None
+                application.notice_period = None 
+            
             application.linked_paper = paper
             
-            # Initial stage set करें (Optional, पर अच्छा है)
+            # Set initial stage
             application.current_stage = CandidateApplication.CandidateStage.APPLIED
             application.overall_status = CandidateApplication.ApplicationStatus.ACTIVE
             
             application.save()
-            form.save_m2m() # M2M data (agar form mein ho) save karein
+            form.save_m2m() # Save any M2M fields
             
             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
             
-            # Success screen dikhayen
+            # Success screen render करें
             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
         else:
-            # Form validation fail hone par error message dikhayen
+            # Validation fail hone par error message show karein aur form ko render karein
             messages.error(request, "Please correct the errors below.")
             
     else:
@@ -3833,118 +4131,6 @@ def interview_candidate_apply_view(request, paper_id):
         'title': f'Apply: {paper.job_title}'
     }
     return render(request, 'recruitment/interview_application_form.html', context)
-    """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
-    
-    paper = get_object_or_404(QuestionPaper, pk=paper_id)
-    
-    # ... (Error checks for paper.is_interview_round and paper.is_public_active remain the same) ...
-    if not paper.is_interview_round:
-        return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
-        
-    if not paper.is_public_active:
-        return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
-
-    if request.method == 'POST':
-        # 💡 IMPORTANT: request.POST ko mutable banao tak ki hum data modify kar sakein
-        post_data = request.POST.copy()
-        
-        # 💡 HTML Form fields ko Model fields se map karein
-        # HTML: fullName -> Model: full_name
-        # HTML: mobile -> Model: phone_number
-        post_data['full_name'] = post_data.get('fullName')
-        post_data['phone_number'] = post_data.get('mobile')
-        
-        # HTML: resume -> Model: resume_file
-        # HTML: photo (IGNORED)
-        
-        # CandidateApplicationForm ko prepare kiye gaye data ke saath instantiate karein
-        # 'recruitment_drive' field ko exclude kar rahe hain kyunki QuestionPaper se link kar rahe hain
-        form = CandidateApplicationForm(post_data, request.FILES) 
-        
-        if form.is_valid():
-            # Check for duplicate application (optional but recommended)
-            if CandidateApplication.objects.filter(email=form.cleaned_data['email']).exists():
-                 messages.error(request, "An application with this email already exists.")
-                 return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
-
-            application = form.save(commit=False)
-            
-            # 💡 CRITICAL: Recruitment Drive ya Question Paper ko link karein
-            # Hum yahan QuestionPaper ko link kar rahe hain (agar model mein field ho)
-            # Lekin CandidateApplication model mein QuestionPaper ke liye koi FK nahi hai.
-            # Isliye, hum sirf data save kar rahe hain. 
-            # Agar RecruitmentDrive se link karna ho toh pehle drive banana hoga.
-
-            # Safest option: Sirf data save karein
-            application.save()
-            
-            # CRITICAL: Is user ko TestRegistration mein bhi save karna hoga agar baad mein is user ko test dena ho.
-            # Filhaal, hum TestRegistration ko bypass kar rahe hain kyonki yeh interview round hai.
-            # Agar future mein QuestionPaper se link karna ho, toh CandidateApplication model mein ek FK field add karein.
-            
-            # Success screen dikhayen
-            messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
-            
-            # Reload page to show success screen (like the HTML does)
-            return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
-        else:
-            # Form validation fail hone par error message dikhayen
-            messages.error(request, "Please correct the errors below.")
-
-    else:
-        # GET request: Form ko initialize karein
-        form = CandidateApplicationForm(initial={
-            'full_name': request.GET.get('full_name', ''), # Agar URL mein koi prefill ho
-            'email': request.GET.get('email', '') 
-        })
-
-    context = {
-        'paper': paper,
-        'form': form,
-        'title': f'Apply: {paper.job_title}'
-    }
-    return render(request, 'recruitment/interview_application_form.html', context)
-    """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
-    
-    # Paper ko fetch karein aur ensure karein ki yeh interview round hai
-    paper = get_object_or_404(QuestionPaper, pk=paper_id)
-    
-    if not paper.is_interview_round:
-        # Agar galti se written test ka link use kiya, toh error de dein
-        return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
-        
-    # Check if the public link is active (optional, but good practice)
-    if not paper.is_public_active:
-        return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
-
-    if request.method == 'POST':
-        # CandidateApplicationForm mein paper_id ko pass karne ke liye
-        form = CandidateApplicationForm(request.POST, request.FILES, initial={'paper_id': paper.id})
-        
-        if form.is_valid():
-            application = form.save(commit=False)
-            
-            # Note: Assuming CandidateApplication model has fields to store data.
-            # Agar CandidateApplication ko QuestionPaper se link karna hai, toh model mein field add karein.
-            # Filhaal, hum sirf form fill karwa rahe hain.
-            
-            application.save()
-            
-            messages.success(request, f"Application for {paper.job_title} submitted successfully!")
-            # Assuming a success template exists
-            return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success'})
-    else:
-        # Form ko initialize karein
-        form = CandidateApplicationForm(initial={'job_title': paper.job_title})
-
-    context = {
-        'paper': paper,
-        'form': form,
-        'title': f'Apply: {paper.job_title}'
-    }
-    return render(request, 'recruitment/interview_application_form.html', context) 
-
-
 
 # app/views.py
 
@@ -4071,73 +4257,146 @@ from .models import CandidateApplication # सुनिश्चित करे
 # ✨ नया/अपडेटेड कानबन व्यू फंक्शन (Kanban View Function)
 # ==============================================================================
 
+# @login_required
+# def kanban_view(request):
+#     """
+#     Fetches CandidateApplications and groups them by their current_stage 
+#     for the Kanban board display.
+#     """
+    
+#     # 1. Base Query: Get applications linked to papers/drives created by the current user.
+#     # Note: यह query उन applications को लाएगी जो current user द्वारा बनाए गए 
+#     # QuestionPaper या RecruitmentDrive से जुड़े हैं।
+#     applications_query = CandidateApplication.objects.filter(
+#         Q(linked_paper__created_by=request.user) | Q(recruitment_drive__created_by=request.user)
+#     ).order_by('-applied_at')
+    
+#     # 2. Stage Grouping: Initialize dictionary for Kanban columns
+#     # CandidateApplication.CandidateStage.choices से सभी possible stages लें।
+#     # इसे 'kanban_data' में स्टोर करें।
+#     kanban_data = {}
+#     for value, label in CandidateApplication.CandidateStage.choices:
+#         # स्टेज को लोअरकेस में रखें ताकि टेम्पलेट में आसानी हो
+#         kanban_data[value.lower()] = {
+#             'title': label,
+#             'applications': []
+#         }
+
+#     # 3. Populate Groups: Iterate over the queryset and group applications
+#     for app in applications_query:
+#         # Determine Job Title and Company/Source
+#         if app.linked_paper:
+#             job_title = app.linked_paper.job_title
+#             source = app.linked_paper.created_by.username # या कोई अन्य कंपनी फील्ड
+#         elif app.recruitment_drive:
+#             job_title = app.recruitment_drive.position
+#             source = app.recruitment_drive.title
+#         else:
+#             job_title = "N/A Job"
+#             source = "Unlinked"
+
+#         app_data = {
+#             'application_id': app.id,
+#             'full_name': app.full_name,
+#             'email': app.email,
+#             'job_title': job_title,
+#             'source': source,
+#             'current_stage': app.current_stage.lower(),
+#             'overall_status': app.overall_status.lower(),
+#         }
+        
+#         # Add application to the corresponding stage list
+#         stage_key = app.current_stage.lower()
+#         if stage_key in kanban_data:
+#             kanban_data[stage_key]['applications'].append(app_data)
+#         # अगर कोई एप्लीकेशन किसी ऐसे स्टेज में है जो choices में नहीं है, 
+#         # तो उसे 'applied' में डालें (fallback)
+#         else:
+#              kanban_data['applied']['applications'].append(app_data)
+
+#     # 4. Prepare Context
+#     context = {
+#         'title': 'Applied Jobs - Kanban Board',
+#         # dictionary of lists, keyed by lowercased stage value:
+#         # {'applied': {'title': 'Applied', 'applications': [...]}, 'screening': {...}}
+#         'kanban_data': kanban_data, 
+#     }
+
+#     return render(request, 'partials/users/kanban.html', context) # ✨ नया टेम्पलेट पाथ
+
+
+# app/views.py
+
+import logging # Ensure this is at the top
+from django.db.models import Q
+from .models import CandidateApplication # सुनिश्चित करें कि यह आयात है
+
+logger = logging.getLogger(__name__)
+
 @login_required
 def kanban_view(request):
     """
     Fetches CandidateApplications and groups them by their current_stage 
     for the Kanban board display.
+    FIXED: Added try-except block for robust production use.
     """
-    
-    # 1. Base Query: Get applications linked to papers/drives created by the current user.
-    # Note: यह query उन applications को लाएगी जो current user द्वारा बनाए गए 
-    # QuestionPaper या RecruitmentDrive से जुड़े हैं।
-    applications_query = CandidateApplication.objects.filter(
-        Q(linked_paper__created_by=request.user) | Q(recruitment_drive__created_by=request.user)
-    ).order_by('-applied_at')
-    
-    # 2. Stage Grouping: Initialize dictionary for Kanban columns
-    # CandidateApplication.CandidateStage.choices से सभी possible stages लें।
-    # इसे 'kanban_data' में स्टोर करें।
-    kanban_data = {}
-    for value, label in CandidateApplication.CandidateStage.choices:
-        # स्टेज को लोअरकेस में रखें ताकि टेम्पलेट में आसानी हो
-        kanban_data[value.lower()] = {
-            'title': label,
-            'applications': []
-        }
+    try:
+        # 1. Base Query: Get applications linked to papers/drives created by the current user.
+        applications_query = CandidateApplication.objects.filter(
+            Q(linked_paper__created_by=request.user) | Q(recruitment_drive__created_by=request.user)
+        ).order_by('-applied_at').select_related('linked_paper', 'recruitment_drive')
+        
+        # 2. Stage Grouping: Initialize dictionary for Kanban columns
+        kanban_data = {}
+        for value, label in CandidateApplication.CandidateStage.choices:
+            kanban_data[value.lower()] = {
+                'title': label,
+                'applications': []
+            }
 
-    # 3. Populate Groups: Iterate over the queryset and group applications
-    for app in applications_query:
-        # Determine Job Title and Company/Source
-        if app.linked_paper:
-            job_title = app.linked_paper.job_title
-            source = app.linked_paper.created_by.username # या कोई अन्य कंपनी फील्ड
-        elif app.recruitment_drive:
-            job_title = app.recruitment_drive.position
-            source = app.recruitment_drive.title
-        else:
+        # 3. Populate Groups: Iterate over the queryset and group applications
+        for app in applications_query:
+            # Determine Job Title and Company/Source
             job_title = "N/A Job"
             source = "Unlinked"
+            if app.linked_paper:
+                job_title = app.linked_paper.job_title
+                source = app.linked_paper.created_by.username # या कोई अन्य कंपनी फील्ड
+            elif app.recruitment_drive:
+                job_title = app.recruitment_drive.position
+                source = app.recruitment_drive.title
 
-        app_data = {
-            'application_id': app.id,
-            'full_name': app.full_name,
-            'email': app.email,
-            'job_title': job_title,
-            'source': source,
-            'current_stage': app.current_stage.lower(),
-            'overall_status': app.overall_status.lower(),
+            app_data = {
+                'application_id': app.id,
+                'full_name': app.full_name,
+                'email': app.email,
+                'job_title': job_title,
+                'source': source,
+                'current_stage': app.current_stage.lower(),
+                'overall_status': app.overall_status.lower(),
+            }
+            
+            # Add application to the corresponding stage list
+            stage_key = app.current_stage.lower()
+            if stage_key in kanban_data:
+                kanban_data[stage_key]['applications'].append(app_data)
+            else:
+                # Fallback to 'applied' stage if stage key is invalid/missing
+                kanban_data['applied']['applications'].append(app_data)
+
+        # 4. Prepare Context
+        context = {
+            'title': 'Applied Jobs - Kanban Board',
+            'kanban_data': kanban_data,  
         }
+
+        return render(request, 'partials/users/kanban.html', context)
         
-        # Add application to the corresponding stage list
-        stage_key = app.current_stage.lower()
-        if stage_key in kanban_data:
-            kanban_data[stage_key]['applications'].append(app_data)
-        # अगर कोई एप्लीकेशन किसी ऐसे स्टेज में है जो choices में नहीं है, 
-        # तो उसे 'applied' में डालें (fallback)
-        else:
-             kanban_data['applied']['applications'].append(app_data)
-
-    # 4. Prepare Context
-    context = {
-        'title': 'Applied Jobs - Kanban Board',
-        # dictionary of lists, keyed by lowercased stage value:
-        # {'applied': {'title': 'Applied', 'applications': [...]}, 'screening': {...}}
-        'kanban_data': kanban_data, 
-    }
-
-    return render(request, 'partials/users/kanban.html', context) # ✨ नया टेम्पलेट पाथ
-
+    except Exception as e:
+        logger.error(f"Kanban View Error: {e}", exc_info=True)
+        # Fallback to an error response or a simpler page
+        messages.error(request, f"Could not load Kanban Board due to a server error. Error: {e}")
+        return redirect('dashboard')
 # ... (rest of your views.py file) ...
 # app/views.py
 
