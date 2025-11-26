@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application Details: {{ application.full_name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Add any custom styles needed for this page */
+    .status-applied {
+      background-color: #d1fae5;
+      color: #059669;
+    }
+
+    .status-screening {
+      background-color: #fffbeb;
+      color: #d97706;
+    }
+
+    .status-rejected {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+  </style>
+</head>
+
+<body class="h-full">
+  <div class="flex h-full">
+
+    {% include 'partials/sidebar.html' %}
+
+    <div class="flex-1 flex flex-col overflow-hidden">
+
+      {# Header include, setting page_title dynamically #}
+      {% include 'partials/header.html' with page_title='Candidate Application' %}
+
+      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+        <div class="max-w-7xl mx-auto">
+          
+          {# START OF YOUR CONTENT BLOCK #}
+          <h2 class="text-3xl font-bold text-gray-900 mb-6">Application Details for {{ application.full_name }}</h2>
+
+          <div class="bg-white p-6 rounded-xl shadow-lg space-y-4">
+            
+            <h3 class="text-xl font-semibold border-b pb-2 mb-4 text-blue-600">Personal Information 🧑‍💼</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div><strong class="text-gray-600">Name:</strong> <span class="text-gray-900 font-medium">{{ application.full_name }}</span></div>
+                <div><strong class="text-gray-600">Email:</strong> <span class="text-gray-900">{{ application.email }}</span></div>
+                <div><strong class="text-gray-600">Phone:</strong> <span class="text-gray-900">{{ application.phone_number }}</span></div>
+                <div><strong class="text-gray-600">Location:</strong> <span class="text-gray-900">{{ application.current_location|default:"N/A" }}</span></div>
+            </div>
+
+            <h3 class="text-xl font-semibold border-b pb-2 mb-4 mt-8 text-blue-600">Job Details 📋</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div><strong class="text-gray-600">Applied Job:</strong> <span class="text-gray-900 font-medium">{{ paper.job_title }}</span></div>
+                <div><strong class="text-gray-600">Applied Date:</strong> <span class="text-gray-900">{{ application.applied_at|date:"d M Y" }}</span></div>
+                <div><strong class="text-gray-600">Current Stage:</strong> <span class="text-gray-900">{{ application.get_current_stage_display }}</span></div>
+                <div><strong class="text-gray-600">Overall Status:</strong> <span class="text-gray-900">{{ application.get_overall_status_display }}</span>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-semibold border-b pb-2 mb-4 mt-8 text-blue-600">Experience & Compensation 💵</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                
+                <div><strong class="text-gray-600">Experience Type:</strong> {% if application.is_experienced %}<span class="text-gray-900">Experienced</span>{% else %}<span class="text-gray-900">Fresher</span>{% endif %}</div>
+                
+                {% if application.is_experienced %}
+                <div><strong class="text-gray-600">Total Experience:</strong> <span class="text-gray-900">{{ application.total_experience|default:"N/A" }} years</span></div>
+                <div><strong class="text-gray-600">Current CTC:</strong> <span class="text-gray-900">{{ application.current_ctc|default:"N/A" }} {{ application.current_ctc_rate|default:"" }}</span></div>
+                <div><strong class="text-gray-600">Expected CTC:</strong> <span class="text-gray-900">{{ application.expected_ctc|default:"N/A" }} {{ application.expected_ctc_rate|default:"" }}</span></div>
+                <div><strong class="text-gray-600">Notice Period:</strong> <span class="text-gray-900">{{ application.notice_period|default:"N/A" }}</span></div>
+                {% endif %}
+                <div><strong class="text-gray-600">Skills:</strong> <span class="text-gray-900">{{ application.skills|default:"N/A" }}</span></div>
+            </div>
+
+            <h3 class="text-xl font-semibold border-b pb-2 mb-4 mt-8 text-blue-600">Documents 📎</h3>
+            <div>
+                <strong class="text-gray-600">Resume:</strong>
+                {% if application.resume_file %}
+                <a href="{% url 'download_resume' application_id=application.id %}" target="_blank"
+                    class="text-blue-600 hover:underline font-medium">Download Resume</a> 
+                {% else %}
+                N/A
+                {% endif %}
+            </div>
+
+          </div>
+          {# END OF YOUR CONTENT BLOCK #}
+          
+        </div>
+      </main>
+    </div>
+
+  </div>
+</body>
+
+</html>
