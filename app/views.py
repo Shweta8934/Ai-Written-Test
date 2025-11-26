@@ -2396,11 +2396,76 @@ def evaluate_answer_simple(
     return is_correct
 
 
+# @require_POST
+# def submit_test(request, registration_id):
+#     """
+#     Evaluates test submission, distinguishing between incorrect and unattempted answers.
+#     """
+#     registration = get_object_or_404(TestRegistration, pk=registration_id)
+
+#     if registration.is_completed:
+#         return redirect("test_result", registration_id=registration.id)
+
+#     user_responses = UserResponse.objects.filter(
+#         registration=registration
+#     ).select_related("question")
+
+#     total_questions = registration.question_paper.total_questions
+#     correct_answers_count = 0
+
+#     for response in user_responses:
+#         question = response.question
+#         user_answer = response.user_answer.strip()
+#         is_correct = False
+
+#         if user_answer:
+#             if question.question_type == "MCQ":
+#                 model_answer = question.answer.strip()
+#                 is_correct = user_answer.lower() == model_answer.lower()
+#             else:
+#                 # Map internal question type to evaluator type
+#                 qtype = question.question_type.upper()
+#                 if qtype in ("CODE", "CODING"):
+#                     evaluator_type = "coding"
+#                 elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
+#                     evaluator_type = "short"
+#                 elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
+#                     evaluator_type = "true_false"
+#                 else:
+#                     evaluator_type = "short"
+
+#                 # evaluate_answer_with_ai returns (is_correct, details)
+#                 is_correct, _ = evaluate_answer_with_ai(
+#                     question_text=question.text,
+#                     user_answer=user_answer,
+#                     model_answer=question.answer.strip(),
+#                     question_type=evaluator_type,
+#                 )
+
+#             if is_correct:
+#                 correct_answers_count += 1
+
+#     # Calculate score
+#     percentage_score = 0
+#     if total_questions > 0:
+#         percentage_score = round((correct_answers_count / total_questions) * 100, 2)
+
+#     # Save results
+#     registration.is_completed = True
+#     registration.end_time = timezone.now()
+#     registration.score = percentage_score
+#     registration.save(update_fields=["is_completed", "end_time", "score"])
+
+#     return redirect("test_result", registration_id=registration.id)
+
 @require_POST
 def submit_test(request, registration_id):
     """
     Evaluates test submission, distinguishing between incorrect and unattempted answers.
+    CRITICAL: Automatically creates/updates CandidateApplication if the candidate passes the test,
+    and sets the stage to ROUND_1 (Test Passed).
     """
+    # 1. Fetch Registration and Paper
     registration = get_object_or_404(TestRegistration, pk=registration_id)
 
     if registration.is_completed:
@@ -2410,9 +2475,11 @@ def submit_test(request, registration_id):
         registration=registration
     ).select_related("question")
 
-    total_questions = registration.question_paper.total_questions
+    paper = registration.question_paper 
+    total_questions = paper.total_questions
     correct_answers_count = 0
 
+    # 2. Score Calculation (AI Evaluation Logic - UNCHANGED)
     for response in user_responses:
         question = response.question
         user_answer = response.user_answer.strip()
@@ -2423,18 +2490,10 @@ def submit_test(request, registration_id):
                 model_answer = question.answer.strip()
                 is_correct = user_answer.lower() == model_answer.lower()
             else:
-                # Map internal question type to evaluator type
+                # AI Evaluation Logic
                 qtype = question.question_type.upper()
-                if qtype in ("CODE", "CODING"):
-                    evaluator_type = "coding"
-                elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
-                    evaluator_type = "short"
-                elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
-                    evaluator_type = "true_false"
-                else:
-                    evaluator_type = "short"
-
-                # evaluate_answer_with_ai returns (is_correct, details)
+                evaluator_type = "coding" if qtype in ("CODE", "CODING") else "short"
+                # Note: Assuming evaluate_answer_with_ai is available
                 is_correct, _ = evaluate_answer_with_ai(
                     question_text=question.text,
                     user_answer=user_answer,
@@ -2445,20 +2504,60 @@ def submit_test(request, registration_id):
             if is_correct:
                 correct_answers_count += 1
 
-    # Calculate score
-    percentage_score = 0
-    if total_questions > 0:
-        percentage_score = round((correct_answers_count / total_questions) * 100, 2)
-
-    # Save results
+    percentage_score = round((correct_answers_count / total_questions) * 100, 2) if total_questions > 0 else 0
+    
+    # Determine Pass/Fail status
+    is_passed = percentage_score >= paper.cutoff_score
+    
+    # 3. Update TestRegistration
     registration.is_completed = True
     registration.end_time = timezone.now()
     registration.score = percentage_score
     registration.save(update_fields=["is_completed", "end_time", "score"])
 
+    
+    # 4. >>> CRITICAL: Create/Update CandidateApplication for Pipeline Tracking <<<
+    with transaction.atomic():
+        # a) Get or create the CandidateApplication using email and linked_paper
+        application, created = CandidateApplication.objects.get_or_create(
+            linked_paper=paper,
+            email=registration.email,
+            defaults={
+                'full_name': registration.user.get_full_name() if registration.user else registration.email,
+                'phone_number': registration.phone_number,
+                'applied_at': timezone.now(),
+                'current_stage': CandidateApplication.CandidateStage.APPLIED,
+                'overall_status': CandidateApplication.ApplicationStatus.ACTIVE,
+            }
+        )
+
+        # b) Set the Aggregate Score
+        application.aggregate_score = percentage_score
+        
+        # c) Set Stage/Status based on test result
+        if is_passed:
+            # Candidate passed: Move to the ROUND_1 stage (Test Passed)
+            new_stage = CandidateApplication.CandidateStage.ROUND_1
+            
+            # Update aggregate score and move stage (move_to_stage saves the model)
+            # 🟢 REFINEMENT 1: aggregate_score को save करने के लिए update_fields list का प्रयोग करें
+            application.save(update_fields=['aggregate_score']) 
+            application.move_to_stage(new_stage) 
+            
+            # NOTE: application.overall_status = CandidateApplication.ApplicationStatus.ACTIVE 
+            # यह move_to_stage के अंदर already सेट हो जाता है।
+            
+        else:
+            # Candidate failed: Set overall status to REJECTED
+            application.overall_status = CandidateApplication.ApplicationStatus.REJECTED
+            # We set stage to APPLIED for clear visibility in the recruiter pipeline
+            application.current_stage = CandidateApplication.CandidateStage.APPLIED 
+            
+            # 🟢 REFINEMENT 2: सिर्फ status और stage को save करें, क्योंकि move_to_stage कॉल नहीं हुआ
+            application.save(update_fields=['aggregate_score', 'overall_status', 'current_stage'])
+
+    # 5. Redirect to Result
     return redirect("test_result", registration_id=registration.id)
-
-
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth import views as auth_views
@@ -3961,7 +4060,148 @@ def download_resume(request, application_id):
 # Note: You would need to update the application_detail_view logic 
 # to ensure only the recruiter (request.user) can access this, 
 # similar to your existing security checks.
+# app/views.py
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.db.models import Q
+from .models import CandidateApplication # सुनिश्चित करें कि यह आयात है
+
+# ==============================================================================
+# ✨ नया/अपडेटेड कानबन व्यू फंक्शन (Kanban View Function)
+# ==============================================================================
+
+@login_required
+def kanban_view(request):
+    """
+    Fetches CandidateApplications and groups them by their current_stage 
+    for the Kanban board display.
+    """
+    
+    # 1. Base Query: Get applications linked to papers/drives created by the current user.
+    # Note: यह query उन applications को लाएगी जो current user द्वारा बनाए गए 
+    # QuestionPaper या RecruitmentDrive से जुड़े हैं।
+    applications_query = CandidateApplication.objects.filter(
+        Q(linked_paper__created_by=request.user) | Q(recruitment_drive__created_by=request.user)
+    ).order_by('-applied_at')
+    
+    # 2. Stage Grouping: Initialize dictionary for Kanban columns
+    # CandidateApplication.CandidateStage.choices से सभी possible stages लें।
+    # इसे 'kanban_data' में स्टोर करें।
+    kanban_data = {}
+    for value, label in CandidateApplication.CandidateStage.choices:
+        # स्टेज को लोअरकेस में रखें ताकि टेम्पलेट में आसानी हो
+        kanban_data[value.lower()] = {
+            'title': label,
+            'applications': []
+        }
+
+    # 3. Populate Groups: Iterate over the queryset and group applications
+    for app in applications_query:
+        # Determine Job Title and Company/Source
+        if app.linked_paper:
+            job_title = app.linked_paper.job_title
+            source = app.linked_paper.created_by.username # या कोई अन्य कंपनी फील्ड
+        elif app.recruitment_drive:
+            job_title = app.recruitment_drive.position
+            source = app.recruitment_drive.title
+        else:
+            job_title = "N/A Job"
+            source = "Unlinked"
+
+        app_data = {
+            'application_id': app.id,
+            'full_name': app.full_name,
+            'email': app.email,
+            'job_title': job_title,
+            'source': source,
+            'current_stage': app.current_stage.lower(),
+            'overall_status': app.overall_status.lower(),
+        }
+        
+        # Add application to the corresponding stage list
+        stage_key = app.current_stage.lower()
+        if stage_key in kanban_data:
+            kanban_data[stage_key]['applications'].append(app_data)
+        # अगर कोई एप्लीकेशन किसी ऐसे स्टेज में है जो choices में नहीं है, 
+        # तो उसे 'applied' में डालें (fallback)
+        else:
+             kanban_data['applied']['applications'].append(app_data)
+
+    # 4. Prepare Context
+    context = {
+        'title': 'Applied Jobs - Kanban Board',
+        # dictionary of lists, keyed by lowercased stage value:
+        # {'applied': {'title': 'Applied', 'applications': [...]}, 'screening': {...}}
+        'kanban_data': kanban_data, 
+    }
+
+    return render(request, 'partials/users/kanban.html', context) # ✨ नया टेम्पलेट पाथ
+
+# ... (rest of your views.py file) ...
+# app/views.py
+
+# ... (Add this import at the top if missing)
+from django.views.decorators.csrf import csrf_exempt 
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.shortcuts import get_object_or_404
+from .models import CandidateApplication # Ensure this is imported
+
+# ==============================================================================
+# ✨ नया: कानबन स्टेज अपडेट व्यू (Kanban Stage Update View)
+# ==============================================================================
+
+@login_required
+@require_POST
+@csrf_exempt # क्योंकि यह AJAX से आ रहा है और हम इसे POST कर रहे हैं
+def kanban_update_stage(request):
+    """
+    Handles AJAX request to move a CandidateApplication to a new stage.
+    """
+    try:
+        data = json.loads(request.body)
+        application_id = data.get('application_id')
+        new_stage_key = data.get('new_stage_key').upper() # 'APPLIED', 'SCREENING', etc.
+
+        if not application_id or not new_stage_key:
+            return HttpResponseBadRequest(json.dumps({'status': 'error', 'message': 'Missing application ID or new stage key'}), content_type="application/json")
+        
+        # 1. CandidateApplication fetch करें और स्वामित्व जांचें
+        app = get_object_or_404(CandidateApplication, pk=application_id)
+        
+        # 💡 Security Check: सुनिश्चित करें कि अपडेट करने वाला यूजर ही इसका मालिक है 
+        # (यानी, जिस पेपर/ड्राइव से यह जुड़ा है, वह उसी ने बनाया है)
+        is_owner = False
+        if app.linked_paper and app.linked_paper.created_by == request.user:
+            is_owner = True
+        if app.recruitment_drive and app.recruitment_drive.created_by == request.user:
+            is_owner = True
+            
+        if not is_owner:
+            return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
+
+        # 2. CandidateApplication.CandidateStage में वैध स्टेज चेक करें
+        valid_stages = [choice[0] for choice in CandidateApplication.CandidateStage.choices]
+        if new_stage_key not in valid_stages:
+            return HttpResponseBadRequest(json.dumps({'status': 'error', 'message': f'Invalid stage key: {new_stage_key}'}), content_type="application/json")
+
+        # 3. move_to_stage method का उपयोग करके स्टेज अपडेट करें
+        app.move_to_stage(new_stage_key, updated_by=request.user) # move_to_stage logic re-use करें
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Application {application_id} moved to {app.get_current_stage_display()}',
+            'new_stage': app.current_stage.lower()
+        })
+
+    except CandidateApplication.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Application not found.'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON body.'}, status=400)
+    except Exception as e:
+        print(f"Kanban Update Error: {e}")
+        return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {str(e)}'}, status=500)
 @login_required
 def paper_applications_view(request, paper_id):
     """

@@ -564,7 +564,8 @@ class CandidateApplication(models.Model):
             self.save(update_fields=['aggregate_score'])
             return self.aggregate_score
         return None
-    
+    # app/models.py (CandidateApplication model के अंदर move_to_stage method)
+
     def move_to_stage(self, new_stage, updated_by=None, reason=''):
         """Update candidate stage with validation"""
         from django.utils import timezone
@@ -575,14 +576,18 @@ class CandidateApplication(models.Model):
         if new_stage == 'HIRED':
             self.overall_status = 'HIRED'
             self.hired_at = timezone.now()
-            # Increment drive's filled_positions
-            self.recruitment_drive.filled_positions += 1
-            self.recruitment_drive.save(update_fields=['filled_positions'])
             
-            # Auto-complete drive if full
-            if self.recruitment_drive.filled_positions >= self.recruitment_drive.total_positions:
-                if self.recruitment_drive.auto_close_on_full:
-                    self.recruitment_drive.mark_as_completed()
+            # ⭐ FIX: Only update the drive if self.recruitment_drive is NOT None ⭐
+            if self.recruitment_drive: 
+                # Increment drive's filled_positions
+                self.recruitment_drive.filled_positions += 1
+                self.recruitment_drive.save(update_fields=['filled_positions'])
+                
+                # Auto-complete drive if full
+                if self.recruitment_drive.filled_positions >= self.recruitment_drive.total_positions:
+                    if self.recruitment_drive.auto_close_on_full:
+                        self.recruitment_drive.mark_as_completed()
+            # ⭐ FIX ENDS HERE: If self.recruitment_drive is None, this block is skipped.
         
         elif new_stage == 'REJECTED':
             self.overall_status = 'REJECTED'
@@ -591,4 +596,10 @@ class CandidateApplication(models.Model):
         elif new_stage == 'WITHDRAWN':
             self.overall_status = 'WITHDRAWN'
         
+        # Ensure overall_status is 'ACTIVE' for all intermediate stages
+        elif new_stage in ['APPLIED', 'SCREENING', 'ROUND_1', 'ROUND_2', 'FINAL_ROUND']:
+            # यह सुनिश्चित करता है कि बीच के चरणों में स्टेटस 'ACTIVE' बना रहे।
+            self.overall_status = 'ACTIVE' 
+
         self.save()
+   

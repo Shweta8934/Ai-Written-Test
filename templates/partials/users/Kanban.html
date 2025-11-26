@@ -1,0 +1,425 @@
+
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ title|default:'Applied Jobs' }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.3/dragula.min.css'/>
+    <style>
+        /*
+        *** UI/UX IMPROVEMENTS ***
+        1. Define the custom width for columns on screens larger than mobile.
+        2. Custom Scrollbar for better aesthetics (Webkit only).
+        3. Sticky Column Header for UX.
+        */
+        .kanban-col {
+            min-width: 280px;
+            max-width: 300px;
+            width: 300px;
+            /* For desktop, ensure column is contained and provides its own scroll */
+            height: 100%;
+        }
+        
+        .kanban-col-container {
+            /* Content area that scrolls vertically */
+            overflow-y: auto;
+            padding-bottom: 0.5rem; /* Space below the last card */
+        }
+
+        /* 4. Override min-width for small screens (Mobile View) to stack vertically */
+        @media (max-width: 639px) {
+            .kanban-col {
+                min-width: 100%;
+                max-width: 100%;
+                width: 100%;
+                /* Mobile columns stack vertically and don't need fixed height */
+                height: auto;
+            }
+        }
+        
+        /* 5. Custom Scrollbar Styling for aesthetics */
+        .kanban-col-container::-webkit-scrollbar,
+        .overflow-x-auto::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+
+        .kanban-col-container::-webkit-scrollbar-thumb,
+        .overflow-x-auto::-webkit-scrollbar-thumb {
+            background: #9ca3af; /* Gray-400 */
+            border-radius: 4px;
+        }
+
+        /* DRAGULA STYLING FOR UX */
+        .gu-mirror {
+            /* Mirror is the ghost image being dragged */
+            opacity: 0.8;
+            transform: rotate(1deg);
+        }
+        .gu-transit {
+            /* Original element while dragging */
+            opacity: 0.2;
+        }
+        
+        /* CARD STYLING */
+        .card-applied { border-left: 4px solid #3b82f6; /* Blue */ }
+        .card-screening { border-left: 4px solid #f59e0b; /* Amber */ }
+        .card-interview { border-left: 4px solid #8b5cf6; /* Violet */ }
+        .card-selected { border-left: 4px solid #10b981; /* Emerald */ }
+        .card-rejected { border-left: 4px solid #ef4444; /* Red */ }
+
+    </style>
+</head>
+
+<body class="h-full">
+    <div class="flex h-full">
+
+        {% include 'partials/sidebar.html' %} 
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            
+            {% include 'partials/header.html' with page_title='' %}
+
+            <main class="flex-1 overflow-y-auto bg-gray-100 p-6">
+                <div class="max-w-full mx-auto h-full flex flex-col">
+                    
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 flex-shrink-0">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4 sm:mb-0">{{ title }}</h2>
+                        <a href="{% url 'user_list' %}"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-lg transition duration-150 text-base flex items-center w-full sm:w-auto justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+                            </svg>
+                            List View
+                        </a>
+                    </div>
+                    
+                    <div class="flex-1 overflow-x-auto overflow-y-hidden pb-6">
+                        <div class="flex sm:flex-nowrap flex-wrap space-x-0 sm:space-x-6 space-y-4 sm:space-y-0 h-full">
+
+                            {% for stage_key, stage_info in kanban_data.items %}
+                            
+                            {% with column_title=stage_info.title|default:stage_key|capfirst %}
+
+                                {% if stage_key == 'applied' %}
+                                    {% with temp_header_color='text-blue-600' temp_border_color='border-blue-200' temp_card_class='card-applied' %}{% endwith %}
+                                {% elif stage_key == 'screening' or stage_key == 'round_1' %}
+                                    {% with temp_header_color='text-yellow-600' temp_border_color='border-yellow-200' temp_card_class='card-screening' %}{% endwith %}
+                                {% elif 'interview' in stage_key or stage_key == 'round_2' or stage_key == 'round_3' or stage_key == 'final_round' %}
+                                    {% with temp_header_color='text-purple-600' temp_border_color='border-purple-200' temp_card_class='card-interview' %}{% endwith %}
+                                {% elif stage_key == 'offer' or stage_key == 'hired' %}
+                                    {% with temp_header_color='text-green-600' temp_border_color='border-green-200' temp_card_class='card-selected' %}{% endwith %}
+                                {% elif stage_key == 'rejected' or stage_key == 'withdrawn' %}
+                                    {% with temp_header_color='text-red-600' temp_border_color='border-red-200' temp_card_class='card-rejected' %}{% endwith %}
+                                {% else %}
+                                    {% with temp_header_color='text-gray-600' temp_border_color='border-gray-200' temp_card_class='card-default' %}{% endwith %}
+                                {% endif %}
+
+                                {% with header_color=temp_header_color border_color=temp_border_color card_class=temp_card_class %}
+
+                                    <div class="kanban-col bg-white p-4 rounded-xl shadow-lg flex-shrink-0 flex flex-col h-full border {{ border_color }}"
+                                            data-stage-id="{{ stage_key }}"
+                                            id="column-{{ stage_key }}">
+                                        
+                                        <div class="mb-4 pb-2 border-b {{ border_color }} bg-white sticky top-0 z-10">
+                                            <h3 class="text-xl font-bold {{ header_color }}">
+                                                {{ column_title }} <span class="text-gray-500 font-medium ml-1">({{ stage_info.applications|length }})</span>
+                                            </h3>
+                                        </div>
+                                        
+                                        <div class="kanban-col-container space-y-3 flex-1 min-h-[50px] overflow-y-auto">
+                                            
+                                            {% for app in stage_info.applications %}
+                                            
+                                            <div class="bg-gray-50 p-4 rounded-xl shadow-md {{ card_class }} cursor-grab
+                                                            hover:shadow-lg hover:ring-2 ring-offset-1 ring-gray-200
+                                                            transition duration-200 border border-gray-200"
+                                                    data-application-id="{{ app.application_id }}">
+                                                
+                                                <a href="{% url 'application_detail_view' application_id=app.application_id %}" class="block">
+                                                    
+                                                    <p class="font-semibold text-gray-900 truncate text-base" title="{{ app.job_title }}">
+                                                        {{ app.job_title }}
+                                                    </p>
+                                                    
+                                                    <p class="text-sm text-gray-700 mt-1 truncate" title="{{ app.full_name }}">
+                                                        <span class="font-medium text-gray-600">👤</span> {{ app.full_name }}
+                                                    </p>
+                                                    
+                                                    <p class="text-xs text-gray-500 mt-0.5 truncate" title="{{ app.source }}">
+                                                        <span class="font-medium text-gray-400">🔗</span> {{ app.source }}
+                                                    </p>
+                                                </a>
+                                            </div>
+                                            
+                                            {% empty %}
+                                            <div class="text-sm text-gray-500 text-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
+                                                No applications in this stage.
+                                            </div>
+                                            {% endfor %}
+
+                                        </div>
+                                    </div>
+                                {% endwith %}
+                            {% endwith %}
+                            {% endfor %}
+
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+    </div>
+    <div id="hireConfirmationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg mx-4 p-6">
+            
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 class="text-xl font-bold text-gray-900">Terms & Conditions</h3>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="mt-4 space-y-4">
+                <p class="text-gray-700 font-medium">Please review and accept the terms before confirming the hire.</p>
+                
+                <div class="agreement-summary border border-gray-200 bg-gray-50 p-4 rounded-lg h-48 overflow-y-auto text-sm text-gray-600">
+                    <h4 class="font-bold text-gray-800 mb-2">Agreement summary</h4>
+                    <ol class="list-decimal pl-5 space-y-1">
+                        <li>Employment begins on the agreed start date and is subject to company policies.</li>
+                        <li>Candidate agrees to the confidential information and IP assignment clauses.</li>
+                        <li>Salary, benefits and probation terms have been communicated and accepted.</li>
+                        <li>Termination and notice period conditions are as per the employee handbook.</li>
+                        <li>The candidate confirms authenticity of provided documents and background checks.</li>
+                        <li>Any non-compete clauses apply for the duration mentioned in the contract.</li>
+                        <li>Additional company-specific policies (dress code, work hours, remote policy).</li>
+                        <li>By accepting, both parties agree to the jurisdiction and dispute resolution method.</li>
+                        <li>Further onboarding steps will be shared via email after acceptance.</li>
+                        <li>This agreement is confidential and intended only for the named candidate.</li>
+                    </ol>
+                </div>
+                
+                <div class="flex items-center pt-2">
+                    <input type="checkbox" id="acceptTermsCheckbox" class="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="acceptTermsCheckbox" class="ml-2 text-sm font-medium text-red-600">
+                        I have read and accept the <span class="font-bold text-gray-700">Terms & Conditions</span> to proceed
+                    </label>
+                </div>
+                
+                <p class="text-xs text-gray-500 mt-1">Note: Once you accept, the candidate will be moved to "Hired" and onboarding email will be triggered.</p>
+            </div>
+            
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancelHireBtn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">
+                    Decline
+                </button>
+                <button id="confirmHireBtn" disabled class="px-4 py-2 text-sm font-medium text-white bg-blue-400 rounded-lg cursor-not-allowed transition duration-150">
+                    Accept & Confirm Hire
+                </button>
+            </div>
+            
+        </div>
+    </div>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.3/dragula.min.js'></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const HIRED_STAGE_KEY = 'HIRED';
+    let applicationToHire = null; // Temporarily stores application ID
+    let draggedElement = null; // Stores dragged card element
+
+    // Modal Elements
+    const modal = document.getElementById('hireConfirmationModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const cancelHireBtn = document.getElementById('cancelHireBtn');
+    const confirmHireBtn = document.getElementById('confirmHireBtn');
+    const acceptTermsCheckbox = document.getElementById('acceptTermsCheckbox');
+
+    // Kanban Columns and Containers
+    const kanbanContainers = document.querySelectorAll('.kanban-col-container');
+    const columnElements = document.querySelectorAll('.kanban-col');
+
+    if (kanbanContainers.length === 0) {
+        console.warn("No kanban containers found. Dragula will not initialize.");
+        return;
+    }
+
+    // Initialize Dragula
+    const dragulaInstance = dragula(Array.from(kanbanContainers), {
+        moves: (el, source, handle, sibling) => el.hasAttribute('data-application-id')
+    });
+
+    // Save dragged element on drag start
+    dragulaInstance.on('drag', (el, source) => {
+        draggedElement = el;
+    });
+
+    // Handle drop event
+    dragulaInstance.on('drop', (el, target, source, sibling) => {
+        const application_id = el.getAttribute('data-application-id');
+        const new_stage_key = target.closest('.kanban-col').getAttribute('data-stage-id').toUpperCase();
+        const old_stage_key = source.closest('.kanban-col').getAttribute('data-stage-id').toUpperCase();
+
+        if (new_stage_key === HIRED_STAGE_KEY) {
+            // Cancel the DOM move immediately (card reverts visually)
+            dragulaInstance.cancel(true);
+
+            // Save the application ID and dragged element for modal
+            applicationToHire = application_id;
+            draggedElement = el;
+
+            // Show the terms & conditions modal
+            showModal();
+            return; // Do not proceed with AJAX yet
+        }
+
+        // For non-HIRED moves
+        if (old_stage_key === new_stage_key) {
+            return;
+        }
+
+        sendStageUpdate(application_id, new_stage_key)
+            .catch(error => {
+                console.error('Error:', error);
+                dragulaInstance.cancel(true);
+                alert(`Error updating stage: ${error.message}. Card returned to ${old_stage_key}.`);
+            });
+    });
+
+    // Show modal and reset checkbox/button
+    function showModal() {
+        modal.style.display = 'flex';
+        acceptTermsCheckbox.checked = false;
+        toggleConfirmButtonState(false);
+    }
+
+    // Hide modal
+    function hideModal() {
+        modal.style.display = 'none';
+    }
+
+    // Enable or disable confirm button based on checkbox
+    function toggleConfirmButtonState(isEnabled) {
+        confirmHireBtn.disabled = !isEnabled;
+        if (isEnabled) {
+            confirmHireBtn.classList.remove('bg-blue-400', 'cursor-not-allowed');
+            confirmHireBtn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'cursor-pointer');
+        } else {
+            confirmHireBtn.classList.add('bg-blue-400', 'cursor-not-allowed');
+            confirmHireBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'cursor-pointer');
+        }
+    }
+
+    // Decline or close buttons revert card (already reverted) and hide modal
+    function revertHireAndHideModal() {
+        applicationToHire = null;
+        draggedElement = null;
+        hideModal();
+        updateColumnCounts();
+    }
+
+    // Checkbox listener for enabling confirm button
+    acceptTermsCheckbox.addEventListener('change', () => {
+        toggleConfirmButtonState(acceptTermsCheckbox.checked);
+    });
+
+    // Modal button listeners
+    closeModalBtn.addEventListener('click', revertHireAndHideModal);
+    cancelHireBtn.addEventListener('click', revertHireAndHideModal);
+
+    // Confirm hire button listener
+    confirmHireBtn.addEventListener('click', () => {
+        if (!acceptTermsCheckbox.checked || !applicationToHire) {
+            alert('Please accept the terms and conditions.');
+            return;
+        }
+
+        toggleConfirmButtonState(false);
+
+        sendStageUpdate(applicationToHire, HIRED_STAGE_KEY)
+            .then(() => {
+                hideModal();
+                applicationToHire = null;
+                draggedElement = null;
+                // Optionally reload or update UI to reflect hiring
+                // location.reload();
+            })
+            .catch(error => {
+                console.error('Error during final hire confirmation:', error);
+                alert(`Final hire failed: ${error.message}.`);
+                applicationToHire = null;
+                draggedElement = null;
+                hideModal();
+                updateColumnCounts();
+            });
+    });
+
+    // AJAX POST for updating stage
+    function sendStageUpdate(appId, newStage) {
+        const url = "{% url 'kanban_update_stage' %}"; 
+
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken') 
+            },
+            body: JSON.stringify({
+                application_id: appId,
+                new_stage_key: newStage
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(error => { 
+                    throw new Error(error.message || `Server responded with status ${response.status}`); 
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            updateColumnCounts();
+            return data;
+        });
+    }
+
+    // Helper to get CSRF cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Update card counts in column headers
+    function updateColumnCounts() {
+        columnElements.forEach(column => {
+            const titleElement = column.querySelector('h3');
+            const cardCount = column.querySelector('.kanban-col-container').querySelectorAll('[data-application-id]').length;
+
+            let originalTitleText = titleElement.childNodes[0].nodeValue ? titleElement.childNodes[0].nodeValue.trim() : titleElement.textContent.replace(/\s*\(\d+\)\s*$/, '').trim();
+
+            titleElement.innerHTML = `${originalTitleText} <span class="text-gray-500 font-medium ml-1">(${cardCount})</span>`;
+        });
+    }
+
+    // Run initial update
+    updateColumnCounts();
+});
+
+</script>
+</body>
+
+</html>
