@@ -146,4 +146,15 @@ path('interview/apply/<int:paper_id>/', views.interview_candidate_apply_view, na
          views.export_paper_applications_csv, 
          name='export_paper_applications'),
 path('submit-application/<int:paper_id>/', views.submit_personal_info_application, name='submit_application'),
+path('paper/<int:paper_id>/applications/', views.paper_applications_view, name='paper_applications'),
+    # path('recruiter/application/<int:application_id>/', views.application_detail_view, name='application_detail_view'),# Candidate/User Side
+    path('my-applied-jobs/', views.applied_jobs_view, name='applied_jobs'),
+
+path(
+    "application/<int:application_id>/download-resume/",
+    views.download_resume,
+    name="download_resume",
+),
+path('recruiter/application/<int:application_id>/', views.application_detail_view, name='application_detail_view'),
+    # path('application/detail/<int:application_id>/', views.application_detail_view_candidate, name='candidate_app_detail'),
 ]

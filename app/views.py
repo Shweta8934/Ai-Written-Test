@@ -1137,10 +1137,248 @@ def skill_delete_view(request, pk):
 
 User = get_user_model()
 
+# app/views.py (Around Line 1140, where def user_list is located)
 
+# ... (rest of your imports and functions) ...
+
+# @login_required
+# def user_list(request):
+#     """
+#     Handles /users/ route (which was previously listing TestRegistrations, 
+#     but is now updated to show all CandidateApplications).
+    
+#     This function contains the printing logic for confirmation.
+#     """
+#     stage_filter = request.GET.get('stage', 'all')
+#     status_filter = request.GET.get('status', 'all')
+    
+   
+    
+#     # सभी Applications लो (Recruiter Ownership चेक को बायपास करते हुए)
+#     applications_query = CandidateApplication.objects.all().order_by('-applied_at') \
+#         .select_related('linked_paper', 'recruitment_drive')
+
+#     if stage_filter != 'all':
+#         applications_query = applications_query.filter(current_stage=stage_filter.upper())
+
+#     if status_filter != 'all':
+#         applications_query = applications_query.filter(overall_status=status_filter.upper())
+    
+#     # --- DEBUG 2: Total records fetched before pagination ---
+#     total_count = applications_query.count()
+   
+    
+#     paginator = Paginator(applications_query, 20)
+#     page_number = request.GET.get('page')
+#     applications_page = paginator.get_page(page_number)
+
+#     applications_data = []
+    
+#     # --- DEBUG 3: Looping through the fetched objects ---
+    
+#     for app in applications_page.object_list:
+#         if app.linked_paper:
+#             job_title = app.linked_paper.job_title
+#             source = f"Paper: {app.linked_paper.title}"
+#         elif app.recruitment_drive:
+#             job_title = app.recruitment_drive.position
+#             source = f"Drive: {app.recruitment_drive.title}"
+#         else:
+#             job_title = "N/A"
+#             source = "Unlinked"
+            
+#         # Print the key data points
+
+#         applications_data.append({
+#             'application_id': app.id,
+#             'full_name': app.full_name,
+#             'email': app.email,
+#             'job_title': job_title,
+#             'source': source,
+#             'applied_date': app.applied_at.strftime('%d %b %Y'),
+#             'current_stage': app.get_current_stage_display(),
+#             'overall_status': app.get_overall_status_display(),
+#         })
+    
+    
+#     context = {
+#         'applications_data': applications_data, 
+#         'applications_page': applications_page,
+#         'selected_stage': stage_filter,
+#         'selected_status': status_filter,
+#         'title': 'All Candidate Applications',
+#         'CandidateStageChoices': CandidateApplication.CandidateStage.choices,
+#         'ApplicationStatusChoices': CandidateApplication.ApplicationStatus.choices,
+#     }
+    
+#     # यह आपका वांछित रेंडर पाथ है
+#     return render(request, 'partials/users/user_list.html', context)
+
+# app/views.py (Inside def user_list(request):)
+
+# सुनिश्चित करें कि ये imports फ़ाइल के शीर्ष पर मौजूद हैं:
+# from django.db.models import Q 
+# from .models import CandidateApplication
+# from django.core.paginator import Paginator
+# from django.contrib.auth.decorators import login_required
+# app/views.py (user_list function)
+
+@login_required
 def user_list(request):
-    users = TestRegistration.objects.all().order_by("id")
-    return render(request, "partials/users/user_list.html", {"users": users})
+    # Fetch all filter parameters
+    stage_filter = request.GET.get('stage', 'all').strip()
+    status_filter = request.GET.get('status', 'all').strip()
+    name_query = request.GET.get('name_query', '').strip()
+    title_query = request.GET.get('title_query', '').strip()
+
+    applications_query = CandidateApplication.objects.all().order_by('-applied_at') \
+        .select_related('linked_paper', 'recruitment_drive')
+
+    if stage_filter != 'all':
+        applications_query = applications_query.filter(current_stage__iexact=stage_filter)
+    
+    if stage_filter != 'all':
+        applications_query = applications_query.filter(current_stage=stage_filter.upper())
+
+    if status_filter != 'all':
+        applications_query = applications_query.filter(overall_status=status_filter.upper())
+
+    if name_query:
+        applications_query = applications_query.filter(
+            full_name__icontains=name_query
+        )
+        
+    if title_query:
+        applications_query = applications_query.filter(
+            Q(linked_paper__job_title__icontains=title_query) |
+            Q(recruitment_drive__position__icontains=title_query)
+        )
+        
+    
+    paginator = Paginator(applications_query, 20)
+    page_number = request.GET.get('page')
+    applications_page = paginator.get_page(page_number)
+
+    # 6. Format Data for Template
+    applications_data = []
+    for app in applications_page.object_list:
+        if app.linked_paper:
+            job_title = app.linked_paper.job_title
+            source = f"Paper: {app.linked_paper.title}"
+        elif app.recruitment_drive:
+            job_title = app.recruitment_drive.position
+            source = f"Drive: {app.recruitment_drive.title}"
+        else:
+            job_title = "N/A"
+            source = "Unlinked"
+            
+        applications_data.append({
+            'application_id': app.id,
+            'full_name': app.full_name,
+            'email': app.email,
+            'job_title': job_title,
+            'source': source,
+            'applied_date': app.applied_at.strftime('%d %b %Y'),
+            'current_stage': app.get_current_stage_display(),
+            'overall_status': app.get_overall_status_display(),
+        })
+    
+    context = {
+        'applications_data': applications_data, 
+        'applications_page': applications_page,
+        'selected_stage': stage_filter, # URL से raw value (e.g., 'round_2') भेजें
+        'selected_status': status_filter, # URL से raw value (e.g., 'all') भेजें
+        'title': 'All Candidate Applications',
+        'CandidateStageChoices': CandidateApplication.CandidateStage.choices,
+        'ApplicationStatusChoices': CandidateApplication.ApplicationStatus.choices,
+    }
+    
+    return render(request, 'partials/users/user_list.html', context)
+
+# @login_required
+# def user_list(request):
+#     # Fetch all filter parameters
+#     stage_filter = request.GET.get('stage', 'all')
+#     status_filter = request.GET.get('status', 'all')
+#     name_query = request.GET.get('name_query', '').strip()
+#     title_query = request.GET.get('title_query', '').strip()
+
+#     # --- DEBUGGING PRINTS (Consolidation) ---
+#     print("\n--- ✅ CANDIDATE APPLICATIONS VIEW HIT (START) ---")
+#     print(f"Name Query: {name_query}, Title Query: {title_query}")
+#     print(f"Stage Filter: {stage_filter}, Status Filter: {status_filter}")
+    
+#     # 1. Base Query
+#     applications_query = CandidateApplication.objects.all().order_by('-applied_at') \
+#         .select_related('linked_paper', 'recruitment_drive')
+
+#     # 2. Apply Stage Filter (Dropdown)
+#     if stage_filter != 'all':
+#         applications_query = applications_query.filter(current_stage=stage_filter.upper())
+
+#     # 3. Apply Status Filter (Dropdown)
+#     if status_filter != 'all':
+#         applications_query = applications_query.filter(overall_status=status_filter.upper())
+
+#     # 4. Apply Name Search (Text Input - Case-insensitive partial search)
+#     if name_query:
+#         applications_query = applications_query.filter(
+#             full_name__icontains=name_query
+#         )
+        
+#     # 5. Apply Job Title Search (Text Input - Case-insensitive partial search across two fields)
+#     if title_query:
+#         applications_query = applications_query.filter(
+#             Q(linked_paper__job_title__icontains=title_query) |
+#             Q(recruitment_drive__position__icontains=title_query)
+#         )
+        
+#     # --- Pagination ---
+#     print(f"Total Records After Filters: {applications_query.count()}")
+#     paginator = Paginator(applications_query, 20)
+#     page_number = request.GET.get('page')
+#     applications_page = paginator.get_page(page_number)
+
+#     # 6. Format Data for Template
+#     applications_data = []
+#     for app in applications_page.object_list:
+#         if app.linked_paper:
+#             job_title = app.linked_paper.job_title
+#             source = f"Paper: {app.linked_paper.title}"
+#         elif app.recruitment_drive:
+#             job_title = app.recruitment_drive.position
+#             source = f"Drive: {app.recruitment_drive.title}"
+#         else:
+#             job_title = "N/A"
+#             source = "Unlinked"
+            
+#         applications_data.append({
+#             'application_id': app.id,
+#             'full_name': app.full_name,
+#             'email': app.email,
+#             'job_title': job_title,
+#             'source': source,
+#             'applied_date': app.applied_at.strftime('%d %b %Y'),
+#             'current_stage': app.get_current_stage_display(),
+#             'overall_status': app.get_overall_status_display(),
+#         })
+    
+#     context = {
+#         'applications_data': applications_data, 
+#         'applications_page': applications_page,
+#         'selected_stage': stage_filter,
+#         'selected_status': status_filter,
+#         'title': 'All Candidate Applications',
+#         'CandidateStageChoices': CandidateApplication.CandidateStage.choices,
+#         'ApplicationStatusChoices': CandidateApplication.ApplicationStatus.choices,
+#     }
+    
+#     print("--- ✅ CANDIDATE APPLICATIONS VIEW HIT (END) ---\n")
+#     return render(request, 'partials/users/user_list.html', context)
+
+# def user_list(request):
+#     users = TestRegistration.objects.all().order_by("id")
+#     return render(request, "partials/users/user_list.html", {"users": users})
 
 
 def user_detail(request, user_id):
@@ -1547,39 +1785,7 @@ def regenerate_question(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-# @login_required
-# @require_POST
-# def deactivate_paper(request, paper_id):
-#     """
-#     Soft deletes a question paper by setting its is_active flag to False.
-#     """
-#     try:
 
-#         paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
-
-#         paper.is_active = False
-#         paper.save()
-
-#         return JsonResponse(
-#             {
-#                 "status": "success",
-#                 "message": f'Paper "{paper.title}" has been deactivated successfully.',
-#             }
-#         )
-
-#     except QuestionPaper.DoesNotExist:
-#         return JsonResponse(
-#             {
-#                 "status": "error",
-#                 "message": "Paper not found or you do not have permission to perform this action.",
-#             },
-#             status=404,
-#         )
-#     except Exception as e:
-#         return JsonResponse({"status": "error", "message": str(e)}, status=500)
-# app/views.py
-
-# ... (baaki saare imports)
 from django.utils import timezone  # Yeh add karein
 import datetime  # Yeh add karein
 # ... (baaki saare imports)
@@ -1756,78 +1962,6 @@ import google.generativeai as genai
 from django.conf import settings
 
 
-# def evaluate_answer_with_ai(
-#     question_text: str,
-#     user_answer: str,
-#     model_answer: str,
-#     question_type: str = "short",
-# ) -> Tuple[bool, Dict[str, Any]]:
-#     """
-#     Uses Gemini AI to evaluate if a user's answer is conceptually correct.
-
-#     Args:
-#         question_text: The question being asked
-#         user_answer: User's submitted answer
-#         model_answer: Correct/reference answer
-#         question_type: Type of question - "mcq", "short", "coding", "true_false"
-
-#     Returns:
-#         Tuple of (is_correct: bool, details: dict with confidence and reason)
-#     """
-#     # Empty answer check
-#     if not user_answer or not user_answer.strip():
-#         return False, {
-#             "is_correct": False,
-#             "confidence": 100,
-#             "reason": "Answer is empty",
-#         }
-
-#     # Normalize inputs
-#     user_answer = user_answer.strip()
-#     model_answer = model_answer.strip()
-
-#     try:
-#         # Quick checks for specific question types before AI call
-#         if question_type.lower() == "mcq":
-#             return _evaluate_mcq(user_answer, model_answer)
-
-#         elif question_type.lower() in ["true_false", "boolean"]:
-#             return _evaluate_boolean(user_answer, model_answer)
-
-#         # AI evaluation for short answer and coding
-#         genai.configure(api_key=settings.GEMINI_API_KEY)
-#         model = genai.GenerativeModel("gemini-2.0-flash-exp")
-
-#         # Different prompts for different question types
-#         if question_type.lower() == "coding":
-#             prompt = _get_coding_prompt(question_text, user_answer, model_answer)
-#         else:
-#             prompt = _get_short_answer_prompt(question_text, user_answer, model_answer)
-
-#         response = model.generate_content(prompt)
-#         cleaned_text = response.text.strip()
-
-#         # Remove markdown code blocks if present
-#         if cleaned_text.startswith("```json"):
-#             cleaned_text = cleaned_text[7:]
-#         elif cleaned_text.startswith("```"):
-#             cleaned_text = cleaned_text[3:]
-#         if cleaned_text.endswith("```"):
-#             cleaned_text = cleaned_text[:-3]
-#         cleaned_text = cleaned_text.strip()
-
-#         result = json.loads(cleaned_text)
-
-#         is_correct = result.get("is_correct", False)
-#         return is_correct, result
-
-#     except json.JSONDecodeError as e:
-
-#         return _fallback_evaluation(user_answer, model_answer, question_type)
-
-#     except Exception as e:
-#         print(f"AI Evaluation Error: {e}")
-#         return _fallback_evaluation(user_answer, model_answer, question_type)
 
 import json
 import re
@@ -1959,57 +2093,7 @@ Respond with ONLY a valid JSON object (no markdown, no extra text):
 }}"""
 
 
-# def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> str:
-#     """
-#     Generate prompt for coding evaluation with cross-language flexibility criteria.
-#     (MODIFIED FOR LANGUAGE FLEXIBILITY - FOR DIRECT PASTE)
-#     """
-#     return f"""You are an expert programming instructor. Evaluate if the user's code correctly solves the problem.
 
-# **Question:**
-# {question_text}
-
-# **Reference Solution (Use for context, but do not require exact matching):**
-# ```
-# {model_code}
-# ```
-
-# **User's Code:**
-# ```
-# {user_code}
-# ```
-
-# **Evaluation Criteria:**
-# 1. **CRITICAL: The user's code MUST solve the specific problem described in the Question.**
-
-# 2. **⭐ Cross-Language Tolerance (FLEXIBLE LOGIC) ⭐:**
-#     * **If the QUESTION text DOES NOT explicitly name a programming language** (e.g., "Write a function...", "Solve this problem..."), **then ACCEPT the solution, even if the language of the User's Code differs from the Reference Solution, provided the core logic is sound.** The goal is to check technical skill, not language specific adherence, unless requested.
-#     * If the **QUESTION text EXPLICITLY specifies a language** (e.g., "Write a JavaScript function...", "Implement this in Python"), then **code in a different language should result in is_correct: false**, regardless of the logic.
-
-# 3. The core logic must be sound, even if the implementation style differs.
-# 4. Accept different approaches: loops vs. comprehensions, recursion vs. iteration.
-# 5. Accept different but correct algorithms.
-# 6. Ignore minor syntax variations: spacing, indentation, bracket styles.
-# 7. Accept more efficient or optimized solutions.
-
-# **What to REJECT (This must result in is_correct: false):**
-# - **Code that solves a COMPLETELY DIFFERENT PROBLEM than the one asked.**
-# - Logic errors that produce incorrect output.
-# - Missing critical functionality.
-# - **Code in a different language when the question explicitly mandated a specific one.**
-
-# **Scoring Guide:**
-# - is_correct: true if code would work and solve the problem (50%+ functionality)
-# - is_correct: false if code has fundamental logic errors or solves the wrong problem
-# - confidence: 90-100% for perfect or near-perfect solutions
-# - confidence: 70-89% for working solutions with minor issues
-
-# Respond with ONLY valid JSON (no markdown, no extra text):
-# {{
-#     "is_correct": true/false,
-#     "confidence": 0-100,
-#     "reason": "brief explanation"
-# }}"""
 def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> str:
     """
     Generate a highly flexible prompt that forces AI to ignore language differences
@@ -2944,7 +3028,7 @@ def drive_candidates_view(request, drive_id):
         'selected_status': status_filter,
         'title': f'Candidates: {drive.title}'
     }
-    return render(request, 'recruitment/candidates_list.html', context)
+    return render(request, 'partials/users/application_detail.html', context)
 
 
 @login_required
@@ -3462,8 +3546,8 @@ def application_detail_view(request, application_id):
         'paper': application.linked_paper,
         'title': f'Application: {application.full_name}'
     }
-    
-    return render(request, 'recruitment/application_detail.html', context)
+
+    return render(request, 'partials/users/application_detail.html', context)
 
 
 @login_required
@@ -3759,4 +3843,324 @@ def interview_candidate_apply_view(request, paper_id):
         'form': form,
         'title': f'Apply: {paper.job_title}'
     }
-    return render(request, 'recruitment/interview_application_form.html', context) # <--- Naya template
+    return render(request, 'recruitment/interview_application_form.html', context) 
+
+
+
+# app/views.py
+
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from .models import CandidateApplication, QuestionPaper
+from django.db.models import F
+
+@login_required
+def applied_jobs_view(request):
+    """
+    Shows a list of all jobs/papers a logged-in user (candidate) has applied for.
+    This fetches CandidateApplication records linked to the user's email.
+    """
+    user_email = request.user.email
+    
+    # 1. Fetch all applications linked to the logged-in user's email
+    applications = CandidateApplication.objects.filter(
+        email__iexact=user_email,
+        # Only show applications that are linked to a specific paper, and the paper is active
+        linked_paper__isnull=False,
+        linked_paper__is_active=True 
+    ).order_by('-applied_at').select_related('linked_paper')
+    
+    # 2. Format the data for the template (similar to your image)
+    applied_jobs_data = []
+    for app in applications:
+        
+        # Determine the Status for Display (जैसा आपकी इमेज में है)
+        # हम यहाँ CandidateApplication के current_stage को Status के लिए इस्तेमाल कर सकते हैं।
+        if app.overall_status == CandidateApplication.ApplicationStatus.ACTIVE:
+            display_status = app.get_current_stage_display() # 'Applied', 'Screening', 'Interview' आदि
+        elif app.overall_status == CandidateApplication.ApplicationStatus.HIRED:
+             display_status = "Hired"
+        elif app.overall_status == CandidateApplication.ApplicationStatus.REJECTED:
+             display_status = "Rejected"
+        else:
+            display_status = "Pending"
+            
+        
+        applied_jobs_data.append({
+            'application_id': app.id,
+            # Job details from the linked_paper
+            'job_title': app.linked_paper.job_title,
+            'company': app.linked_paper.created_by.username, # Company name के लिए Recruiter का username/नाम
+            'applied_date': app.applied_at.strftime('%d %b %Y'),
+            'status': display_status,
+        })
+        
+    context = {
+        'applied_jobs': applied_jobs_data,
+        'title': 'My Applied Jobs'
+    }
+    
+    # Render the new template
+    return render(request, 'recruitment/applied_jobs_list.html', context)
+
+
+# @login_required
+# def application_detail_view_candidate(request, application_id):
+#     """
+#     Detailed view of a single candidate application for the candidate themselves.
+#     """
+#     application = get_object_or_404(
+#         CandidateApplication,
+#         pk=application_id,
+#         email__iexact=request.user.email # CRITICAL: Ensure the logged-in user owns this application
+#     )
+    
+#     # Fetch related paper/drive details for context
+#     paper = application.linked_paper
+#     drive = application.recruitment_drive
+    
+#     context = {
+#         'application': application,
+#         'paper': paper,
+#         'drive': drive,
+#         'title': f'Application Details: {application.full_name}'
+#     }
+    
+#     # Render the template to show all details (email, phone, experience, status history etc.)
+#     return render(request, 'recruitment/candidate_application_detail.html', context)
+
+
+# app/views.py
+
+# from django.contrib.auth.decorators import login_required
+# from django.shortcuts import render, get_object_or_404
+# from django.core.paginator import Paginator
+# from .models import QuestionPaper, CandidateApplication
+
+# app/views.py
+
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+from .models import CandidateApplication # Ensure this is imported
+
+def download_resume(request, application_id):
+    application = get_object_or_404(CandidateApplication, pk=application_id)
+    
+    if not application.resume_file:
+        return HttpResponseNotFound("Resume file not found.")
+
+    file_path = application.resume_file.path
+    
+    # Use Content-Disposition: attachment to force download
+    response = FileResponse(open(file_path, 'rb'))
+    response['Content-Type'] = 'application/octet-stream'
+    response['Content-Disposition'] = f'attachment; filename="{application.resume_file.name}"'
+    
+    return response
+
+# Note: You would need to update the application_detail_view logic 
+# to ensure only the recruiter (request.user) can access this, 
+# similar to your existing security checks.
+
+@login_required
+def paper_applications_view(request, paper_id):
+    """
+    View to see all candidate applications for a specific QuestionPaper
+    """
+    try:
+        # 1. Get the QuestionPaper created by the current user
+        paper = get_object_or_404(
+            QuestionPaper, 
+            pk=paper_id, 
+            created_by=request.user
+        )
+        
+        # Filter applications
+        stage_filter = request.GET.get('stage', 'all')
+        status_filter = request.GET.get('status', 'all')
+        
+        # 2. Get all applications linked to this paper
+        applications_query = CandidateApplication.objects.filter(
+            linked_paper=paper
+        ).order_by('-applied_at')
+        
+        # Apply filters 
+        if stage_filter != 'all':
+            applications_query = applications_query.filter(
+                current_stage=stage_filter.upper()
+            )
+        
+        if status_filter != 'all':
+            applications_query = applications_query.filter(
+                overall_status=status_filter.upper()
+            )
+        
+        # Pagination
+        paginator = Paginator(applications_query, 20)
+        page_number = request.GET.get('page')
+        applications = paginator.get_page(page_number)
+        
+        # Statistics (assuming you want these in the UI)
+        total_applications = CandidateApplication.objects.filter(
+            linked_paper=paper
+        ).count()
+        
+        active_count = CandidateApplication.objects.filter(
+            linked_paper=paper,
+            overall_status='ACTIVE'
+        ).count()
+
+        hired_count = CandidateApplication.objects.filter(
+            linked_paper=paper,
+            overall_status='HIRED'
+        ).count()
+
+        context = {
+            'paper': paper,
+            'applications': applications,
+            'total_applications': total_applications,
+            'active_count': active_count,
+            'hired_count': hired_count,
+            'selected_stage': stage_filter,
+            'selected_status': status_filter,
+            'title': f'Applications for {paper.job_title}'
+        }
+        
+        return render(request, 'recruitment/paper_applications.html', context)
+    
+    except Exception as e:
+        # यहाँ आप एक बेहतर error handling कर सकते हैं या dashboard पर redirect कर सकते हैं।
+        return render(request, 'error.html', {'message': f"Error loading applications: {e}"})
+
+
+
+    stage_filter = request.GET.get('stage', 'all')
+    status_filter = request.GET.get('status', 'all')
+    
+    # --- DEBUG 1: Filters being applied ---
+    print("\n--- DEBUG: FILTERS & USER INFO ---")
+    print(f"Logged-in User Email: {request.user.email}")
+    print(f"Stage Filter: {stage_filter}")
+    print(f"Status Filter: {status_filter}")
+    print("-----------------------------------")
+    
+    # यहां सिर्फ़ सभी Applications लो (Recruiter Ownership चेक को बायपास करते हुए)
+    applications_query = CandidateApplication.objects.all().order_by('-applied_at') \
+        .select_related('linked_paper', 'recruitment_drive')
+
+    # Filters apply करो (optional)
+    if stage_filter != 'all':
+        applications_query = applications_query.filter(current_stage=stage_filter.upper())
+
+    if status_filter != 'all':
+        applications_query = applications_query.filter(overall_status=status_filter.upper())
+    
+    # --- DEBUG 2: Total records fetched before pagination ---
+    print(f"Total Applications Fetched (Before Pagination): {applications_query.count()}")
+    print("-------------------------------------------------")
+    
+    paginator = Paginator(applications_query, 20)
+    page_number = request.GET.get('page')
+    applications_page = paginator.get_page(page_number)
+
+    applications_data = []
+    
+    # --- DEBUG 3: Looping through the fetched objects ---
+    print("\n--- DEBUG: APPLICATION DATA LOOP ---")
+    
+    for app in applications_page.object_list:
+        if app.linked_paper:
+            job_title = app.linked_paper.job_title
+            source = f"Paper: {app.linked_paper.title}"
+        elif app.recruitment_drive:
+            job_title = app.recruitment_drive.position
+            source = f"Drive: {app.recruitment_drive.title}"
+        else:
+            job_title = "N/A"
+            source = "Unlinked"
+            
+        # Print the data before adding to the final list
+        print(f"ID: {app.id}, Name: {app.full_name}, Email: {app.email}, Job: {job_title}, Status: {app.overall_status}")
+
+        applications_data.append({
+            'application_id': app.id,
+            'full_name': app.full_name,
+            'email': app.email,
+            'job_title': job_title,
+            'source': source,
+            'applied_date': app.applied_at.strftime('%d %b %Y'),
+            'current_stage': app.get_current_stage_display(),
+            'overall_status': app.get_overall_status_display(),
+        })
+    
+    print("-----------------------------------")
+
+    context = {
+        'applications_data': applications_data, 
+        'applications_page': applications_page,
+        'selected_stage': stage_filter,
+        'selected_status': status_filter,
+        'title': 'All Candidate Applications',
+        'CandidateStageChoices': CandidateApplication.CandidateStage.choices,
+        'ApplicationStatusChoices': CandidateApplication.ApplicationStatus.choices,
+    }
+    
+    # यह आपका वांछित रेंडर पाथ है
+    return render(request, 'partials/users/user_list.html', context)
+    stage_filter = request.GET.get('stage', 'all')
+    status_filter = request.GET.get('status', 'all')
+
+    # यहां सिर्फ़ सभी Applications लो, किसी भी Recruiter Ownership के बिना
+    applications_query = CandidateApplication.objects.all().order_by('-applied_at') \
+        .select_related('linked_paper', 'recruitment_drive')
+
+    # Filters apply करो (optional)
+    if stage_filter != 'all':
+        applications_query = applications_query.filter(current_stage=stage_filter.upper())
+
+    if status_filter != 'all':
+        applications_query = applications_query.filter(overall_status=status_filter.upper())
+
+    paginator = Paginator(applications_query, 20)
+    page_number = request.GET.get('page')
+    applications_page = paginator.get_page(page_number)
+
+    # 💡 IMPORTANT: Pagination object के अंदर के items को format करें
+    applications_data = []
+    for app in applications_page.object_list: # .object_list का उपयोग करें
+        if app.linked_paper:
+            job_title = app.linked_paper.job_title
+            source = f"Paper: {app.linked_paper.title}"
+        elif app.recruitment_drive:
+            job_title = app.recruitment_drive.position
+            source = f"Drive: {app.recruitment_drive.title}"
+        else:
+            job_title = "N/A"
+            source = "Unlinked"
+
+        applications_data.append({
+            'application_id': app.id,
+            'full_name': app.full_name,
+            'email': app.email,
+            'job_title': job_title,
+            'source': source,
+            'applied_date': app.applied_at.strftime('%d %b %Y'),
+            'current_stage': app.get_current_stage_display(),
+            'overall_status': app.get_overall_status_display(),
+        })
+
+    context = {
+        # 🟢 FIX: अब हम pagination object और formatted data दोनों को भेज रहे हैं।
+        # HTML में हम applications_page पर लूप करेंगे, और data को उसी index से fetch करेंगे।
+        # लेकिन Django Template के लिए, सीधे applications_data पर लूप करना आसान है।
+        'applications_data': applications_data, 
+        'applications_page': applications_page, # Pagination links के लिए
+        'selected_stage': stage_filter,
+        'selected_status': status_filter,
+        'title': 'All Candidate Applications',
+        'CandidateStageChoices': CandidateApplication.CandidateStage.choices,
+        'ApplicationStatusChoices': CandidateApplication.ApplicationStatus.choices,
+    }
+    
+    # आपका अनुरोधित रेंडर पाथ
+    return render(request, 'partials/users/user_list.html', context)
