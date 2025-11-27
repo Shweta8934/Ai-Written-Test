@@ -140,7 +140,6 @@ from pathlib import Path
 import os 
 import environ
 import dj_database_url
-from django.conf import settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -187,7 +186,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjjack.XFrameOptionsMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",  # ✅ FIXED: clickjacking
 ]
 
 ROOT_URLCONF = "ai_test.urls"
@@ -211,10 +210,10 @@ TEMPLATES = [
 WSGI_APPLICATION = "ai_test.wsgi.application"
 
 # =============================================================================
-# 🚀 EMAIL CONFIGURATION - Mailtrap + Gmail + Local (Production Ready)
+# 🚀 EMAIL CONFIGURATION - Mailtrap + Fallback (Production Ready)
 # =============================================================================
 if 'RENDER' in os.environ:
-    # Production: Render + Mailtrap/Gmail (SMTP works on paid plans)
+    # Production: Render + Mailtrap
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.mailtrap.io')
     EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
@@ -223,17 +222,15 @@ if 'RENDER' in os.environ:
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
     DEFAULT_FROM_EMAIL = os.getenv('DEFAULTFROMEMAIL', 'noreply@yourapp.com')
     
-    # Render Free Tier Fallback: Console Backend (No SMTP port blocking)
+    # Render Free Tier Fallback
     if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
         EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-        print("🚨 Render Free Tier: Using Console Backend (emails logged)")
+        print("🚨 Render Free Tier: Using Console Backend")
         
 else:
-    # Local Development: Console Backend
+    # Local Development
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'noreply@localhost'
-
-# =============================================================================
 
 # Database - Render PostgreSQL
 DATABASES = {
@@ -266,10 +263,10 @@ STORAGES = {
     },
 }
 
-# Default primary key field type
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# Security (Production)
+# Security
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
