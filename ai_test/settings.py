@@ -264,7 +264,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-प्रोडक्शन के लिए, इन दोनों को चालू करें
+
 STATIC_ROOT = BASE_DIR / 'staticfiles' 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
