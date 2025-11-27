@@ -64,6 +64,7 @@
 # EMAIL_USE_TLS = True
 # EMAIL_HOST_USER = "shweta.ladne.averybit@gmail.com"
 # EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
+# DEFAULT_FROM_EMAIL = "shweta.ladne.averybit@gmail.com" # Yah bhi add kar dein
 # DATABASES = {
 #     "default": {
 #         "ENGINE": "django.db.backends.postgresql",
@@ -223,6 +224,7 @@ EMAIL_USE_TLS = True
 # SECURITY WARNING: Email credentials ko .env se load karein!
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="shweta.ladne.averybit@gmail.com") 
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="qwgh jagp euzh qcwi")
+DEFAULT_FROM_EMAIL = "shweta.ladne.averybit@gmail.com" # Yah bhi add kar dein
 
 # 5. DATABASES: Local setting ko comment karein aur Production setting ko activate karein.
 # Render automatically DATABASE_URL environment variable set karta hai.

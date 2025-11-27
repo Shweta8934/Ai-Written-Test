@@ -839,6 +839,18 @@
             throw new Error("Validation Failed"); // Break the chain
           });
         }
+        // 🔴 FIX START: Agar status 400 ya 200 nahi hai (e.g., 500), 
+        // toh bhi JSON body ko parse karke uske 'message' ko throw karein.
+        if (!res.ok) {
+           return res.json().then(data => {
+               // Server side error message ko front end par dikhayen
+               throw new Error(data.message || "An unknown server error occurred."); 
+           }).catch(() => {
+               // Agar response JSON nahi hai (rare, but safe)
+               throw new Error(`HTTP Error: ${res.status} occurred. Check console logs.`); 
+           });
+        }
+        // 🔴 FIX END
         if (!res.ok) {
            throw new Error("Server error occurred.");
         }
