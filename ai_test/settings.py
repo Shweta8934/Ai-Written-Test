@@ -260,10 +260,14 @@ USE_I18N = True
 USE_TZ = True
 
 # 6. STATIC FILE SETTINGS: WhiteNoise ke liye Static files ki configuration.
+
+
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # Static files ko yahan collect kiya jayega
+
+प्रोडक्शन के लिए, इन दोनों को चालू करें
+STATIC_ROOT = BASE_DIR / 'staticfiles' 
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
+    BASE_DIR / "static",
 ]
 
 # 7. WhiteNoise ke liye Storage Backend
