@@ -134,9 +134,6 @@
 #     os.path.join(BASE_DIR, "static"),
 # ]
 
-
-# settings.py for Render Deployment
-# settings.py for Render Deployment (Production-Ready)
 from pathlib import Path
 import os 
 import environ
@@ -150,17 +147,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 1. Environment Initialization
 # =============================================================================
 env = environ.Env(
-    # Set defaults and type casting
+    # Set casting defaults and types for all Env Vars
     DEBUG=(bool, False), 
-    SECRET_KEY=(str, 'django-insecure-rf^i_@h*%*-6bz7n5djy8d2r26z+e!y-s4=h2g83pv=uptw)gk'),
+    SECRET_KEY=(str, 'django-insecure-rf^i_@h*%*-6bz7n5djy8d2r26z+e!y-s4=h2g83pv=uptw)gk'), # Fallback key
     ALLOWED_HOSTS=(list, ['ai-written-test-5tny.onrender.com']),
-    DATABASE_URL=(str, ''),
+    DATABASE_URL=(str, 'sqlite:///db.sqlite3'), # Local default DB for safety
     
-    # Email settings (Use environment variables for production)
+    # Email settings (Using standard TLS port 587)
     EMAIL_HOST=(str, 'smtp.gmail.com'),
-    EMAIL_PORT=(int, 465), # ✅ Changed: Standard secure port for TLS/STARTTLS
-    EMAIL_USE_TLS=(bool, True), # ✅ Changed: Default to TLS (port 587)
-    EMAIL_USE_SSL=(bool, False), # ✅ Changed: SSL (port 465) and TLS (port 587) are mutually exclusive, prefer TLS
+    EMAIL_PORT=(int, 587),
+    EMAIL_USE_TLS=(bool, True),
+    EMAIL_USE_SSL=(bool, False), # TLS and SSL are mutually exclusive
     EMAIL_HOST_USER=(str, ''),
     EMAIL_HOST_PASSWORD=(str, ''),
     DEFAULT_FROM_EMAIL=(str, 'noreply@yourapp.com'),
@@ -169,45 +166,38 @@ env = environ.Env(
     GEMINI_API_KEY=(str, ""),
     OPENAI_API_KEY=(str, "")
 )
-# Read .env file ONLY in non-production environments (or if needed for local testing)
-if not 'RENDER' in os.environ:
+# Read .env file ONLY in local development
+if not os.environ.get('RENDER'):
     environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # =============================================================================
 # 2. Basic Configuration
 # =============================================================================
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY')
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
-# Set ALLOWED_HOSTS
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 if DEBUG:
+    # Add local development hosts only if DEBUG is True
     ALLOWED_HOSTS += ["127.0.0.1", "localhost", "192.168.1.10", "10.0.0.42"]
     
 # Application definition
 INSTALLED_APPS = [
-    # Built-in Apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Third-party Apps
     'django.contrib.humanize',
     "widget_tweaks",
-    # Your Apps
     "app",
     "user_tests",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    # WhiteNoise must be placed directly after SecurityMiddleware
-    "whitenoise.middleware.WhiteNoiseMiddleware", 
+    "whitenoise.middleware.WhiteNoiseMiddleware", # Must be here for static files
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -262,30 +252,18 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # =============================================================================
-# 3. Production-Specific Settings
+# 3. Production/Deployment Settings
 # =============================================================================
 
 # --- Database Configuration ---
-# Use DATABASE_URL environment variable for production (Render)
-database_url = env('DATABASE_URL')
-if not database_url and not 'makemigrations' in sys.argv and not 'migrate' in sys.argv:
-    # Fallback to local settings only if no DATABASE_URL is set and not running migration commands
-    # This prevents an error if you run makemigrations/migrate locally without a .env
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
-else:
-    # Use dj_database_url for production/local database_url
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=database_url,
-            conn_max_age=600,
-            ssl_require=True # Important for Render PostgreSQL
-        )
-    }
+# Use dj_database_url for production/local DATABASE_URL
+DATABASES = {
+    'default': dj_database_url.config(
+        default=env('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=(not DEBUG) # Require SSL only in production
+    )
+}
 
 # --- Static Files (WhiteNoise for Render) ---
 STATIC_URL = "/static/"
@@ -294,7 +272,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Directories where Django looks for static files *during development*
 STATICFILES_DIRS = [BASE_DIR / "static"] 
 
-# Use WhiteNoise's storage for compressed and cached static files
+# Use WhiteNoise's storage for compressed and cached static files in production
 if not DEBUG:
     STORAGES = {
         "staticfiles": {
@@ -303,7 +281,6 @@ if not DEBUG:
     }
 
 # --- Email Configuration ---
-# Simplified and centralized email configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = env('EMAIL_HOST')
 EMAIL_PORT = env('EMAIL_PORT')
@@ -313,24 +290,24 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 
-# Fallback/Security Check for Production
+# Fallback to console backend if credentials are missing in production
 if not EMAIL_HOST_USER and not DEBUG:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    print("🚨 WARNING: Using Console Email Backend in Production! Set EMAIL_HOST_USER/PASSWORD.")
+    print("🚨 WARNING: Using Console Email Backend! Set EMAIL_HOST_USER/PASSWORD.")
 
 # --- API Keys ---
 GEMINI_API_KEY = env("GEMINI_API_KEY")
 OPENAI_API_KEY = env("OPENAI_API_KEY")
 print(f"DEBUG: OpenAI Key Loaded: {'Yes' if OPENAI_API_KEY else 'No'}") 
 
-# --- Security Headers (Best Practices) ---
+# --- Security Headers (Production only) ---
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True  # Force HTTPS
+    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000 # 1 year
+    SECURE_HSTS_SECONDS = 31536000 
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY' # Already in your Middleware, but good to set here too
+    X_FRAME_OPTIONS = 'DENY'
