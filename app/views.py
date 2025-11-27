@@ -4068,22 +4068,47 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, render, redirect # Ensure redirect is imported
 # ... (Other imports at the top)
 
+
+from django.shortcuts import render, get_object_or_404
+from django.http import Http404
+from django.contrib import messages
+from django.db import transaction
+
+# मान लीजिए कि आपके मॉडल और फॉर्म यहाँ imported हैं
+# from .models import QuestionPaper, CandidateApplication
+# from .forms import CandidateApplicationForm 
+
 @transaction.atomic
 def interview_candidate_apply_view(request, paper_id):
     """
     Public page for candidates to apply based on a QuestionPaper link (Interview).
-    FIXED: Correctly handles form validation, sets is_experienced, and prevents crashes on errors.
+    FIXED: Efficiently filters QuestionPaper and handles application logic.
     """
     try:
-        paper = get_object_or_404(QuestionPaper, pk=paper_id)
+        # 💡 UPDATED: सीधे फिल्टर करें कि QuestionPaper मौजूद है और Interview Round है
+        paper = get_object_or_404(
+            QuestionPaper, 
+            pk=paper_id, 
+            is_interview_round=True  # अगर यह False है, तो सीधे Http404 trigger होगा
+        )
     except Http404:
-        return render(request, 'recruitment/drive_closed.html', {'message': 'The specified job posting was not found.'}, status=404)
+        # अगर ID नहीं मिली या is_interview_round=False है, तो यह 404/closed दिखाएगा
+        return render(
+            request, 
+            'recruitment/drive_closed.html', 
+            {'message': 'The specified job posting was not found or is not an application form.'}, 
+            status=404
+        )
         
-    if not paper.is_interview_round:
-        return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
-        
+    # ❌ is_interview_round चेक अब हटा दिया गया है
+    
     if not paper.is_public_active:
-        return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
+        return render(
+            request, 
+            'recruitment/drive_closed.html', 
+            {'message': 'The application link for this interview round is currently inactive.'}, 
+            status=403
+        )
 
     if request.method == 'POST':
         form = CandidateApplicationForm(request.POST, request.FILES)  
@@ -4098,7 +4123,7 @@ def interview_candidate_apply_view(request, paper_id):
 
             # --- CRITICAL FIX: Manually set is_experienced and clear dependent fields ---
             application = form.save(commit=False)
-            candidate_type = request.POST.get('candidateType') # Access raw POST data
+            candidate_type = request.POST.get('candidateType') 
             is_experienced_candidate = (candidate_type == 'experienced')
             application.is_experienced = is_experienced_candidate
             
@@ -4109,6 +4134,7 @@ def interview_candidate_apply_view(request, paper_id):
                 application.current_ctc_rate = None
                 application.notice_period = None 
             
+            # ⭐ Linking the application to the specific QuestionPaper (Interview Round)
             application.linked_paper = paper
             
             # Set initial stage
@@ -4139,7 +4165,7 @@ def interview_candidate_apply_view(request, paper_id):
         'title': f'Apply: {paper.job_title}'
     }
     return render(request, 'recruitment/interview_application_form.html', context)
-
+    
 # app/views.py
 
 from django.shortcuts import render
