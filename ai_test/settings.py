@@ -60,11 +60,13 @@
 # # --- ADD YOUR EMAIL SETTING HERE ---
 # EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 # EMAIL_HOST = "smtp.gmail.com"
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
+# EMAIL_PORT = 465
+# EMAIL_USE_TLS = False  # Disable TLS
+# EMAIL_USE_SSL = True   # Enable SSL for port 465
 # EMAIL_HOST_USER = "shweta.ladne.averybit@gmail.com"
 # EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
-# DEFAULT_FROM_EMAIL = "shweta.ladne.averybit@gmail.com" # Yah bhi add kar dein
+# DEFAULT_FROM_EMAIL = "shweta.ladne.averybit@gmail.com"
+
 # DATABASES = {
 #     "default": {
 #         "ENGINE": "django.db.backends.postgresql",
@@ -212,12 +214,25 @@ WSGI_APPLICATION = "ai_test.wsgi.application"
 # =============================================================================
 # 🚀 EMAIL CONFIGURATION - Mailtrap + Fallback (Production Ready)
 # =============================================================================
+# =============================================================================
+# 🚀 EMAIL CONFIGURATION - Mailtrap + Fallback (Production Ready)
+# =============================================================================
 if 'RENDER' in os.environ:
-    # Production: Render + Mailtrap
+    # Production: Render + (New SMTP)
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.mailtrap.io')
-    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
+    
+    # --- CHANGES START HERE ---
+    
+    # Gmail SMTP: Read from Env Vars, default to Gmail Host for port 465 setup
+    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))
+    
+    # Gmail uses SSL (port 465) by default, so set TLS False and SSL True
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'false').lower() == 'true' # Default changed to 'false'
+    EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'true').lower() == 'true' # New setting added
+    
+    # --- CHANGES END HERE ---
+    
     EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
     DEFAULT_FROM_EMAIL = os.getenv('DEFAULTFROMEMAIL', 'noreply@yourapp.com')
@@ -229,9 +244,11 @@ if 'RENDER' in os.environ:
         
 else:
     # Local Development
+    # NOTE: You should set up your local Gmail credentials at the top 
+    # OR change this to 'django.core.mail.backends.smtp.EmailBackend'
+    # to test emailing locally.
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'noreply@localhost'
-
 # Database - Render PostgreSQL
 DATABASES = {
     'default': dj_database_url.config(
