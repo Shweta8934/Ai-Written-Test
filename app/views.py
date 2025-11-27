@@ -3954,28 +3954,111 @@ from django.contrib import messages
 from .models import QuestionPaper, CandidateApplication # Ensure these are imported
 from .forms import CandidateApplicationForm
 
+# @transaction.atomic 
+# def interview_candidate_apply_view(request, paper_id):
+#     """
+#     Public page for candidates to apply based on a QuestionPaper link (Interview).
+#     Handles GET (showing form) and POST (submitting application).
+#     """
+    
+#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
+    
+#     # --- CRITICAL ACCESS CHECKS ---
+#     if not paper.is_interview_round:
+#         messages.error(request, 'This link is for a written assessment, not a candidate application form.')
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
+        
+#     if not paper.is_public_active:
+#         messages.error(request, 'The application link for this interview round is currently inactive.')
+#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
+
+#     # --- POST REQUEST (Form Submission) ---
+#     if request.method == 'POST':
+#         # CandidateApplicationForm को request.POST और request.FILES के साथ instantiate करें
+#         # Note: 'initial' सिर्फ GET request के लिए होता है, POST के लिए नहीं
+#         form = CandidateApplicationForm(request.POST, request.FILES) 
+        
+#         if form.is_valid():
+#             email = form.cleaned_data['email']
+
+#             # Duplicate Check: Check for application with same email linked to this specific paper
+#             if CandidateApplication.objects.filter(email__iexact=email, linked_paper=paper).exists():
+#                  messages.error(request, "An application with this email already exists for this interview round.")
+#                  # Form को error के साथ वापस render करें
+#                  return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
+
+
+#             application = form.save(commit=False)
+            
+#             # ⭐ CRITICAL FIX: QuestionPaper (Interview Round) को CandidateApplication से लिंक करें
+#             application.linked_paper = paper
+            
+#             # Initial stage set करें
+#             application.current_stage = CandidateApplication.CandidateStage.APPLIED
+#             application.overall_status = CandidateApplication.ApplicationStatus.ACTIVE
+            
+#             application.save()
+#             # M2M data (जैसे skills) को save करें
+#             # Note: CandidateApplicationForm में M2M fields save करने के लिए save_m2m की आवश्यकता हो सकती है,
+#             # यदि आप CandidateApplicationForm को custom save नहीं कर रहे हैं।
+#             try:
+#                 form.save_m2m() 
+#             except ValueError:
+#                 # यदि फॉर्म में कोई M2M field नहीं है, तो यह ValueError दे सकता है।
+#                 pass
+            
+#             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
+            
+#             # Success screen dikhayen
+#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
+#         else:
+#             # Form validation fail होने पर error message dikhayen
+#             messages.error(request, "Please correct the errors below.")
+#             # Form को errors के साथ render करें ताकि candidate गलतियाँ सुधार सके
+
+#     # --- GET REQUEST (Show Form) ---
+#     else:
+#         # GET request: Form को initialize करे, URL parameters से full_name और email को pre-fill करें
+#         form = CandidateApplicationForm(initial={
+#             'full_name': request.GET.get('full_name', ''),
+#             'email': request.GET.get('email', '') 
+#         })
+
+#     context = {
+#         'paper': paper,
+#         'form': form,
+#         'title': f'Apply: {paper.job_title}'
+#     }
+#     return render(request, 'recruitment/interview_application_form.html', context)
 @transaction.atomic 
 def interview_candidate_apply_view(request, paper_id):
     """
     Public page for candidates to apply based on a QuestionPaper link (Interview).
     Handles GET (showing form) and POST (submitting application).
+    
+    CRITICAL CHANGE: Removed the 'paper.is_public_active' check to ensure the form loads 
+    directly if the link is generated and the paper exists.
     """
     
     paper = get_object_or_404(QuestionPaper, pk=paper_id)
     
     # --- CRITICAL ACCESS CHECKS ---
+    # Check 1: Must be an interview round (This check is retained and is essential).
     if not paper.is_interview_round:
+        # If it's a written assessment, return a 404/403 error.
         messages.error(request, 'This link is for a written assessment, not a candidate application form.')
         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
         
-    if not paper.is_public_active:
-        messages.error(request, 'The application link for this interview round is currently inactive.')
-        return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
+    # 🚫 REMOVED: is_public_active check. 
+    # If a recruiter manually sets the paper to inactive, they must re-enable it.
+    # By removing this, we assume the shared link grants persistent access.
+    # if not paper.is_public_active:
+    #     messages.error(request, 'The application link for this interview round is currently inactive.')
+    #     return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
 
     # --- POST REQUEST (Form Submission) ---
     if request.method == 'POST':
         # CandidateApplicationForm को request.POST और request.FILES के साथ instantiate करें
-        # Note: 'initial' सिर्फ GET request के लिए होता है, POST के लिए नहीं
         form = CandidateApplicationForm(request.POST, request.FILES) 
         
         if form.is_valid():
@@ -3998,13 +4081,11 @@ def interview_candidate_apply_view(request, paper_id):
             application.overall_status = CandidateApplication.ApplicationStatus.ACTIVE
             
             application.save()
+            
             # M2M data (जैसे skills) को save करें
-            # Note: CandidateApplicationForm में M2M fields save करने के लिए save_m2m की आवश्यकता हो सकती है,
-            # यदि आप CandidateApplicationForm को custom save नहीं कर रहे हैं।
             try:
                 form.save_m2m() 
             except ValueError:
-                # यदि फॉर्म में कोई M2M field नहीं है, तो यह ValueError दे सकता है।
                 pass
             
             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
@@ -4030,7 +4111,6 @@ def interview_candidate_apply_view(request, paper_id):
         'title': f'Apply: {paper.job_title}'
     }
     return render(request, 'recruitment/interview_application_form.html', context)
-
 # app/views.py
 
 from django.shortcuts import render
