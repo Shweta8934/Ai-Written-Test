@@ -214,9 +214,7 @@ WSGI_APPLICATION = "ai_test.wsgi.application"
 # =============================================================================
 # 🚀 EMAIL CONFIGURATION - Mailtrap + Fallback (Production Ready)
 # =============================================================================
-# =============================================================================
-# 🚀 EMAIL CONFIGURATION - Mailtrap + Fallback (Production Ready)
-# =============================================================================
+
 if 'RENDER' in os.environ:
     # Production: Render + (New SMTP)
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
