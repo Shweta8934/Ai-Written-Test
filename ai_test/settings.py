@@ -137,11 +137,11 @@
 
 # settings.py for Render Deployment
 # settings.py for Render Deployment (Production-Ready)
-
 from pathlib import Path
 import os 
 import environ
 import dj_database_url
+import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -188,7 +188,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",  # ✅ FIXED: clickjacking
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "ai_test.urls"
@@ -212,41 +212,30 @@ TEMPLATES = [
 WSGI_APPLICATION = "ai_test.wsgi.application"
 
 # =============================================================================
-# 🚀 EMAIL CONFIGURATION - Mailtrap + Fallback (Production Ready)
+# 🚀 EMAIL CONFIGURATION
 # =============================================================================
 
 if 'RENDER' in os.environ:
-    # Production: Render + (New SMTP)
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     
-    # --- CHANGES START HERE ---
-    
-    # Gmail SMTP: Read from Env Vars, default to Gmail Host for port 465 setup
     EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
     EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))
     
-    # Gmail uses SSL (port 465) by default, so set TLS False and SSL True
-    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'false').lower() == 'true' # Default changed to 'false'
-    EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'true').lower() == 'true' # New setting added
-    
-    # --- CHANGES END HERE ---
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'false').lower() == 'true'
+    EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'true').lower() == 'true'
     
     EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
     DEFAULT_FROM_EMAIL = os.getenv('DEFAULTFROMEMAIL', 'noreply@yourapp.com')
     
-    # Render Free Tier Fallback
     if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
         EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
         print("🚨 Render Free Tier: Using Console Backend")
         
 else:
-    # Local Development
-    # NOTE: You should set up your local Gmail credentials at the top 
-    # OR change this to 'django.core.mail.backends.smtp.EmailBackend'
-    # to test emailing locally.
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'noreply@localhost'
+
 # Database - Render PostgreSQL
 DATABASES = {
     'default': dj_database_url.config(
@@ -285,3 +274,25 @@ X_FRAME_OPTIONS = 'DENY'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+
+# =====================================================================
+# ✅ LOGGING ENABLED FOR RENDER (Shows full traceback for 500 errors)
+# =====================================================================
+
+DEBUG_PROPAGATE_EXCEPTIONS = True   # show full exceptions
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',   # log all errors
+    },
+}
