@@ -155,9 +155,9 @@ env = environ.Env(
     
     # Email settings (Using standard TLS port 587)
     EMAIL_HOST=(str, 'smtp.gmail.com'),
-    EMAIL_PORT=(int, 587),
-    EMAIL_USE_TLS=(bool, True),
-    EMAIL_USE_SSL=(bool, False), # TLS and SSL are mutually exclusive
+    EMAIL_PORT=(int, 465),
+    EMAIL_USE_TLS=(bool, False),
+    EMAIL_USE_SSL=(bool, True), # TLS and SSL are mutually exclusive
     EMAIL_HOST_USER=(str, ''),
     EMAIL_HOST_PASSWORD=(str, ''),
     DEFAULT_FROM_EMAIL=(str, 'noreply@yourapp.com'),
