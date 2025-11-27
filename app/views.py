@@ -5,6 +5,14 @@ import re
 from typing import Optional, Dict, Any
 from openai import OpenAI  
 import re
+# app/views.py (TOP OF THE FILE)
+# ...
+from django.db import transaction
+from django.conf import settings
+from .forms import QuestionPaperEditForm
+from django.http import JsonResponse, HttpResponseForbidden, Http404 # 💡 FIX 1: Add Http404 here
+from django.contrib.auth import get_user_model
+# ...
 import google.generativeai as genai
 from django.contrib.auth import login, logout
 from django.views.decorators.http import require_POST
