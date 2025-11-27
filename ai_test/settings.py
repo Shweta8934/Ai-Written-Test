@@ -134,37 +134,33 @@
 
 
 # settings.py for Render Deployment
+# settings.py for Render Deployment (Production-Ready)
 
 from pathlib import Path
 import os 
 import environ
-import dj_database_url  # New import: Database URL parsing ke liye
+import dj_database_url
+from django.conf import settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Initialize environment variables
 env = environ.Env(
-    # Production settings ke liye DEBUG default False rakhein
     DEBUG=(bool, False), 
     GEMINI_API_KEY=(str, ""),
     OPENAI_API_KEY=(str, ""),
-    # DATABASE_URL ke liye default empty string rakhein agar file mein define nahi hai
-    DATABASE_URL=(str, "") 
+    DATABASE_URL=(str, "")
 )
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
-# Quick-start development settings - unsuitable for production
 # SECURITY WARNING: keep the secret key used in production secret!
-# 1. SECRET_KEY ko Environment Variable se load karein
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-rf^i_@h*%*-6bz7n5djy8d2r26z+e!y-s4=h2g83pv=uptw)gk')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# 2. DEBUG ko Environment Variable se load karein (Render par False hona chahiye)
 DEBUG = env('DEBUG')
 
-# 3. ALLOWED_HOSTS ko Environment Variable se ya Render ke URL se load karein
-# '*' Render par default ke liye theek hai ya fir env.list('ALLOWED_HOSTS') use karein.
+# ALLOWED_HOSTS
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['ai-written-test-5tny.onrender.com'])
 if DEBUG:
     ALLOWED_HOSTS += ["127.0.0.1", "localhost"]
@@ -178,14 +174,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     'django.contrib.humanize',
-    # WhiteNoise ke liye koi app install karne ki zarurat nahi hai, bas middleware mein add karein
     "app",
     "user_tests",
     "widget_tweaks",
 ]
 
 MIDDLEWARE = [
-    # 4. WhiteNoise middleware ko Security aur Session middleware ke beech add karein
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -193,7 +187,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.middleware.clickjjack.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "ai_test.urls"
@@ -216,63 +210,56 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "ai_test.wsgi.application"
 
-# --- EMAIL SETTING ---
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-# SECURITY WARNING: Email credentials ko .env se load karein!
-EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="shweta.ladne.averybit@gmail.com") 
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="qwgh jagp euzh qcwi")
-DEFAULT_FROM_EMAIL = "shweta.ladne.averybit@gmail.com" # Yah bhi add kar dein
+# =============================================================================
+# 🚀 EMAIL CONFIGURATION - Mailtrap + Gmail + Local (Production Ready)
+# =============================================================================
+if 'RENDER' in os.environ:
+    # Production: Render + Mailtrap/Gmail (SMTP works on paid plans)
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.mailtrap.io')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
+    EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+    DEFAULT_FROM_EMAIL = os.getenv('DEFAULTFROMEMAIL', 'noreply@yourapp.com')
+    
+    # Render Free Tier Fallback: Console Backend (No SMTP port blocking)
+    if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+        EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+        print("🚨 Render Free Tier: Using Console Backend (emails logged)")
+        
+else:
+    # Local Development: Console Backend
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'noreply@localhost'
 
-# 5. DATABASES: Local setting ko comment karein aur Production setting ko activate karein.
-# Render automatically DATABASE_URL environment variable set karta hai.
+# =============================================================================
 
-# Local Database (Commented out)
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": "aiTest",
-#         "USER": "postgres",
-#         "PASSWORD": "12345",
-#         "HOST": "localhost",
-#         "PORT": "5432",
-#     }
-# }
-
-# Production Database (Render-friendly)
+# Database - Render PostgreSQL
 DATABASES = {
     'default': dj_database_url.config(
-        default=env('DATABASE_URL'), # Render se DATABASE_URL load karega
+        default=env('DATABASE_URL'),
         conn_max_age=600,
-        ssl_require=True # SSL mode Render ki PostgreSQL ke liye required hai
+        ssl_require=True
     )
 }
 
 # AI Keys
 GEMINI_API_KEY = env("GEMINI_API_KEY")
 OPENAI_API_KEY = env("OPENAI_API_KEY")
-print(f"DEBUG: OpenAI Key Loaded: {'Yes' if OPENAI_API_KEY else 'No'}") 
+print(f"DEBUG: OpenAI Key Loaded: {'Yes' if OPENAI_API_KEY else 'No'}")
 
-# Internationalization...
+# Internationalization
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# 6. STATIC FILE SETTINGS: WhiteNoise ke liye Static files ki configuration.
+# Static files (WhiteNoise for Render)
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
-
-STATIC_URL = "static/"
-
-
-STATIC_ROOT = BASE_DIR / 'staticfiles' 
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
-
-# 7. WhiteNoise ke liye Storage Backend
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
@@ -281,18 +268,8 @@ STORAGES = {
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-import os
-from django.conf import settings
 
-# Email Configuration - Works for Local + Production
-if 'RENDER' in os.environ or os.getenv('EMAIL_BACKEND'):  # Production
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
-    EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-    EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-    DEFAULT_FROM_EMAIL = os.getenv('DEFAULTFROMEMAIL', 'noreply@yourapp.com')
-else:  # Local Development
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    DEFAULT_FROM_EMAIL = 'noreply@localhost'
+# Security (Production)
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
