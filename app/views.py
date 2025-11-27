@@ -2695,7 +2695,7 @@ def invite_candidate(request):
             return JsonResponse(
                 {
                     "status": "error",
-                    "message": "Email sending failed. Please check server logs.",
+                    "message": f"Email sending failed. Server Error: {str(e)}",
                 },
                 status=500,
             )
