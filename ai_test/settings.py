@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "app",
     "user_tests",
     "widget_tweaks",
+    'crispy_forms',
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -58,29 +59,29 @@ TEMPLATES = [
 ]
 WSGI_APPLICATION = "ai_test.wsgi.application"
 # --- ADD YOUR EMAIL SETTING HERE ---
-# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-# EMAIL_HOST = "smtp.gmail.com"
-# EMAIL_PORT = 465
-# EMAIL_USE_TLS = False  # Disable TLS
-# EMAIL_USE_SSL = True   # Enable SSL for port 465
-# EMAIL_HOST_USER = "shweta.ladne.averybit@gmail.com"
-# EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
-# DEFAULT_FROM_EMAIL = "shweta.ladne.averybit@gmail.com"
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 465
+EMAIL_USE_TLS = False  # Disable TLS
+EMAIL_USE_SSL = True   # Enable SSL for port 465
+EMAIL_HOST_USER = "shweta.ladne.averybit@gmail.com"
+EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
+DEFAULT_FROM_EMAIL = "shweta.ladne.averybit@gmail.com"
 
 # ----------------------------------------------------------------------
 # --- SENDGRID EMAIL SETTINGS ---
 # ----------------------------------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.sendgrid.net" # SendGrid SMTP Host
-# settings.py or equivalent configuration file
-EMAIL_USE_TLS = False # Set this to False
-EMAIL_USE_SSL = True  # Set this to True
-EMAIL_PORT = 465
-# EMAIL_PORT = 587             # Standard port for TLS
-# EMAIL_USE_TLS = True         # Use TLS encryption
-EMAIL_HOST_USER = "apikey"   # SendGrid uses the literal string "apikey" as username
-EMAIL_HOST_PASSWORD = "" # Your API Key
-DEFAULT_FROM_EMAIL = "shweta.ladne@averybit.in" # SendGrid में Verify किया हुआ Email ID डालें
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST = "smtp.sendgrid.net" # SendGrid SMTP Host
+# # settings.py or equivalent configuration file
+# EMAIL_USE_TLS = False # Set this to False
+# EMAIL_USE_SSL = True  # Set this to True
+# EMAIL_PORT = 465
+# # EMAIL_PORT = 587             # Standard port for TLS
+# # EMAIL_USE_TLS = True         # Use TLS encryption
+# EMAIL_HOST_USER = "apikey"   # SendGrid uses the literal string "apikey" as username
+# EMAIL_HOST_PASSWORD = "" # Your API Key
+# DEFAULT_FROM_EMAIL = "shweta.ladne@averybit.in" # SendGrid में Verify किया हुआ Email ID डालें
 
 DATABASES = {
     "default": {

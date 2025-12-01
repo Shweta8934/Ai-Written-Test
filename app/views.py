@@ -24,13 +24,23 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
 from .models import QuestionPaper, PaperSection, Question  # Import your models
-
+from .models import (
+    QuestionPaper, 
+    PaperSection, 
+    Question, 
+    Department, 
+    Skill, 
+    Section,
+    Round ,
+    InterviewEvaluation
+)
 from .forms import (
     LoginForm,
     UserRegistrationForm,
     UserProfileRegistrationForm,
     DepartmentForm,
     SkillForm,
+    
 )
 import csv  
 from .models import QuestionPaper, PaperSection, Question, Department, Skill
@@ -43,7 +53,17 @@ from django.views.decorators.csrf import csrf_exempt
 
 from django.contrib import messages
 
+# Define standard round choices=
+ROUND_CHOICES_STATIC = ["Assessment Test", "Technical Interview (R1)", "HR Interview (Final)"]
 
+# Example of ROUND_CHOICES if needed globally (though not strictly necessary now):
+ROUND_CHOICES = [
+    ("1", "Assessment Test"),
+    ("2", "Technical Interview (R1)"),
+    ("3", "HR Interview (Final)"),
+]
+
+# ... rest of the file ...
 def user_login(request):
     if request.user.is_authenticated:
         return redirect("dashboard") if request.user.is_staff else redirect("home")
@@ -351,84 +371,69 @@ def generate_questions(request):
         # Note: Department ID ki jagah Department Name use kiya (HTML mein 'department' tha)
     ).order_by('-created_at')
 
+    # 1. Fetch ALL active rounds from the dedicated Round model
+    all_rounds = list(Round.objects.filter(is_active=True).values_list('name', flat=True))
+
+    # 2. Prepare rounds list (key: name, value: name)
+    rounds_list = []
+    for round_name in all_rounds:
+        rounds_list.append({'value': round_name, 'label': round_name})
+    
+    # 3. If "Assessment Test" is a static round, ensure it's in the list
+    if "Assessment Test" not in all_rounds:
+        rounds_list.insert(0, {'value': 'Assessment Test', 'label': 'Assessment Test'})
+    
+    # Sort for cleaner display (optional)
+    rounds_list = sorted(rounds_list, key=lambda x: x['label'])
+
     context = {
         "departments": departments,
-        "existing_papers": list(existing_papers) # Data ko list mein convert karna
+        "existing_papers": list(existing_papers),
+        "round_choices": rounds_list,  # <--- This now contains only Round names
     }
+    return render(request, "question_generator/generator.html", context)
+    # context = {
+    #     "departments": departments,
+    #     "existing_papers": list(existing_papers) # Data ko list mein convert karna
+    # }
     
     return render(request, "question_generator/generator.html", context)
 
+@login_required
+@require_POST
+@csrf_exempt
+def create_custom_round_ajax(request):
+    """
+    AJAX endpoint to create a new custom round, saving it to the Round model.
+    """
+    try:
+        data = json.loads(request.body)
+        round_name = data.get("name", "").strip()
 
-# @login_required
-# @require_POST
-# @transaction.atomic
-# def save_paper(request):
-#     """Saves the generated paper and calculates the total question count."""
-#     try:
-#         data = json.loads(request.body)
+        if not round_name:
+             return JsonResponse({"status": "error", "message": "Round name cannot be empty."}, status=400)
+        
+        # 🛑 FIX: Check against the dedicated Round model
+        if Round.objects.filter(name__iexact=round_name).exists():
+             return JsonResponse({"status": "error", "message": "This round name already exists."}, status=400)
 
-#         total_questions_count = 0
-#         for section_data in data.get("sections", []):
-#             total_questions_count += len(section_data.get("questions", []))
+        # 🛑 FIX: Create new Round entry
+        round_instance = Round.objects.create(name=round_name, is_default=False)
 
-#         paper = QuestionPaper.objects.create(
-#             created_by=request.user,
-#             title=data.get("title", "Generated Assessment"),
-#             job_title=data.get("job_title"),
-#             department_name=data.get("department"),
-#             min_exp=data.get("min_exp"),
-#             max_exp=data.get("max_exp"),
-#             is_active=True,
-#             duration=data.get("duration"),
-#             is_public_active=False,
-#             is_private_link_active=False, 
-#              # ✨ NAYA FIELD ADD KAREIN
-#             status = models.CharField(
-#                 max_length=20,
-#                 choices=[
-#                     ('draft', 'Draft'),
-#                     ('active', 'Active'),
-#                     ('inactive', 'Inactive'),
-#                     ('archived', 'Archived'),
-#                 ],
-#                 default='draft',  # ✅ DEFAULT VALUE ZAROORI HAI
-#                 help_text="Current status of the question paper"
-#             ) ,
-#             skills_list=(
-#                 ", ".join(data.get("skills", []))
-#                 if isinstance(data.get("skills"), list)
-#                 else data.get("skills")
-#             ),
-#             total_questions=total_questions_count,
-#         )
-
-#         for section_index, section_data in enumerate(data.get("sections", [])):
-#             section = PaperSection.objects.create(
-#                 question_paper=paper,
-#                 title=section_data.get("title"),
-#                 order=section_index,
-#             )
-#             for q_index, question_data in enumerate(section_data.get("questions", [])):
-
-#                 Question.objects.create(
-#                     section=section,
-#                     text=question_data.get("text"),
-#                     answer=question_data.get("answer"),
-#                     options=question_data.get("options"),
-#                     order=q_index,
-#                     question_type=question_data.get("type", "UN"),
-#                 )
-
-#         return JsonResponse(
-#             {
-#                 "success": True,
-#                 "message": "Paper saved successfully!",
-#                 "redirect_url": "/dashboard/",
-#             }
-#         )
-#     except Exception as e:
-#         print(f"Error saving paper: {e}")
-#         return JsonResponse({"success": False, "error": str(e)}, status=400)
+        return JsonResponse({
+            "status": "success",
+            "section": { # Keeping 'section' key for client-side compatibility (if needed)
+                "id": round_instance.id,
+                "name": round_instance.name
+            },
+            "message": f"Round '{round_instance.name}' created successfully."
+        }, status=201)
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
+    except Exception as e:
+        # Note: Log this error properly in a real app
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.http import JsonResponse
@@ -436,97 +441,6 @@ import json
 from .models import QuestionPaper, PaperSection, Question
 
 
-
-
-# @require_POST
-# @transaction.atomic
-# def save_paper(request):
-#     try:
-#         data = json.loads(request.body)
-#         sections_data = data.get("sections", [])
-#         total_questions_count = 0
-        
-#         # --- DEBUGGING PRINT (Aap ise baad mein hata sakte hain) ---
-#         print("-------------- DEBUG: DATA RECEIVED ---------------")
-#         print(data)
-        
-#         # Create the main QuestionPaper object
-#         paper = QuestionPaper.objects.create(
-#             created_by=request.user,
-#             title=data.get("title", ""),
-#             job_title=data.get("job_title", ""),
-#             department_name=data.get("department", ""),
-#             min_exp=data.get("min_exp", 0),
-#             max_exp=data.get("max_exp", 0),
-#             duration=data.get("duration", 0),
-#             skills_list=data.get("skills", ""),
-#             is_active=True,
-#             is_public_active=False,
-#             is_private_link_active=False,
-#             cutoff_score=data.get("cutoff_score", 20),
-#             # ✅ FIX: ADDED MISSING FIELDS FROM THE PAYLOAD
-#             job_location=data.get("job_location", ""), # <-- ADD THIS
-#             job_type=data.get("job_type", ""),         # <-- ADD THIS
-#             positions=data.get("positions", ""),       # <-- ADD THIS
-#             rounds=data.get("rounds", ""),             # <-- ADD THIS
-#             pay_scale=data.get("pay_scale", ""),       # <-- ADD THIS
-#             end_date=data.get("end_date", None),       # <-- ADD THIS (Keep None for DateField if blank allowed)
-#         )
-        
-#         # ✅ FIXED: Create sections and questions with proper weightage handling
-#         for section_index, section_data in enumerate(sections_data):
-#             # Extract and validate section weightage
-#             section_weightage = 0.0
-#             try:
-#                 weightage_raw = section_data.get("weightage", 0.0)
-#                 section_weightage = float(weightage_raw)
-#             except (ValueError, TypeError) as e:
-#                 print(f"Weightage conversion error for section {section_index}: {e}")
-#                 section_weightage = 0.0
-            
-#             # ✅ FIX: weightage parameter ko add kiya gaya hai
-#             section = PaperSection.objects.create(
-#                 question_paper=paper,
-#                 title=section_data.get("title", f"Section {section_index}"),
-#                 order=section_index,
-#                 weightage=section_weightage  # ✅ YEH LINE MISSING THI
-#             )
-            
-#             questions = section_data.get("questions", [])
-#             total_questions_count += len(questions)
-            
-#             # Create questions for this section
-#             for q_index, question_data in enumerate(questions):
-#                 Question.objects.create(
-#                     section=section,
-#                     text=question_data.get("text", ""),
-#                     answer=question_data.get("answer", ""),
-#                     options=question_data.get("options", None),
-#                     order=q_index,
-#                     question_type=question_data.get("type", "MCQ")
-#                 )
-
-#         # Update total_questions count
-#         paper.total_questions = total_questions_count
-#         paper.save(update_fields=["total_questions"])
-        
-#         return JsonResponse({
-#             "success": True,
-#             "message": "Paper saved successfully!",
-#             "redirect_url": "/dashboard"
-#         })
-        
-#     except Exception as e:
-#         # Server-side error logging
-#         print(f"Error saving paper: {str(e)}") 
-        
-#         return JsonResponse({
-#             "success": False,
-#             "error": f"Failed to save paper: {str(e)}"
-#         }, status=400)
-
-
-# app/views.py
 
 @require_POST
 @transaction.atomic
@@ -822,123 +736,6 @@ def paper_detail_view(request, paper_id):
     return render(request, "question_generator/paper_detail.html", context)
 
 
-# @login_required
-# def paper_detail_view(request, paper_id):
-#     """
-#     Displays the details of a single question paper with WEIGHTED SCORING logic.
-#     """
-#     paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
-#     status_filter = request.GET.get("status", "all")
-#     shortlist_filter = request.GET.get("shortlist_status", "all")
-
-#     skills = [skill.strip() for skill in paper.skills_list.split(",") if skill.strip()]
-
-#     # Fetch all sections once to avoid repetitive DB calls inside the loop
-#     paper_sections = list(paper.paper_sections.all().prefetch_related('questions'))
-
-#     all_participants = list(
-#         TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
-#     )
-
-#     # ▼▼▼ UPDATED LOGIC: WEIGHTED SCORING (Same as test_report) ▼▼▼
-#     for p in all_participants:
-#         if p.is_completed:
-#             user_responses = UserResponse.objects.filter(registration=p).select_related('question')
-            
-#             total_weighted_score = 0.0  # Initialize weighted score
-            
-#             # Iterate through each section to calculate weighted score
-#             for section in paper_sections:
-#                 section_questions = section.questions.all()
-#                 section_total = len(section_questions)
-#                 section_correct = 0
-                
-#                 # Calculate correct answers for this specific section
-#                 for response in user_responses:
-#                     question = response.question
-#                     # Check if response belongs to current section
-#                     if question and question.section_id == section.id:
-#                         user_answer = response.user_answer.strip()
-#                         is_correct = False
-
-#                         if not user_answer:
-#                             is_correct = False
-#                         elif question.question_type == "MCQ":
-#                             cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
-#                             is_correct = user_answer.lower() == cleaned_answer.lower()
-#                         else:
-#                             # AI Evaluation Logic reusing existing function
-#                             qtype = question.question_type.upper()
-#                             if qtype in ("CODE", "CODING"):
-#                                 evaluator_type = "coding"
-#                             elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
-#                                 evaluator_type = "short"
-#                             elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
-#                                 evaluator_type = "true_false"
-#                             else:
-#                                 evaluator_type = "short"
-
-#                             is_correct, _ = evaluate_answer_with_ai(
-#                                 question_text=question.text,
-#                                 user_answer=user_answer,
-#                                 model_answer=question.answer.strip(),
-#                                 question_type=evaluator_type,
-#                             )
-
-#                         if is_correct:
-#                             section_correct += 1
-                
-#                 # Apply Section Weightage Logic
-#                 if section_total > 0:
-#                     section_percentage = (section_correct / section_total) * 100
-#                     # Weightage apply karein
-#                     weighted_score = (section_percentage * section.weightage) / 100 if section.weightage else 0
-#                     total_weighted_score += weighted_score
-
-#             # Final calculation
-#             final_percentage = round(total_weighted_score, 2)
-#             p.score = final_percentage  # Update the score object for display
-            
-#             cutoff = p.question_paper.cutoff_score
-
-#             if cutoff is not None:
-#                 if final_percentage >= cutoff:
-#                     p.status = "pass"
-#                 else:
-#                     p.status = "fail"
-#             else:
-#                 p.status = "pass"
-#         else:
-#             p.status = "pending"
-#             p.score = 0
-#     # ▲▲▲ END OF UPDATED LOGIC ▲▲▲
-
-#     if status_filter != "all":
-#         filtered_participants = [
-#             p for p in all_participants if p.status == status_filter
-#         ]
-#     else:
-#         filtered_participants = all_participants
-
-#     if shortlist_filter == "shortlisted":
-#         final_participants = [p for p in filtered_participants if p.is_shortlisted]
-#     elif shortlist_filter == "not_shortlisted":
-#         final_participants = [p for p in filtered_participants if not p.is_shortlisted]
-#     else:
-#         final_participants = filtered_participants
-
-#     context = {
-#         "paper": paper,
-#         "skills": skills,
-#         "participants": final_participants,
-#         "title": f"Details for {paper.title}",
-#         "selected_status": status_filter,
-#         "selected_shortlist_status": shortlist_filter,
-#     }
-#     return render(request, "question_generator/paper_detail.html", context)
-
-
-
 @login_required
 @transaction.atomic
 def paper_edit_view(request, paper_id):
@@ -1137,91 +934,7 @@ def skill_delete_view(request, pk):
 
 User = get_user_model()
 
-# app/views.py (Around Line 1140, where def user_list is located)
 
-# ... (rest of your imports and functions) ...
-
-# @login_required
-# def user_list(request):
-#     """
-#     Handles /users/ route (which was previously listing TestRegistrations, 
-#     but is now updated to show all CandidateApplications).
-    
-#     This function contains the printing logic for confirmation.
-#     """
-#     stage_filter = request.GET.get('stage', 'all')
-#     status_filter = request.GET.get('status', 'all')
-    
-   
-    
-#     # सभी Applications लो (Recruiter Ownership चेक को बायपास करते हुए)
-#     applications_query = CandidateApplication.objects.all().order_by('-applied_at') \
-#         .select_related('linked_paper', 'recruitment_drive')
-
-#     if stage_filter != 'all':
-#         applications_query = applications_query.filter(current_stage=stage_filter.upper())
-
-#     if status_filter != 'all':
-#         applications_query = applications_query.filter(overall_status=status_filter.upper())
-    
-#     # --- DEBUG 2: Total records fetched before pagination ---
-#     total_count = applications_query.count()
-   
-    
-#     paginator = Paginator(applications_query, 20)
-#     page_number = request.GET.get('page')
-#     applications_page = paginator.get_page(page_number)
-
-#     applications_data = []
-    
-#     # --- DEBUG 3: Looping through the fetched objects ---
-    
-#     for app in applications_page.object_list:
-#         if app.linked_paper:
-#             job_title = app.linked_paper.job_title
-#             source = f"Paper: {app.linked_paper.title}"
-#         elif app.recruitment_drive:
-#             job_title = app.recruitment_drive.position
-#             source = f"Drive: {app.recruitment_drive.title}"
-#         else:
-#             job_title = "N/A"
-#             source = "Unlinked"
-            
-#         # Print the key data points
-
-#         applications_data.append({
-#             'application_id': app.id,
-#             'full_name': app.full_name,
-#             'email': app.email,
-#             'job_title': job_title,
-#             'source': source,
-#             'applied_date': app.applied_at.strftime('%d %b %Y'),
-#             'current_stage': app.get_current_stage_display(),
-#             'overall_status': app.get_overall_status_display(),
-#         })
-    
-    
-#     context = {
-#         'applications_data': applications_data, 
-#         'applications_page': applications_page,
-#         'selected_stage': stage_filter,
-#         'selected_status': status_filter,
-#         'title': 'All Candidate Applications',
-#         'CandidateStageChoices': CandidateApplication.CandidateStage.choices,
-#         'ApplicationStatusChoices': CandidateApplication.ApplicationStatus.choices,
-#     }
-    
-#     # यह आपका वांछित रेंडर पाथ है
-#     return render(request, 'partials/users/user_list.html', context)
-
-# app/views.py (Inside def user_list(request):)
-
-# सुनिश्चित करें कि ये imports फ़ाइल के शीर्ष पर मौजूद हैं:
-# from django.db.models import Q 
-# from .models import CandidateApplication
-# from django.core.paginator import Paginator
-# from django.contrib.auth.decorators import login_required
-# app/views.py (user_list function)
 
 @login_required
 def user_list(request):
@@ -1295,90 +1008,7 @@ def user_list(request):
     
     return render(request, 'partials/users/user_list.html', context)
 
-# @login_required
-# def user_list(request):
-#     # Fetch all filter parameters
-#     stage_filter = request.GET.get('stage', 'all')
-#     status_filter = request.GET.get('status', 'all')
-#     name_query = request.GET.get('name_query', '').strip()
-#     title_query = request.GET.get('title_query', '').strip()
 
-#     # --- DEBUGGING PRINTS (Consolidation) ---
-#     print("\n--- ✅ CANDIDATE APPLICATIONS VIEW HIT (START) ---")
-#     print(f"Name Query: {name_query}, Title Query: {title_query}")
-#     print(f"Stage Filter: {stage_filter}, Status Filter: {status_filter}")
-    
-#     # 1. Base Query
-#     applications_query = CandidateApplication.objects.all().order_by('-applied_at') \
-#         .select_related('linked_paper', 'recruitment_drive')
-
-#     # 2. Apply Stage Filter (Dropdown)
-#     if stage_filter != 'all':
-#         applications_query = applications_query.filter(current_stage=stage_filter.upper())
-
-#     # 3. Apply Status Filter (Dropdown)
-#     if status_filter != 'all':
-#         applications_query = applications_query.filter(overall_status=status_filter.upper())
-
-#     # 4. Apply Name Search (Text Input - Case-insensitive partial search)
-#     if name_query:
-#         applications_query = applications_query.filter(
-#             full_name__icontains=name_query
-#         )
-        
-#     # 5. Apply Job Title Search (Text Input - Case-insensitive partial search across two fields)
-#     if title_query:
-#         applications_query = applications_query.filter(
-#             Q(linked_paper__job_title__icontains=title_query) |
-#             Q(recruitment_drive__position__icontains=title_query)
-#         )
-        
-#     # --- Pagination ---
-#     print(f"Total Records After Filters: {applications_query.count()}")
-#     paginator = Paginator(applications_query, 20)
-#     page_number = request.GET.get('page')
-#     applications_page = paginator.get_page(page_number)
-
-#     # 6. Format Data for Template
-#     applications_data = []
-#     for app in applications_page.object_list:
-#         if app.linked_paper:
-#             job_title = app.linked_paper.job_title
-#             source = f"Paper: {app.linked_paper.title}"
-#         elif app.recruitment_drive:
-#             job_title = app.recruitment_drive.position
-#             source = f"Drive: {app.recruitment_drive.title}"
-#         else:
-#             job_title = "N/A"
-#             source = "Unlinked"
-            
-#         applications_data.append({
-#             'application_id': app.id,
-#             'full_name': app.full_name,
-#             'email': app.email,
-#             'job_title': job_title,
-#             'source': source,
-#             'applied_date': app.applied_at.strftime('%d %b %Y'),
-#             'current_stage': app.get_current_stage_display(),
-#             'overall_status': app.get_overall_status_display(),
-#         })
-    
-#     context = {
-#         'applications_data': applications_data, 
-#         'applications_page': applications_page,
-#         'selected_stage': stage_filter,
-#         'selected_status': status_filter,
-#         'title': 'All Candidate Applications',
-#         'CandidateStageChoices': CandidateApplication.CandidateStage.choices,
-#         'ApplicationStatusChoices': CandidateApplication.ApplicationStatus.choices,
-#     }
-    
-#     print("--- ✅ CANDIDATE APPLICATIONS VIEW HIT (END) ---\n")
-#     return render(request, 'partials/users/user_list.html', context)
-
-# def user_list(request):
-#     users = TestRegistration.objects.all().order_by("id")
-#     return render(request, "partials/users/user_list.html", {"users": users})
 
 
 def user_detail(request, user_id):
@@ -1462,97 +1092,7 @@ def toggle_paper_public_status(request, paper_id):
         )
 
 
-# def test_result(request, registration_id):
-#     """
-#     Displays test results with clear indication of unattempted questions.
-#     """
-#     registration = get_object_or_404(TestRegistration, pk=registration_id)
-#     user_responses = UserResponse.objects.filter(
-#         registration=registration
-#     ).select_related("question")
 
-#     paper = registration.question_paper
-#     total_questions = paper.total_questions
-#     cutoff_score = paper.cutoff_score
-
-#     score = 0
-#     results_data = []
-#     unattempted_count = 0  # ✅ NEW: Track unattempted questions
-
-#     for response in user_responses:
-#         question = response.question
-#         user_answer = response.user_answer.strip()
-#         is_correct = False
-#         attempt_status = "incorrect"  # ✅ NEW: Default status
-
-#         # ✅ Check if question was attempted
-#         if not user_answer:
-#             attempt_status = "unattempted"
-#             unattempted_count += 1
-#         else:
-#             # Question attempt kiya gaya hai, ab evaluate karo
-#             if question.question_type == "MCQ":
-#                 model_answer = question.answer.strip()
-#                 is_correct = user_answer.lower() == model_answer.lower()
-#             else:
-#                 # Map internal question type to evaluator type
-#                 qtype = question.question_type.upper()
-#                 if qtype in ("CODE", "CODING"):
-#                     evaluator_type = "coding"
-#                 elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
-#                     evaluator_type = "short"
-#                 elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
-#                     evaluator_type = "true_false"
-#                 else:
-#                     evaluator_type = "short"
-
-#                 # evaluate_answer_with_ai returns (is_correct, details)
-#                 is_correct, _ = evaluate_answer_with_ai(
-#                     question_text=question.text,
-#                     user_answer=user_answer,
-#                     model_answer=question.answer.strip(),
-#                     question_type=evaluator_type,
-#                 )
-
-#             # Set status based on correctness
-#             if is_correct:
-#                 score += 1
-#                 attempt_status = "correct"
-#             else:
-#                 attempt_status = "incorrect"
-
-#         results_data.append(
-#             {
-#                 "question_text": response.question.text,
-#                 "user_answer": (
-#                     response.user_answer if user_answer else "Not Attempted"
-#                 ),  # ✅ NEW
-#                 "correct_answer": response.question.answer,
-#                 "is_correct": is_correct,
-#                 "attempt_status": attempt_status,  # ✅ NEW: Pass status to template
-#             }
-#         )
-
-#     incorrect_answers = total_questions - score - unattempted_count  # ✅ UPDATED
-#     percentage = round((score / total_questions) * 100) if total_questions > 0 else 0
-
-#     status = "Pass" if percentage >= cutoff_score else "Fail"
-
-#     context = {
-#         "registration": registration,
-#         "results": results_data,
-#         "score": score,
-#         "total_questions": total_questions,
-#         "incorrect_answers": incorrect_answers,
-#         "unattempted_count": unattempted_count,  # ✅ NEW
-#         "percentage": percentage,
-#         "title": f"Test Report for {registration.email}",
-#         "status": status,
-#         "cutoff_score": cutoff_score,
-#     }
-
-#     return render(request, "partials/users/test_report.html", context)
-# app/views.py
 
 def testresult(request, registration_id):
     """Displays test results with section-wise weightage breakdown."""
@@ -2396,68 +1936,6 @@ def evaluate_answer_simple(
     return is_correct
 
 
-# @require_POST
-# def submit_test(request, registration_id):
-#     """
-#     Evaluates test submission, distinguishing between incorrect and unattempted answers.
-#     """
-#     registration = get_object_or_404(TestRegistration, pk=registration_id)
-
-#     if registration.is_completed:
-#         return redirect("test_result", registration_id=registration.id)
-
-#     user_responses = UserResponse.objects.filter(
-#         registration=registration
-#     ).select_related("question")
-
-#     total_questions = registration.question_paper.total_questions
-#     correct_answers_count = 0
-
-#     for response in user_responses:
-#         question = response.question
-#         user_answer = response.user_answer.strip()
-#         is_correct = False
-
-#         if user_answer:
-#             if question.question_type == "MCQ":
-#                 model_answer = question.answer.strip()
-#                 is_correct = user_answer.lower() == model_answer.lower()
-#             else:
-#                 # Map internal question type to evaluator type
-#                 qtype = question.question_type.upper()
-#                 if qtype in ("CODE", "CODING"):
-#                     evaluator_type = "coding"
-#                 elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
-#                     evaluator_type = "short"
-#                 elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
-#                     evaluator_type = "true_false"
-#                 else:
-#                     evaluator_type = "short"
-
-#                 # evaluate_answer_with_ai returns (is_correct, details)
-#                 is_correct, _ = evaluate_answer_with_ai(
-#                     question_text=question.text,
-#                     user_answer=user_answer,
-#                     model_answer=question.answer.strip(),
-#                     question_type=evaluator_type,
-#                 )
-
-#             if is_correct:
-#                 correct_answers_count += 1
-
-#     # Calculate score
-#     percentage_score = 0
-#     if total_questions > 0:
-#         percentage_score = round((correct_answers_count / total_questions) * 100, 2)
-
-#     # Save results
-#     registration.is_completed = True
-#     registration.end_time = timezone.now()
-#     registration.score = percentage_score
-#     registration.save(update_fields=["is_completed", "end_time", "score"])
-
-#     return redirect("test_result", registration_id=registration.id)
-
 @require_POST
 def submit_test(request, registration_id):
     """
@@ -2741,44 +2219,7 @@ def create_section_ajax(request):
             "message": "Invalid JSON"
         }, status=400)
 
-# @login_required
-# def search_skills_with_suggestions(request):
-#     '''User type करे तो AI suggest करे'''
-#     query = request.GET.get('q', '').strip().lower()
-    
-#     if not query or len(query) < 2:
-#         return JsonResponse({'skills': [], 'suggestions': []})
-    
-#     try:
-#         # DB में खोजो
-#         db_skills = Skill.objects.filter(
-#             name__icontains=query,
-#             is_active=True
-#         ).values_list('name', flat=True)[:5]
-        
-#         db_list = list(db_skills)
-        
-#         if len(db_list) >= 3:
-#             return JsonResponse({'skills': db_list, 'suggestions': []})
-        
-#         genai.configure(api_key=settings.GEMINI_API_KEY)
-#         model = genai.GenerativeModel('gemini-2.5-pro')
-        
-#         prompt = f'Technical recruiting expert: User typed "{query}". Suggest 7-10 related tech skills. Only skill names, one per line.'
-        
-#         response = model.generate_content(prompt)
-#         ai_suggestions = [
-#             s.strip() for s in response.text.split('\n')
-#             if s.strip() and len(s.strip()) > 2
-#         ][:6]
-        
-#         return JsonResponse({
-#             'skills': db_list,
-#             'suggestions': ai_suggestions
-#         })
-    
-#     except Exception as e:
-#         return JsonResponse({'skills': [], 'suggestions': []}, status=500)
+
 
 
 from openai import OpenAI
@@ -2920,45 +2361,7 @@ def drive_list_view(request):
     return render(request, 'recruitment/drive_list.html', context)
 
 
-# @login_required
-# @transaction.atomic
-# def drive_create_view(request):
-#     """Create a new recruitment drive"""
-#     if request.method == 'POST':
-#         form = RecruitmentDriveForm(request.POST)
-#         if form.is_valid():
-#             drive = form.save(commit=False)
-#             drive.created_by = request.user
-#             drive.save()
-#             form.save_m2m()  # Save many-to-many relationships
-            
-#             messages.success(request, f"Drive '{drive.title}' created successfully!")
-#             return redirect('drive_detail', drive_id=drive.id)
-#     else:
-#         form = RecruitmentDriveForm()
-    
-#     context = {'form': form, 'title': 'Create Recruitment Drive'}
-#     return render(request, 'recruitment/drive_form.html', context)
-# @login_required
-# @transaction.atomic
-# def drive_create_view(request):
-#     """Create a new recruitment drive"""
-#     if request.method == 'POST':
-#         form = RecruitmentDriveForm(request.POST)
-#         if form.is_valid():
-#             drive = form.save(commit=False)
-#             drive.created_by = request.user
-#             drive.drive_status = 'OPEN'  # ✅ Set to OPEN instead of DRAFT
-#             drive.save()
-#             form.save_m2m()  # Save many-to-many relationships
-            
-#             messages.success(request, f"Drive '{drive.title}' created successfully!")
-#             return redirect('drive_detail', drive_id=drive.id)
-#     else:
-#         form = RecruitmentDriveForm()
-    
-#     context = {'form': form, 'title': 'Create Recruitment Drive'}
-#     return render(request, 'recruitment/drive_form.html', context)
+
 @login_required
 @transaction.atomic
 def drive_create_view(request):
@@ -3006,23 +2409,7 @@ def drive_detail_view(request, drive_id):
     return render(request, 'recruitment/drive_detail.html', context)
 
 
-# @login_required
-# @transaction.atomic
-# def drive_edit_view(request, drive_id):
-#     """Edit an existing recruitment drive"""
-#     drive = get_object_or_404(RecruitmentDrive, pk=drive_id, created_by=request.user)
-    
-#     if request.method == 'POST':
-#         form = RecruitmentDriveForm(request.POST, instance=drive)
-#         if form.is_valid():
-#             form.save()
-#             messages.success(request, "Drive updated successfully!")
-#             return redirect('drive_detail', drive_id=drive.id)
-#     else:
-#         form = RecruitmentDriveForm(instance=drive)
-    
-#     context = {'form': form, 'drive': drive, 'title': f'Edit: {drive.title}'}
-#     return render(request, 'recruitment/drive_form.html', context)
+
 @login_required
 @transaction.atomic
 def drive_edit_view(request, drive_id):
@@ -3152,14 +2539,56 @@ def candidate_detail_view(request, drive_id, candidate_id):
     return render(request, 'recruitment/candidate_detail.html', context)
 
 
+# @login_required
+# @require_POST
+# def update_candidate_stage(request, candidate_id):
+#     """Update a candidate's stage"""
+#     try:
+#         data = json.loads(request.body)
+#         candidate = get_object_or_404(CandidateApplication, pk=candidate_id)
+        
+#         new_stage = data.get('new_stage')
+#         notes = data.get('notes', '')
+#         rejection_reason = data.get('rejection_reason', '')
+        
+#         # Move candidate to new stage
+#         candidate.move_to_stage(new_stage, updated_by=request.user, reason=rejection_reason)
+        
+#         if notes:
+#             candidate.notes = notes
+#             candidate.save(update_fields=['notes'])
+        
+#         # TODO: Send email notification to candidate
+        
+#         return JsonResponse({
+#             'status': 'success',
+#             'message': f'Candidate moved to {new_stage}',
+#             'new_stage': candidate.current_stage,
+#             'overall_status': candidate.overall_status
+#         })
+    
+#     except Exception as e:
+#         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
 @login_required
 @require_POST
 def update_candidate_stage(request, candidate_id):
     """Update a candidate's stage"""
     try:
         data = json.loads(request.body)
-        candidate = get_object_or_404(CandidateApplication, pk=candidate_id)
+        candidate = get_object_or_404(CandidateApplication, pk=candidate_id) # OK
         
+        # ⚠️ सुरक्षा जाँच (Ownership Check) को यहाँ जोड़ें:
+        is_owner = False
+        if candidate.linked_paper and candidate.linked_paper.created_by == request.user:
+             is_owner = True
+        if candidate.recruitment_drive and candidate.recruitment_drive.created_by == request.user:
+             is_owner = True
+        
+        if not is_owner and not request.user.is_superuser:
+            return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
+        # -----------------------------------------------
+
         new_stage = data.get('new_stage')
         notes = data.get('notes', '')
         rejection_reason = data.get('rejection_reason', '')
@@ -3167,23 +2596,17 @@ def update_candidate_stage(request, candidate_id):
         # Move candidate to new stage
         candidate.move_to_stage(new_stage, updated_by=request.user, reason=rejection_reason)
         
-        if notes:
-            candidate.notes = notes
-            candidate.save(update_fields=['notes'])
-        
-        # TODO: Send email notification to candidate
+        # ... (rest of the logic) ...
         
         return JsonResponse({
             'status': 'success',
             'message': f'Candidate moved to {new_stage}',
             'new_stage': candidate.current_stage,
-            'overall_status': candidate.overall_status
+            'overall_status': candidate.overall_status # यह key UI update के लिए आवश्यक है
         })
     
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-
-
 @login_required
 @require_POST
 def bulk_update_stages(request):
@@ -3310,36 +2733,7 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404
 
-# @login_required
-# @require_POST
-# def toggle_drive_link(request, drive_id):
-#     """Toggle public link for recruitment drive"""
-#     try:
-#         drive = get_object_or_404(RecruitmentDrive, id=drive_id, created_by=request.user)
-        
-#         data = json.loads(request.body)
-#         action = data.get('action')
-        
-#         if action == 'activate':
-#             drive.is_public_link_active = True
-#             # ✅ CHANGE STATUS TO OPEN
-#             if drive.drive_status == 'DRAFT':
-#                 drive.drive_status = 'OPEN'
-#             drive.save()
 
-#             message = 'Public link activated! Drive is now OPEN.'
-            
-#         elif action == 'deactivate':
-#             drive.is_public_link_active = False
-#             message = 'Public link deactivated!'
-#         else:
-#             return JsonResponse({'success': False, 'message': 'Invalid action'}, status=400)
-        
-#         drive.save()
-#         return JsonResponse({'success': True, 'message': message})
-        
-#     except Exception as e:
-#         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 @login_required
 @require_POST
@@ -3635,7 +3029,11 @@ def application_detail_view(request, application_id):
         CandidateApplication,
         pk=application_id
     )
-    
+  
+
+    # --- NEW: Fetch all evaluations for this candidate ---
+    evaluations = application.evaluations.all()
+    # ---------------------------------------------------
     # Verify the user owns the linked paper
     if application.linked_paper and application.linked_paper.created_by != request.user:
         return HttpResponseForbidden("You don't have permission to view this application.")
@@ -3643,7 +3041,8 @@ def application_detail_view(request, application_id):
     context = {
         'application': application,
         'paper': application.linked_paper,
-        'title': f'Application: {application.full_name}'
+        'title': f'Application: {application.full_name}',
+        'evaluations': evaluations
     }
 
     return render(request, 'partials/users/application_detail.html', context)
@@ -3714,13 +3113,24 @@ def create_interview_round(request):
         round_title = 'Interview Round'
         
         # ... (Round title logic) ...
-        if rounds_raw == '2': round_title = 'Technical Interview (R1)'
-        elif rounds_raw == '3': round_title = 'Technical Interview (R2)'
-        elif rounds_raw == '4': round_title = 'HR Round (Final)'
-        elif rounds_raw == '1': 
-            return JsonResponse({"status": "error", "message": "Assessment rounds must use generate_questions endpoint."}, status=400)
-        else: round_title = f'Round {rounds_raw}'
-        
+        # if rounds_raw == '2': round_title = 'Technical Interview (R1)'
+        # elif rounds_raw == '3': round_title = 'Technical Interview (R2)'
+        # elif rounds_raw == '4': round_title = 'HR Round (Final)'
+        # elif rounds_raw == '1': 
+        #     return JsonResponse({"status": "error", "message": "Assessment rounds must use generate_questions endpoint."}, status=400)
+        # else: round_title = f'Round {rounds_raw}'
+        # 💡 FIX: 'Assessment Test' नाम को राउंड नंबर 1 से जोड़ें
+        if rounds_raw == '1':
+            round_title = 'Assessment Test (Interview)' # Written से अलग करने के लिए नाम बदल सकते हैं
+        elif rounds_raw == '2':
+            round_title = 'Technical Interview (R1)'
+        elif rounds_raw == '3':
+            round_title = 'Technical Interview (R2)'
+        elif rounds_raw == '4':
+            round_title = 'HR Round (Final)'
+        else: 
+            # यह सुनिश्चित करता है कि कोई भी राउंड नंबर एक वैलिड टाइटल जनरेट करे
+            round_title = data.get('round_name', f'Round {rounds_raw}')
         # Get Department Name from ID
         department_name = Department.objects.get(id=data.get("departmentId")).name
         
@@ -3772,264 +3182,13 @@ def create_interview_round(request):
         return JsonResponse({"status": "error", "message": f"Server Error: {str(e)}"}, status=500)
 
 
-# @transaction.atomic 
-# def interview_candidate_apply_view(request, paper_id):
-#     """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
-    
-#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
-    
-#     if not paper.is_interview_round:
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
-        
-#     if not paper.is_public_active:
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
-
-#     if request.method == 'POST':
-#         # 💡 IMPORTANT: request.POST को mutable बनाने की ज़रूरत नहीं, सीधे form में पास करें
-        
-#         # CandidateApplicationForm को request.POST और request.FILES के साथ instantiate करें
-#         # Note: 'initial' सिर्फ GET request के लिए होता है, POST के लिए नहीं
-#         form = CandidateApplicationForm(request.POST, request.FILES) 
-        
-#         if form.is_valid():
-#             email = form.cleaned_data['email']
-
-#             # Duplicate Check: Check for application with same email linked to this paper
-#             if CandidateApplication.objects.filter(email__iexact=email, linked_paper=paper).exists():
-#                  messages.error(request, "An application with this email already exists for this interview round.")
-#                  return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
-
-
-#             application = form.save(commit=False)
-            
-#             # ⭐ CRITICAL FIX: QuestionPaper (Interview Round) को CandidateApplication से लिंक करें
-#             application.linked_paper = paper
-            
-#             # Initial stage set करें (Optional, पर अच्छा है)
-#             application.current_stage = CandidateApplication.CandidateStage.APPLIED
-#             application.overall_status = CandidateApplication.ApplicationStatus.ACTIVE
-            
-#             application.save()
-#             form.save_m2m() # M2M data (agar form mein ho) save karein
-            
-#             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
-            
-#             # Success screen dikhayen
-#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
-#         else:
-#             # Form validation fail hone par error message dikhayen
-#             messages.error(request, "Please correct the errors below.")
-            
-#     else:
-#         # GET request: Form को initialize करे
-#         form = CandidateApplicationForm(initial={
-#             'full_name': request.GET.get('full_name', ''),
-#             'email': request.GET.get('email', '') 
-#         })
-
-#     context = {
-#         'paper': paper,
-#         'form': form,
-#         'title': f'Apply: {paper.job_title}'
-#     }
-#     return render(request, 'recruitment/interview_application_form.html', context)
-#     """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
-    
-#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
-    
-#     # ... (Error checks for paper.is_interview_round and paper.is_public_active remain the same) ...
-#     if not paper.is_interview_round:
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
-        
-#     if not paper.is_public_active:
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
-
-#     if request.method == 'POST':
-#         # 💡 IMPORTANT: request.POST ko mutable banao tak ki hum data modify kar sakein
-#         post_data = request.POST.copy()
-        
-#         # 💡 HTML Form fields ko Model fields se map karein
-#         # HTML: fullName -> Model: full_name
-#         # HTML: mobile -> Model: phone_number
-#         post_data['full_name'] = post_data.get('fullName')
-#         post_data['phone_number'] = post_data.get('mobile')
-        
-#         # HTML: resume -> Model: resume_file
-#         # HTML: photo (IGNORED)
-        
-#         # CandidateApplicationForm ko prepare kiye gaye data ke saath instantiate karein
-#         # 'recruitment_drive' field ko exclude kar rahe hain kyunki QuestionPaper se link kar rahe hain
-#         form = CandidateApplicationForm(post_data, request.FILES) 
-        
-#         if form.is_valid():
-#             # Check for duplicate application (optional but recommended)
-#             if CandidateApplication.objects.filter(email=form.cleaned_data['email']).exists():
-#                  messages.error(request, "An application with this email already exists.")
-#                  return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
-
-#             application = form.save(commit=False)
-            
-#             # 💡 CRITICAL: Recruitment Drive ya Question Paper ko link karein
-#             # Hum yahan QuestionPaper ko link kar rahe hain (agar model mein field ho)
-#             # Lekin CandidateApplication model mein QuestionPaper ke liye koi FK nahi hai.
-#             # Isliye, hum sirf data save kar rahe hain. 
-#             # Agar RecruitmentDrive se link karna ho toh pehle drive banana hoga.
-
-#             # Safest option: Sirf data save karein
-#             application.save()
-            
-#             # CRITICAL: Is user ko TestRegistration mein bhi save karna hoga agar baad mein is user ko test dena ho.
-#             # Filhaal, hum TestRegistration ko bypass kar rahe hain kyonki yeh interview round hai.
-#             # Agar future mein QuestionPaper se link karna ho, toh CandidateApplication model mein ek FK field add karein.
-            
-#             # Success screen dikhayen
-#             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
-            
-#             # Reload page to show success screen (like the HTML does)
-#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
-#         else:
-#             # Form validation fail hone par error message dikhayen
-#             messages.error(request, "Please correct the errors below.")
-
-#     else:
-#         # GET request: Form ko initialize karein
-#         form = CandidateApplicationForm(initial={
-#             'full_name': request.GET.get('full_name', ''), # Agar URL mein koi prefill ho
-#             'email': request.GET.get('email', '') 
-#         })
-
-#     context = {
-#         'paper': paper,
-#         'form': form,
-#         'title': f'Apply: {paper.job_title}'
-#     }
-#     return render(request, 'recruitment/interview_application_form.html', context)
-#     """Public page for candidates to apply based on a QuestionPaper link (Interview)."""
-    
-#     # Paper ko fetch karein aur ensure karein ki yeh interview round hai
-#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
-    
-#     if not paper.is_interview_round:
-#         # Agar galti se written test ka link use kiya, toh error de dein
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
-        
-#     # Check if the public link is active (optional, but good practice)
-#     if not paper.is_public_active:
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
-
-#     if request.method == 'POST':
-#         # CandidateApplicationForm mein paper_id ko pass karne ke liye
-#         form = CandidateApplicationForm(request.POST, request.FILES, initial={'paper_id': paper.id})
-        
-#         if form.is_valid():
-#             application = form.save(commit=False)
-            
-#             # Note: Assuming CandidateApplication model has fields to store data.
-#             # Agar CandidateApplication ko QuestionPaper se link karna hai, toh model mein field add karein.
-#             # Filhaal, hum sirf form fill karwa rahe hain.
-            
-#             application.save()
-            
-#             messages.success(request, f"Application for {paper.job_title} submitted successfully!")
-#             # Assuming a success template exists
-#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success'})
-#     else:
-#         # Form ko initialize karein
-#         form = CandidateApplicationForm(initial={'job_title': paper.job_title})
-
-#     context = {
-#         'paper': paper,
-#         'form': form,
-#         'title': f'Apply: {paper.job_title}'
-#     }
-#     return render(request, 'recruitment/interview_application_form.html', context) 
-
-# app/views.py
-
-# ... (Existing imports: import json, transaction, csrf_exempt, CandidateApplicationForm, CandidateApplication, messages, get_object_or_404, etc.)
-# सुनिश्चित करें कि आपके पास ये imports हैं
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.contrib import messages
 from .models import QuestionPaper, CandidateApplication # Ensure these are imported
 from .forms import CandidateApplicationForm
 
-# @transaction.atomic 
-# def interview_candidate_apply_view(request, paper_id):
-#     """
-#     Public page for candidates to apply based on a QuestionPaper link (Interview).
-#     Handles GET (showing form) and POST (submitting application).
-#     """
-    
-#     paper = get_object_or_404(QuestionPaper, pk=paper_id)
-    
-#     # --- CRITICAL ACCESS CHECKS ---
-#     if not paper.is_interview_round:
-#         messages.error(request, 'This link is for a written assessment, not a candidate application form.')
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'This link is for a written assessment, not a candidate application form.'}, status=403)
-        
-#     if not paper.is_public_active:
-#         messages.error(request, 'The application link for this interview round is currently inactive.')
-#         return render(request, 'recruitment/drive_closed.html', {'message': 'The application link for this interview round is currently inactive.'}, status=403)
 
-#     # --- POST REQUEST (Form Submission) ---
-#     if request.method == 'POST':
-#         # CandidateApplicationForm को request.POST और request.FILES के साथ instantiate करें
-#         # Note: 'initial' सिर्फ GET request के लिए होता है, POST के लिए नहीं
-#         form = CandidateApplicationForm(request.POST, request.FILES) 
-        
-#         if form.is_valid():
-#             email = form.cleaned_data['email']
-
-#             # Duplicate Check: Check for application with same email linked to this specific paper
-#             if CandidateApplication.objects.filter(email__iexact=email, linked_paper=paper).exists():
-#                  messages.error(request, "An application with this email already exists for this interview round.")
-#                  # Form को error के साथ वापस render करें
-#                  return render(request, 'recruitment/interview_application_form.html', {'paper': paper, 'form': form, 'title': f'Apply: {paper.job_title}'})
-
-
-#             application = form.save(commit=False)
-            
-#             # ⭐ CRITICAL FIX: QuestionPaper (Interview Round) को CandidateApplication से लिंक करें
-#             application.linked_paper = paper
-            
-#             # Initial stage set करें
-#             application.current_stage = CandidateApplication.CandidateStage.APPLIED
-#             application.overall_status = CandidateApplication.ApplicationStatus.ACTIVE
-            
-#             application.save()
-#             # M2M data (जैसे skills) को save करें
-#             # Note: CandidateApplicationForm में M2M fields save करने के लिए save_m2m की आवश्यकता हो सकती है,
-#             # यदि आप CandidateApplicationForm को custom save नहीं कर रहे हैं।
-#             try:
-#                 form.save_m2m() 
-#             except ValueError:
-#                 # यदि फॉर्म में कोई M2M field नहीं है, तो यह ValueError दे सकता है।
-#                 pass
-            
-#             messages.success(request, f"Application for {paper.job_title} submitted successfully! We will connect with you soon.")
-            
-#             # Success screen dikhayen
-#             return render(request, 'recruitment/candidate_application_success.html', {'paper': paper, 'title': 'Application Success', 'candidate': application})
-#         else:
-#             # Form validation fail होने पर error message dikhayen
-#             messages.error(request, "Please correct the errors below.")
-#             # Form को errors के साथ render करें ताकि candidate गलतियाँ सुधार सके
-
-#     # --- GET REQUEST (Show Form) ---
-#     else:
-#         # GET request: Form को initialize करे, URL parameters से full_name और email को pre-fill करें
-#         form = CandidateApplicationForm(initial={
-#             'full_name': request.GET.get('full_name', ''),
-#             'email': request.GET.get('email', '') 
-#         })
-
-#     context = {
-#         'paper': paper,
-#         'form': form,
-#         'title': f'Apply: {paper.job_title}'
-#     }
-#     return render(request, 'recruitment/interview_application_form.html', context)
 @transaction.atomic 
 def interview_candidate_apply_view(request, paper_id):
     """
@@ -4168,38 +3327,6 @@ def applied_jobs_view(request):
     return render(request, 'recruitment/applied_jobs_list.html', context)
 
 
-# @login_required
-# def application_detail_view_candidate(request, application_id):
-#     """
-#     Detailed view of a single candidate application for the candidate themselves.
-#     """
-#     application = get_object_or_404(
-#         CandidateApplication,
-#         pk=application_id,
-#         email__iexact=request.user.email # CRITICAL: Ensure the logged-in user owns this application
-#     )
-    
-#     # Fetch related paper/drive details for context
-#     paper = application.linked_paper
-#     drive = application.recruitment_drive
-    
-#     context = {
-#         'application': application,
-#         'paper': paper,
-#         'drive': drive,
-#         'title': f'Application Details: {application.full_name}'
-#     }
-    
-#     # Render the template to show all details (email, phone, experience, status history etc.)
-#     return render(request, 'recruitment/candidate_application_detail.html', context)
-
-
-# app/views.py
-
-# from django.contrib.auth.decorators import login_required
-# from django.shortcuts import render, get_object_or_404
-# from django.core.paginator import Paginator
-# from .models import QuestionPaper, CandidateApplication
 
 # app/views.py
 
@@ -4569,3 +3696,136 @@ def paper_applications_view(request, paper_id):
     
     # आपका अनुरोधित रेंडर पाथ
     return render(request, 'partials/users/user_list.html', context)
+
+
+# app/views.py (Add this new function)
+from .forms import (
+    LoginForm,
+    UserRegistrationForm,
+    UserProfileRegistrationForm,
+    DepartmentForm,
+    SkillForm,
+    # अन्य forms...
+    # ⭐ CRITICAL FIX: InterviewEvaluationForm को जोड़ें ⭐
+    InterviewEvaluationForm, 
+)
+
+from .forms import (
+    GroupDiscussionEvaluationForm,
+    TechnicalRound1EvaluationForm,
+    TechnicalRound2EvaluationForm,
+    HREvaluationForm,
+    InterviewEvaluationForm # Fallback के लिए Base/Old Form
+)
+
+# ... (rest of the imports)
+
+@login_required
+@transaction.atomic
+def evaluation_form_view(request, application_id, round_name):
+    """
+    Renders and handles the submission of the GD/Interview Evaluation form.
+    Loads the correct form and template based on round_name.
+    """
+    candidate_app = get_object_or_404(CandidateApplication, pk=application_id)
+    
+    # 1. Round Name के आधार पर सही Form Class का चयन करें
+    # Round name को clean करें
+    # cleaned_round_name = round_name.lower().strip().replace('(', '').replace(')', '')
+    cleaned_round_name = re.sub(r'[^a-z0-9]', '', round_name.lower())
+    
+    # 💡 राउंड के नाम के आधार पर फॉर्म क्लास और टेम्प्लेट का चयन
+    if 'groupdiscussion' in cleaned_round_name or 'gd' == cleaned_round_name:
+        FormClass = GroupDiscussionEvaluationForm
+        template_suffix = 'gd_evaluation_form' 
+        
+    # 'technicalinterviewr1' या 'round2' (जो ROUND_2 कैंडिडेट स्टेज से आता होगा)
+    elif 'technicalinterviewr1' in cleaned_round_name or 'round2' in cleaned_round_name:
+        FormClass = TechnicalRound1EvaluationForm
+        template_suffix = 'tech_r1_evaluation_form' 
+        
+    # 'technicalinterviewr2' या 'round3'
+    elif 'technicalinterviewr2' in cleaned_round_name or 'round3' in cleaned_round_name:
+        FormClass = TechnicalRound2EvaluationForm
+        template_suffix = 'tech_r2_evaluation_form' 
+        
+    # 'hrinterviewfinal' या 'finalround' (जो FINAL_ROUND कैंडिडेट स्टेज से आता होगा)
+    elif 'hrinterview' in cleaned_round_name or 'finalround' in cleaned_round_name:
+        FormClass = HREvaluationForm
+        template_suffix = 'hr_evaluation_form' 
+        
+    else:
+        # Fallback to the generic/old form
+        FormClass = InterviewEvaluationForm 
+        template_suffix = 'evaluation_form'
+        
+    # 2. Check for an existing evaluation for this round
+    try:
+        instance = InterviewEvaluation.objects.get(
+            candidate_application=candidate_app,
+            round_name__iexact=round_name # Case-insensitive match for the round name
+        )
+    except InterviewEvaluation.DoesNotExist:
+        instance = None
+    
+    # --- Form Submission Logic ---
+    if request.method == 'POST':
+        form = FormClass(request.POST, instance=instance)
+        
+        if form.is_valid():
+            evaluation = form.save(commit=False)
+            evaluation.candidate_application = candidate_app
+            evaluation.round_name = round_name 
+            evaluation.evaluator = request.user
+            
+            # Form में जो अतिरिक्त fields हैं (जैसे basic_programming_score) 
+            # उन्हें evaluation object में कॉपी करें (Django यह automatically handle करता है 
+            # अगर fields Meta में हैं, लेकिन कस्टम fields के लिए यह defensive programming है)
+            for field in FormClass.Meta.fields:
+                 if field in form.cleaned_data:
+                     setattr(evaluation, field, form.cleaned_data[field])
+
+            evaluation.save()
+
+            # --- CRITICAL: Update Candidate's Stage/Status (Logic Re-use) ---
+            # ... (आपका मौजूदा stage update logic यहाँ इस्तेमाल होगा) ...
+            if evaluation.is_passed:
+                 # Logic for next stage (copied from your old code, needs to be precise)
+                 if 'group discussion' in cleaned_round_name:
+                     next_stage = CandidateApplication.CandidateStage.ROUND_2 
+                 elif 'technical interview (r1)' in cleaned_round_name or 'round 2' in cleaned_round_name:
+                     next_stage = CandidateApplication.CandidateStage.FINAL_ROUND
+                 elif 'hr interview' in cleaned_round_name or 'final_round' in cleaned_round_name:
+                     next_stage = CandidateApplication.CandidateStage.HIRED
+                 else:
+                     next_stage = CandidateApplication.CandidateStage.SCREENING # Fallback
+                     
+                 candidate_app.move_to_stage(next_stage, updated_by=request.user)
+                 messages.success(request, f"✅ Evaluation saved. Candidate moved to {candidate_app.get_current_stage_display()}.")
+
+            else:
+                 candidate_app.move_to_stage(CandidateApplication.CandidateStage.REJECTED, updated_by=request.user, reason=f"Failed {round_name}")
+                 messages.warning(request, f"❌ Evaluation saved. Candidate marked as REJECTED due to failure in {round_name}.")
+                 
+            
+            # Redirect back to the candidate detail page
+            if candidate_app.recruitment_drive:
+                return redirect('candidate_detail_view', drive_id=candidate_app.recruitment_drive.id, candidate_id=candidate_app.id)
+            else:
+                return redirect('application_detail_view', application_id=candidate_app.id) 
+        else:
+            messages.error(request, "❌ Please correct the errors in the form.")
+
+    # --- GET Request Logic (Display Form) ---
+    else:
+        form = FormClass(instance=instance)
+        
+    context = {
+        'candidate_app': candidate_app,
+        'round_name': round_name,
+        'form': form,
+        'title': f'Evaluate: {round_name} for {candidate_app.full_name}'
+    }
+    
+    # 3. Dynamic Template Rendering
+    return render(request, f'recruitment/{template_suffix}.html', context)

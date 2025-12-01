@@ -603,3 +603,68 @@ class CandidateApplication(models.Model):
 
         self.save()
    
+
+class Round(models.Model):  # <-- NEW MODEL FOR ROUNDS
+    """Represents recruitment rounds (e.g., Screening, Tech Interview, HR Round)."""
+    name = models.CharField(max_length=100, unique=True)
+    is_default = models.BooleanField(default=False, help_text="True for static rounds like 'Assessment Test'.")
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+
+
+# app/models.py (Add this model)
+
+class InterviewEvaluation(models.Model):
+    """
+    Stores the evaluation form data filled by the invigilator/interviewer
+    for a specific candidate and round.
+    """
+    # 1. Links to the Candidate (CRITICAL)
+    candidate_application = models.ForeignKey(
+        CandidateApplication, 
+        on_delete=models.CASCADE, 
+        related_name='evaluations',
+        help_text="The application being evaluated."
+    )
+
+    # 2. Links to the Round (Optional, but good for tracking)
+    # We can use the linked_paper to know which round it is, but a simpler text field is fine too.
+    round_name = models.CharField(
+        max_length=100,
+        help_text="e.g., 'Group Discussion', 'Technical Interview (R1)', 'HR Interview (Final)'"
+    )
+
+    # 3. Links to the Evaluator (Invigilator/Interviewer)
+    evaluator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='conducted_evaluations'
+    )
+    
+    # 4. Evaluation Data (Customize these fields as needed)
+    score = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text="Overall score out of 100 or a specific scale."
+    )
+    feedback = models.TextField(blank=True, help_text="Detailed feedback on performance.")
+    is_passed = models.BooleanField(default=False)
+    
+    # Example Custom Metrics (Adjust to your actual form fields)
+    communication_score = models.PositiveIntegerField(default=0)
+    domain_knowledge_score = models.PositiveIntegerField(default=0)
+    leadership_score = models.PositiveIntegerField(default=0) # e.g., for GD
+    
+    evaluated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-evaluated_at']
+        verbose_name_plural = "Interview Evaluations"
+
+    def __str__(self):
+        return f"Evaluation for {self.candidate_application.full_name} in {self.round_name}"

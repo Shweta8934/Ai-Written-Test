@@ -483,108 +483,7 @@ class RecruitmentDriveForm(forms.ModelForm):
         
         return cleaned_data
 
-# class CandidateApplicationForm(forms.ModelForm):
-#     """
-#     Public-facing form for candidates to apply.
-#     Note: We manually add 'candidate_type' in views as it's not a model field.
-#     """
-    
-#     # Temporary field to capture radio button value for validation
-#     candidate_type = forms.CharField(required=True, max_length=15) 
-    
-#     class Meta:
-#         model = CandidateApplication
-#         fields = [
-#             'full_name', 'email', 'phone_number', 
-#             'resume_file', 'cover_letter', 'photo_file', 
-            
-#             # Fields that rely on is_experienced logic in clean()
-#             'is_experienced', 'total_experience', 
-            
-#             # Other New Application Fields
-#             'current_ctc', 'expected_ctc', 
-#             'current_ctc_rate', 'expected_ctc_rate', 
-#             'notice_period', 'skills', 
-#             'current_location', 'referral_source',
-#             'linked_paper', # Optional: if you pass paper_id in initial data
-#         ]
-#         widgets = {
-#             # ... (Existing widgets)
-            
-#             # Hiding is_experienced as it's set in clean method
-#             'is_experienced': forms.HiddenInput(),
-#         }
 
-#     def __init__(self, *args, **kwargs):
-#         # We handle linked_paper via initial data, not form input directly
-#         self.linked_paper_id = kwargs.pop('linked_paper_id', None) 
-#         super().__init__(*args, **kwargs)
-        
-#         # Manually set required fields' widgets
-#         for field in ['full_name', 'email', 'phone_number']:
-#              self.fields[field].widget.attrs['class'] = INPUT_CLASSES
-
-#         # Dynamically add the candidate_type field to allow validation
-#         self.fields['candidate_type'] = forms.CharField(required=True)
-#         # Rename field names to match HTML/JS naming convention for simplicity in POST data
-#         self.fields['full_name'].widget.attrs['name'] = 'fullName'
-#         self.fields['phone_number'].widget.attrs['name'] = 'mobile'
-#         self.fields['resume_file'].widget.attrs['name'] = 'resume'
-#         self.fields['photo_file'].widget.attrs['name'] = 'photo'
-#         self.fields['skills'].widget.attrs['name'] = 'skills'
-#         self.fields['current_location'].widget.attrs['name'] = 'location'
-#         self.fields['referral_source'].widget.attrs['name'] = 'referral'
-#         self.fields['cover_letter'].widget.attrs['name'] = 'coverLetter'
-        
-#         self.fields['total_experience'].widget.attrs['name'] = 'experience'
-#         self.fields['current_ctc_rate'].widget.attrs['name'] = 'currentCTCRate'
-#         self.fields['expected_ctc_rate'].widget.attrs['name'] = 'expectedCTCRate'
-#         self.fields['notice_period'].widget.attrs['name'] = 'noticePeriod'
-
-#         # Since we use JavaScript to conditionally hide fields, set them to not required here 
-#         # unless it's a field that should always be required if provided, like experience for experienced users
-#         self.fields['total_experience'].required = False
-#         self.fields['current_ctc'].required = False
-#         self.fields['current_ctc_rate'].required = False
-#         self.fields['notice_period'].required = False
-
-#     def clean(self):
-#         cleaned_data = super().clean()
-        
-#         # 1. Handle is_experienced flag from radio button (candidateType)
-#         candidate_type = self.data.get('candidateType') # Use self.data to get raw POST value
-#         is_experienced = (candidate_type == 'experienced')
-#         cleaned_data['is_experienced'] = is_experienced 
-        
-#         # 2. Conditional Validation and cleaning based on is_experienced
-#         total_experience = cleaned_data.get('total_experience')
-
-#         if is_experienced:
-#             # Enforce required experience check for experienced users
-#             if not total_experience or total_experience <= 0:
-#                 self.add_error('total_experience', "Total Experience must be greater than 0 for experienced applicants.")
-                
-#         else:
-#              # If Fresher, clear/set optional experienced-only fields to None/0 for clean DB state
-#              cleaned_data['total_experience'] = 0.0 # Save as 0 for Fresher
-#              cleaned_data['current_ctc'] = None
-#              cleaned_data['current_ctc_rate'] = None
-#              cleaned_data['notice_period'] = None
-
-#         # Clean photo and resume separately (size/type validation is handled by HTML/JS, here we ensure required status if needed)
-        
-#         return cleaned_data
-
-#     def save(self, commit=True):
-#         instance = super().save(commit=False)
-#         # Set linked_paper if available (only applicable if this form is used in a specific context)
-#         if self.linked_paper_id:
-#              from .models import QuestionPaper # Ensure QuestionPaper is imported
-#              instance.linked_paper = QuestionPaper.objects.get(pk=self.linked_paper_id)
-        
-#         if commit:
-#             instance.save()
-#         return instance
 
 class CandidateStageUpdateForm(forms.Form):
     """Form for recruiters to update candidate stage"""
@@ -612,9 +511,6 @@ class BulkStageUpdateForm(forms.Form):
         widget=forms.Select(attrs={'class': INPUT_CLASSES})
     )
 
-# app/forms.py - Update your CandidateApplicationForm
-
-# app/forms.py - UPDATED CandidateApplicationForm
 
 from django import forms
 from .models import CandidateApplication
@@ -625,198 +521,29 @@ INPUT_CLASSES = "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md s
 TEXTAREA_CLASSES = f"{INPUT_CLASSES} resize-y"
 
 
-# class CandidateApplicationForm(forms.ModelForm):
-#     # Hidden field for radio button value (only for validation logic)
-#     candidateType = forms.CharField(required=True, max_length=15) 
-    
-#     class Meta:
-#         model = CandidateApplication
-#         fields = [
-#             'full_name', 'email', 'phone_number', 
-#             'is_experienced', 'total_experience', 
-#             'current_ctc', 'current_ctc_rate', 'expected_ctc', 'expected_ctc_rate', 
-#             'notice_period', 'skills', 'current_location', 'referral_source', 
-#             'resume_file', 'photo_file', 'cover_letter', 'linked_paper'
-#         ]
+# app/forms.py (Add this form)
 
-#         widgets = {
-#             'is_experienced': forms.HiddenInput(),
-#             'linked_paper': forms.HiddenInput(),
-#         }
+from django import forms
+from .models import InterviewEvaluation
 
-#     def __init__(self, *args, **kwargs):
-#         # We handle linked_paper via initial data/view, not form input directly
-#         self.linked_paper_id = kwargs.pop('linked_paper_id', None) 
-#         super().__init__(*args, **kwargs)
+class InterviewEvaluationForm(forms.ModelForm):
+    # Hidden fields to pass necessary IDs
+    application_id = forms.IntegerField(widget=forms.HiddenInput())
+    round_name = forms.CharField(widget=forms.HiddenInput())
 
-#         # 🚨 HTML Field Name Mapping (Crucial for correct data access) 🚨
-#         # Django form expects 'full_name', but HTML sends 'fullName'. We fix it by setting the widget's 'name' attribute.
-#         self.fields['full_name'].widget.attrs['name'] = 'fullName'
-#         self.fields['phone_number'].widget.attrs['name'] = 'mobile'
-#         self.fields['resume_file'].widget.attrs['name'] = 'resume'
-#         self.fields['photo_file'].widget.attrs['name'] = 'photo'
-#         self.fields['skills'].widget.attrs['name'] = 'skills'
-#         self.fields['current_location'].widget.attrs['name'] = 'location'
-#         self.fields['referral_source'].widget.attrs['name'] = 'referral'
-#         self.fields['cover_letter'].widget.attrs['name'] = 'coverLetter'
-#         self.fields['total_experience'].widget.attrs['name'] = 'experience'
-#         self.fields['current_ctc_rate'].widget.attrs['name'] = 'currentCTCRate'
-#         self.fields['expected_ctc_rate'].widget.attrs['name'] = 'expectedCTCRate'
-#         self.fields['notice_period'].widget.attrs['name'] = 'noticePeriod'
-        
-#         # NOTE: 'candidateType' is a custom field for validation, it is NOT in the model Meta.
-#         self.fields['candidateType'].widget.attrs['name'] = 'candidateType' 
-
-
-#         # Ensure Model Fields are required as per HTML (even if using JS validation)
-#         for field in ['full_name', 'email', 'phone_number', 'resume_file', 'photo_file']:
-#             self.fields[field].required = True 
-
-#         # Set optional fields to not required
-#         self.fields['total_experience'].required = False
-#         self.fields['current_ctc'].required = False
-#         self.fields['current_ctc_rate'].required = False
-#         self.fields['expected_ctc'].required = False
-#         self.fields['expected_ctc_rate'].required = False
-#         self.fields['notice_period'].required = False
-#         self.fields['cover_letter'].required = False
-#         self.fields['linked_paper'].required = False
-        
-#         # File field validation (Max size check)
-#         self.fields['resume_file'].help_text = "Max 2MB. Allowed: pdf, doc, docx."
-#         self.fields['photo_file'].help_text = "Max 1MB. Allowed: png, jpg, jpeg."
-
-
-#     def clean(self):
-#         cleaned_data = super().clean()
-        
-#         # 1. Handle is_experienced flag from radio button (candidateType)
-#         candidate_type = self.data.get('candidateType') # Use self.data to get raw POST value
-#         is_experienced = (candidate_type == 'experienced')
-#         cleaned_data['is_experienced'] = is_experienced 
-        
-#         # 2. Conditional Validation for total_experience
-#         total_experience = cleaned_data.get('total_experience')
-
-#         if is_experienced:
-#             # Enforce required experience check for experienced users
-#             if not total_experience:
-#                 self.add_error('total_experience', "Total Experience is required for experienced applicants.")
-#             elif total_experience < 0.5:
-#                  self.add_error('total_experience', "Total Experience must be 0.5 years or more for experienced applicants.")
-#         else:
-#              # If Fresher, set total_experience to 0.0 and clear experienced-only fields
-#              cleaned_data['total_experience'] = 0.0 
-#              cleaned_data['current_ctc'] = None
-#              cleaned_data['current_ctc_rate'] = None
-#              cleaned_data['notice_period'] = None
-        
-#         # 3. Resume File Validation
-#         resume = cleaned_data.get('resume_file')
-#         if resume:
-#              if resume.size > 2 * 1024 * 1024:
-#                 self.add_error('resume_file', "Max file size for Resume is 2MB.")
-#              ext = resume.name.split('.')[-1].lower()
-#              if ext not in ['pdf', 'doc', 'docx']:
-#                  self.add_error('resume_file', "Allowed formats for Resume are pdf, doc, docx.")
-
-#         # 4. Photo File Validation
-#         photo = cleaned_data.get('photo_file')
-#         if photo:
-#              if photo.size > 1 * 1024 * 1024:
-#                 self.add_error('photo_file', "Max file size for Photo is 1MB.")
-#              ext = photo.name.split('.')[-1].lower()
-#              if ext not in ['png', 'jpg', 'jpeg']:
-#                  self.add_error('photo_file', "Allowed formats for Photo are png, jpg, jpeg.")
-        
-#         # 5. Cover Letter word count (Assuming 500 word limit as per UI JS)
-#         cover_text = cleaned_data.get('cover_letter', '').strip()
-#         word_count = len(cover_text.split()) 
-#         if word_count > 500:
-#              self.add_error('cover_letter', "Cover letter exceeds 500 words limit.")
-        
-#         return cleaned_data
-
-#     def save(self, commit=True, linked_paper=None):
-#         instance = super().save(commit=False)
-        
-#         # Set linked_paper if provided (either via initial or passed directly)
-#         if linked_paper:
-#              instance.linked_paper = linked_paper
-        
-#         # Set phone_number, email, and full_name for uniqueness check
-#         instance.full_name = self.cleaned_data['full_name']
-#         instance.email = self.cleaned_data['email'].lower()
-#         instance.phone_number = self.cleaned_data['phone_number']
-
-#         # NOTE: recruitment_drive is required in the model, but we might not have it here. 
-#         # This view assumes paper_id is the primary link and a recruitment_drive will be 
-#         # assigned later, or that the paper *must* be linked to a drive if the drive field 
-#         # is made required in the model. Since your model shows `linked_paper` but still
-#         # requires `recruitment_drive` (no null/blank=True), we must handle it. 
-#         # 💡 BEST FIX: In this specific view, we assume the application is linked to a paper
-#         # that *is* part of a drive, or we default to the paper's drive.
-#         # Since this is a direct application via paper ID, we can't assume a drive.
-#         # Let's ensure the `recruitment_drive` field in `CandidateApplication` model is `null=True, blank=True` 
-#         # for these direct-paper applications.
-
-#         if commit:
-#             instance.save()
-#         return instance
-#     class Meta:
-#         model = CandidateApplication
-#         fields = [
-#             'full_name',
-#             'email',
-#             'phone_number',
-#             'is_experienced',
-#             'total_experience',
-#             'current_ctc',
-#             'current_ctc_rate',
-#             'expected_ctc',
-#             'expected_ctc_rate',
-#             'notice_period',
-#             'skills',
-#             'current_location',
-#             'referral_source',
-#             'resume_file',
-#             'photo_file',
-#             'cover_letter'
-#         ]
-        
-#     def __init__(self, *args, **kwargs):
-#         # Remove linked_paper_id if it was being passed
-#         self.linked_paper_id = kwargs.pop('linked_paper_id', None)
-#         super().__init__(*args, **kwargs)
-        
-#         # Make certain fields optional
-#         self.fields['total_experience'].required = False
-#         self.fields['current_ctc'].required = False
-#         self.fields['expected_ctc'].required = False
-#         self.fields['current_ctc_rate'].required = False
-#         self.fields['expected_ctc_rate'].required = False
-#         self.fields['notice_period'].required = False
-#         self.fields['skills'].required = False
-#         self.fields['current_location'].required = False
-#         self.fields['referral_source'].required = False
-#         self.fields['photo_file'].required = False
-#         self.fields['cover_letter'].required = False
-        
-#     def clean(self):
-#         cleaned_data = super().clean()
-        
-#         # If experienced, validate experience-related fields
-#         is_experienced = cleaned_data.get('is_experienced')
-#         if is_experienced:
-#             total_exp = cleaned_data.get('total_experience')
-#             if not total_exp or total_exp < 0:
-#                 self.add_error('total_experience', 'Please enter valid experience for experienced candidates.')
-        
-#         return cleaned_data
-
-
-# app/forms.py (Hypothetical Update)
-#... (Rest of the imports and form definition)
+    class Meta:
+        model = InterviewEvaluation
+        fields = [
+            'score', 
+            'feedback', 
+            'is_passed', 
+            'communication_score', 
+            'domain_knowledge_score', 
+            'leadership_score'
+        ]
+        widgets = {
+            'feedback': forms.Textarea(attrs={'rows': 4}),
+        }
 
 class CandidateApplicationForm(forms.ModelForm):
     # candidateType ko form mein ek temporary field ke roop mein add karein
@@ -870,3 +597,211 @@ class CandidateApplicationForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+
+# app/forms.py
+
+from django import forms
+from .models import InterviewEvaluation, CandidateApplication
+from django.core.exceptions import ValidationError
+
+# Input Classes (Forms.py में पहले से परिभाषित)
+INPUT_CLASSES = "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-primary focus:border-blue-primary sm:text-sm"
+TEXTAREA_CLASSES = f"{INPUT_CLASSES} resize-y"
+
+
+# -------------------- BASE EVALUATION FORM --------------------
+class BaseEvaluationForm(forms.ModelForm):
+    """
+    सभी मूल्यांकन (Evaluation) फॉर्म के लिए बेस क्लास, जिसमें मुख्य स्कोर और निर्णय शामिल हैं।
+    """
+    # Hidden fields to pass necessary IDs (Optional, can be passed in view context)
+    application_id = forms.IntegerField(widget=forms.HiddenInput())
+    round_name = forms.CharField(widget=forms.HiddenInput())
+
+    class Meta:
+        model = InterviewEvaluation
+        fields = [
+            'score',
+            'feedback',
+            'is_passed',
+            # Base fields for soft skills/general interview
+            'communication_score',
+        ]
+        widgets = {
+            'feedback': forms.Textarea(attrs={'rows': 4, 'class': TEXTAREA_CLASSES}),
+            'score': forms.NumberInput(attrs={'class': INPUT_CLASSES, 'min': 0, 'max': 100}),
+            'communication_score': forms.NumberInput(attrs={'class': INPUT_CLASSES, 'min': 0, 'max': 100}),
+            # is_passed (Checkbox) widget HTML में ही है
+        }
+    
+    # Optional: common cleanup/validation can go here
+
+# -------------------- ROUND-SPECIFIC FORMS --------------------
+
+# class GroupDiscussionEvaluationForm(BaseEvaluationForm):
+#     """GD के लिए: Communication और Leadership पर ज़ोर।"""
+#     class Meta(BaseEvaluationForm.Meta):
+#         fields = BaseEvaluationForm.Meta.fields + [
+#             'leadership_score',  # Leadership/Teamwork/Initiative Score
+#         ]
+
+
+# class TechnicalRound1EvaluationForm(BaseEvaluationForm):
+#     """Tech R1 के लिए: Basic Programming, Logical, Cultural Fit आदि।"""
+#     # Custom fields for R1 metrics (100 में से स्कोर)
+#     basic_programming_score = forms.IntegerField(
+#         min_value=0, max_value=100, required=True, label="Basic Programming",
+#         widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+#     )
+#     logical_score = forms.IntegerField(
+#         min_value=0, max_value=100, required=True, label="Logical Reasoning",
+#         widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+#     )
+#     cultural_fit_score = forms.IntegerField(
+#         min_value=0, max_value=100, required=True, label="Cultural Fit / Values",
+#         widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+#     )
+#     awareness_score = forms.IntegerField(
+#         min_value=0, max_value=100, required=True, label="Awareness of New Tech",
+#         widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+#     )
+
+#     class Meta(BaseEvaluationForm.Meta):
+#         fields = BaseEvaluationForm.Meta.fields + [
+#             # Technical fields for R1
+#             'basic_programming_score',
+#             'logical_score',
+#             'cultural_fit_score',
+#             'awareness_score',
+#             'domain_knowledge_score', # Domain knowledge score को भी R1 में रखें
+#         ]
+# app/forms.py (लगभग line 655 के आसपास)
+
+# ... (बाकी classes के बाद)
+
+# -------------------- ROUND-SPECIFIC FORMS (GD) --------------------
+
+class GroupDiscussionEvaluationForm(BaseEvaluationForm):
+    """GD के लिए: Communication, Leadership, और Confidence पर ज़ोर।"""
+    
+    # 💡 आपका पहला पॉइंट: Communication (Base Form से लिया गया)
+    # communication_score already BaseEvaluationForm में है
+    
+    # 💡 आपका दूसरा पॉइंट: Team Player/Collaboration (Leadership Score का उपयोग करें)
+    # leadership_score already BaseEvaluationForm में है (इसे Team Player की तरह उपयोग करें)
+    
+    # 💡 आपका तीसरा पॉइंट: Confidence/Assertiveness/Presentation
+    confidence_score = forms.IntegerField(
+        min_value=0, max_value=100, required=True, label="Confidence / Assertiveness",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+    
+    # 💡 Teamwork/Collaboration के लिए एक अलग फील्ड जोड़ें (यदि leadership focus न हो)
+    collaboration_score = forms.IntegerField(
+        min_value=0, max_value=100, required=True, label="Teamwork / Collaboration",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+
+    class Meta(BaseEvaluationForm.Meta):
+        fields = BaseEvaluationForm.Meta.fields + [
+            'leadership_score',        # How they lead or organize the discussion
+            'confidence_score',        # Assertiveness and presentation style
+            'collaboration_score',     # How they include others / are team players
+        ]
+# app/forms.py में बदलाव करें
+
+# ... (Original code) ...
+class TechnicalRound1EvaluationForm(BaseEvaluationForm):
+    """Tech R1 के लिए: Basic Programming, Logical, Cultural Fit आदि।"""
+    # Custom fields for R1 metrics (100 में से स्कोर)
+    
+    # 🟢 FIXED: '...' को हटाकर keyword arguments का उपयोग करें
+    basic_programming_score = forms.IntegerField(
+        min_value=0, 
+        max_value=100, 
+        required=True, 
+        label="Basic Programming",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+    logical_score = forms.IntegerField(
+        min_value=0, 
+        max_value=100, 
+        required=True, 
+        label="Logical Reasoning",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+    cultural_fit_score = forms.IntegerField(
+        min_value=0, 
+        max_value=100, 
+        required=True, 
+        label="Cultural Fit / Values",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+    awareness_score = forms.IntegerField(
+        min_value=0, 
+        max_value=100, 
+        required=True, 
+        label="Awareness of New Tech",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+
+    class Meta(BaseEvaluationForm.Meta):
+        fields = BaseEvaluationForm.Meta.fields + [
+            # Technical fields for R1
+            'basic_programming_score',
+            'logical_score',
+            'cultural_fit_score',
+            'awareness_score',
+            'domain_knowledge_score', # Domain knowledge score को भी R1 में रखें
+        ]
+# आप R2 के लिए भी इसी तरह एक नया फॉर्म बना सकते हैं
+class TechnicalRound2EvaluationForm(TechnicalRound1EvaluationForm):
+    """Tech R2 के लिए: R1 के साथ-साथ System Design, Problem Solving पर ज़ोर।"""
+    # R2 के लिए अतिरिक्त / संशोधित fields
+    system_design_score = forms.IntegerField(
+        min_value=0, max_value=100, required=False, label="System Design / Architecture",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+    advanced_problem_solving_score = forms.IntegerField(
+        min_value=0, max_value=100, required=False, label="Advanced Problem Solving",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+
+    class Meta(TechnicalRound1EvaluationForm.Meta):
+        fields = TechnicalRound1EvaluationForm.Meta.fields + [
+            'system_design_score',
+            'advanced_problem_solving_score',
+        ]
+        # यदि आप R1 के fields हटाना चाहते हैं, तो उन्हें हटा दें और फिर नए fields जोड़ें।
+        # इस उदाहरण में, हम उन्हें retained कर रहे हैं।
+
+
+class HREvaluationForm(BaseEvaluationForm):
+    """HR Round के लिए: Personality, Motivation, Expectation पर ज़ोर।"""
+    # Custom fields for HR metrics
+    personality_score = forms.IntegerField(
+        min_value=0, max_value=100, required=True, label="Personality / Attitude",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+    motivation_score = forms.IntegerField(
+        min_value=0, max_value=100, required=True, label="Motivation / Intent",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+    salary_expectation_fit_score = forms.IntegerField(
+        min_value=0, max_value=100, required=False, label="Salary Expectation Fit",
+        widget=forms.NumberInput(attrs={'class': INPUT_CLASSES})
+    )
+
+    class Meta(BaseEvaluationForm.Meta):
+        fields = BaseEvaluationForm.Meta.fields + [
+            'personality_score',
+            'motivation_score',
+            'salary_expectation_fit_score',
+            'leadership_score', # Leadership को HR में भी रख सकते हैं
+        ]
+
+# पुराने InterviewEvaluationForm को अब हटा सकते हैं या इसे एक alias बना सकते हैं।
+# यदि आप इसे रखना चाहते हैं, तो इसे BaseEvaluationForm के समान बनाएं।
+InterviewEvaluationForm = BaseEvaluationForm

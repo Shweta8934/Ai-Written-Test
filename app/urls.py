@@ -160,4 +160,16 @@ path('recruiter/application/<int:application_id>/', views.application_detail_vie
    path('applications/kanban/', views.kanban_view, name='kanban_view'),
    path('applications/kanban/update/', views.kanban_update_stage, name='kanban_update_stage'),
     # path('application/detail/<int:application_id>/', views.application_detail_view_candidate, name='candidate_app_detail'),
+
+
+# New URL for dynamic round creation
+    path(
+        "api/rounds/create/",
+        views.create_custom_round_ajax,
+        name="create_custom_round_ajax"
+    ),
+path('update-candidate-stage/<int:candidate_id>/', views.update_candidate_stage, name='update_candidate_stage'),
+    path('application/<int:application_id>/evaluate/<str:round_name>/', 
+         views.evaluation_form_view, 
+         name='evaluation_form'),
 ]

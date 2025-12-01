@@ -1,0 +1,273 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluate - {{ candidate_app.full_name }} ({{ round_name }})</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+    }
+    /* Custom style for the switch input to handle the thumb visually */
+    #id_is_passed {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='white'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-size: 1.5rem 1.5rem; /* Set the size of the thumb/icon */
+        background-position: left center; /* Initial position for unchecked */
+        transition: background-position 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    }
+    #id_is_passed:checked {
+        background-position: right center; /* Position for checked */
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-indigo-100 min-h-screen">
+
+  <div class="flex h-screen">
+    {# ✅ SIDEBAR INCLUDE: 'partials/sidebar.html' #}
+    {% include 'partials/sidebar.html' %}
+
+    <div class="flex-1 flex flex-col overflow-hidden">
+      
+      {# ✅ HEADER INCLUDE: 'partials/header.html' #}
+      {% include 'partials/header.html' with page_title="HR Interview Evaluation" %}
+      
+      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+            <div class="max-w-6xl mx-auto">
+                
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">
+                    <i class="fas fa-handshake text-pink-600 mr-2"></i> {{ round_name|upper }} Evaluation
+                </h2>
+                
+                <div class="flex justify-center">
+                    <div class="w-full">
+                        
+                        <div class="bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100">
+                            
+                            {# Candidate Information Header #}
+                            <div class="bg-pink-50 border-l-4 border-pink-500 text-pink-800 p-4 mb-6">
+                                <h5 class="text-lg font-semibold mb-1">Candidate: <strong class="text-gray-900">{{ candidate_app.full_name }}</strong></h5>
+                                <p class="text-sm text-gray-600">Job Role: <strong>{{ candidate_app.linked_paper.job_title|default:"N/A" }}</strong> | Round: <strong>{{ round_name }}</strong></p>
+                            </div>
+                            
+                            <form method="post" novalidate class="p-6 space-y-6">
+                                {% csrf_token %}
+                                
+                                <input type="hidden" name="application_id" value="{{ candidate_app.id }}">
+                                <input type="hidden" name="round_name" value="{{ round_name }}">
+
+                                {# Section 1: Core Evaluation Metrics - HR Focused #}
+                                <h4 class="text-xl font-bold pb-2 border-b border-gray-200 text-pink-600">Personality & Motivation Scores (Out of 100)</h4>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    
+                                    {# Field: personality_score (Personality / Attitude) #}
+                                    <div class="space-y-1">
+                                        <label for="id_personality_score" class="block text-sm font-medium text-gray-700">{{ form.personality_score.label }}</label>
+                                        <input type="number" 
+                                               name="{{ form.personality_score.name }}" 
+                                               id="id_personality_score" 
+                                               value="{{ form.personality_score.value|default_if_none:'' }}" 
+                                               class="w-full rounded-lg border border-gray-300 shadow-sm p-3 text-lg focus:ring-pink-500 focus:border-pink-500"
+                                               {% if form.personality_score.field.required %}required{% endif %} 
+                                               min="0" max="100"
+                                               placeholder="e.g., 95 (Cultural fit, EQ)"
+                                        >
+                                        {% if form.personality_score.errors %}<p class="text-red-500 text-xs mt-1 font-semibold">{{ form.personality_score.errors.0 }}</p>{% endif %}
+                                    </div>
+
+                                    {# Field: motivation_score (Motivation / Intent) #}
+                                    <div class="space-y-1">
+                                        <label for="id_motivation_score" class="block text-sm font-medium text-gray-700">{{ form.motivation_score.label }}</label>
+                                        <input type="number" 
+                                               name="{{ form.motivation_score.name }}" 
+                                               id="id_motivation_score" 
+                                               value="{{ form.motivation_score.value|default_if_none:'' }}" 
+                                               class="w-full rounded-lg border border-gray-300 shadow-sm p-3 text-lg focus:ring-pink-500 focus:border-pink-500"
+                                               {% if form.motivation_score.field.required %}required{% endif %} 
+                                               min="0" max="100"
+                                               placeholder="e.g., 90 (Career Goals, Stability)"
+                                        >
+                                        {% if form.motivation_score.errors %}<p class="text-red-500 text-xs mt-1 font-semibold">{{ form.motivation_score.errors.0 }}</p>{% endif %}
+                                    </div>
+                                    
+                                    {# Field: salary_expectation_fit_score (Compensation Fit) #}
+                                    <div class="space-y-1">
+                                        <label for="id_salary_expectation_fit_score" class="block text-sm font-medium text-gray-700">{{ form.salary_expectation_fit_score.label }}</label>
+                                        <input type="number" 
+                                               name="{{ form.salary_expectation_fit_score.name }}" 
+                                               id="id_salary_expectation_fit_score" 
+                                               value="{{ form.salary_expectation_fit_score.value|default_if_none:'' }}" 
+                                               class="w-full rounded-lg border border-gray-300 shadow-sm p-3 text-lg focus:ring-pink-500 focus:border-pink-500"
+                                               min="0" max="100"
+                                               placeholder="e.g., 80 (Negotiation, Alignment)"
+                                        >
+                                        {% if form.salary_expectation_fit_score.errors %}<p class="text-red-500 text-xs mt-1 font-semibold">{{ form.salary_expectation_fit_score.errors.0 }}</p>{% endif %}
+                                    </div>
+
+                                    {# Field: communication_score (General Communication) #}
+                                    <div class="space-y-1">
+                                        <label for="id_communication_score" class="block text-sm font-medium text-gray-700">{{ form.communication_score.label }}</label>
+                                        <input type="number" 
+                                               name="{{ form.communication_score.name }}" 
+                                               id="id_communication_score" 
+                                               value="{{ form.communication_score.value|default_if_none:'' }}" 
+                                               class="w-full rounded-lg border border-gray-300 shadow-sm p-3 text-lg focus:ring-pink-500 focus:border-pink-500"
+                                               {% if form.communication_score.field.required %}required{% endif %} 
+                                               min="0" max="100"
+                                               placeholder="Clarity and professionalism"
+                                        >
+                                        {% if form.communication_score.errors %}<p class="text-red-500 text-xs mt-1 font-semibold">{{ form.communication_score.errors.0 }}</p>{% endif %}
+                                    </div>
+                                    
+                                    {# Field: leadership_score (Potential/Team Fit) #}
+                                    <div class="space-y-1">
+                                        <label for="id_leadership_score" class="block text-sm font-medium text-gray-700">{{ form.leadership_score.label }}</label>
+                                        <input type="number" 
+                                               name="{{ form.leadership_score.name }}" 
+                                               id="id_leadership_score" 
+                                               value="{{ form.leadership_score.value|default_if_none:'' }}" 
+                                               class="w-full rounded-lg border border-gray-300 shadow-sm p-3 text-lg focus:ring-pink-500 focus:border-pink-500"
+                                               min="0" max="100"
+                                               placeholder="Future potential, team interaction"
+                                        >
+                                        {% if form.leadership_score.errors %}<p class="text-red-500 text-xs mt-1 font-semibold">{{ form.leadership_score.errors.0 }}</p>{% endif %}
+                                    </div>
+                                    
+                                    {# NOTE: domain_knowledge_score is intentionally omitted for a typical HR round UI #}
+                                    
+                                </div>
+                                
+                                {# Overall Score Block #}
+                                <div class="w-full md:w-1/3 lg:w-1/4 mx-auto pt-6">
+                                     <div class="space-y-1 bg-yellow-50 p-3 rounded-xl border border-yellow-400 shadow-inner">
+                                        <label for="id_score" class="block text-sm font-bold text-gray-800">{{ form.score.label }}</label>
+                                        <input type="number" 
+                                               name="{{ form.score.name }}" 
+                                               id="id_score" 
+                                               value="{{ form.score.value|default_if_none:'' }}" 
+                                               class="w-full rounded-lg border border-gray-400 shadow-inner p-3 text-xl font-extrabold focus:ring-yellow-600 focus:border-yellow-600"
+                                               {% if form.score.field.required %}required{% endif %} 
+                                               min="0" max="100"
+                                               placeholder="OVERALL HR RATING"
+                                        >
+                                        {% if form.score.errors %}<p class="text-red-500 text-xs mt-1 font-semibold">{{ form.score.errors.0 }}</p>{% endif %}
+                                     </div>
+                                </div>
+
+
+                                {# Section 2: Feedback and Final Decision #}
+                                <h4 class="mt-8 text-xl font-bold pb-2 border-b border-gray-200 text-pink-600">Decision & Detailed Feedback</h4>
+                                
+                                <div class="space-y-1">
+                                    <label for="id_feedback" class="block text-sm font-medium text-gray-700">{{ form.feedback.label }}</label>
+                                    <textarea name="{{ form.feedback.name }}" 
+                                              id="id_feedback" 
+                                              rows="5" 
+                                              class="w-full rounded-lg border border-gray-300 shadow-sm p-3 focus:ring-pink-500 focus:border-pink-500"
+                                              {% if form.feedback.field.required %}required{% endif %} 
+                                    >{{ form.feedback.value|default_if_none:'' }}</textarea>
+                                    <p class="text-xs text-gray-500 mt-1">Provide detailed comments on attitude, fit, salary expectation, and overall motivation.</p>
+                                    {% if form.feedback.errors %}<p class="text-red-500 text-xs mt-1 font-semibold">{{ form.feedback.errors.0 }}</p>{% endif %}
+                                </div>
+                                
+                                {# Pass/Fail Toggle #}
+                                <div class="pt-4 flex items-center justify-between border-t border-gray-100">
+                                    <label class="block text-xl font-extrabold text-gray-700">Final Decision</label>
+                                    
+                                    <div class="flex items-center space-x-3">
+                                        {# Switch Input #}
+                                        <input class="h-6 w-11 rounded-full appearance-none bg-gray-300 transition duration-200 ease-in-out cursor-pointer shadow-inner" 
+                                               type="checkbox" 
+                                               role="switch" 
+                                               id="id_is_passed" 
+                                               name="is_passed" 
+                                               {% if form.is_passed.value %}checked{% endif %}
+                                        >
+                                        
+                                        {# Dynamic Label #}
+                                        <label for="id_is_passed" class="text-lg font-bold">
+                                            <span id="pass-fail-label">
+                                                {% if form.is_passed.value %}Passed (HIRED/Offer Stage){% else %}Fail (Rejected/Hold){% endif %}
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <p class="text-xs text-red-500 text-right mt-1">
+                                    *Uncheck to mark candidate as Failed/Rejected for this stage.
+                                </p>
+
+                                {# Action Buttons #}
+                                <div class="flex justify-end pt-4 border-t border-gray-200 mt-6">
+                                    <a href="{% url 'application_detail_view' application_id=candidate_app.id %}" class="inline-flex items-center px-5 py-3 border border-gray-300 shadow-md text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-100 transition duration-150 mr-3">
+                                        <i class="fas fa-arrow-left mr-2"></i> Back to Candidate
+                                    </a>
+                                    <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-bold rounded-lg shadow-lg text-white bg-green-600 hover:bg-green-700 transition duration-150 focus:ring-4 focus:ring-green-300">
+                                        <i class="fas fa-save mr-2"></i> Save & Process Decision
+                                    </button>
+                                </div>
+                            </form>
+
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </main>
+
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const passFailCheckbox = document.getElementById('id_is_passed');
+        const passFailLabel = document.getElementById('pass-fail-label');
+
+        function updateLabelAndStyles() {
+            if (passFailCheckbox.checked) {
+                passFailLabel.innerHTML = 'Passed (HIRED/Offer Stage)';
+                passFailLabel.classList.remove('text-red-600');
+                passFailLabel.classList.add('text-green-600');
+                
+                // Switch Styling (Checked/Passed)
+                passFailCheckbox.classList.remove('bg-gray-300');
+                passFailCheckbox.classList.add('bg-green-500');
+                passFailCheckbox.style.setProperty('background-position', 'right center', 'important'); 
+                
+            } else {
+                passFailLabel.innerHTML = 'Fail (Rejected/Hold)';
+                passFailLabel.classList.remove('text-green-600');
+                passFailLabel.classList.add('text-red-600');
+
+                // Switch Styling (Unchecked/Fail)
+                passFailCheckbox.classList.remove('bg-green-500');
+                passFailCheckbox.classList.add('bg-gray-300');
+                passFailCheckbox.style.setProperty('background-position', 'left center', 'important');
+            }
+        }
+
+        // Apply a custom Tailwind-friendly switch style for the thumb/slider
+        passFailCheckbox.style.setProperty('box-shadow', 'inset 0 0 0 2em rgb(255 255 255 / 0.5), 0 2px 4px 0 rgb(0 0 0 / 0.2)', 'important');
+        passFailCheckbox.style.setProperty('transition', 'background-color 0.2s, background-position 0.2s', 'important');
+        passFailCheckbox.style.setProperty('cursor', 'pointer', 'important');
+        
+        // Initial load check for background position
+        if (passFailCheckbox.checked) {
+            passFailCheckbox.style.setProperty('background-position', 'right center', 'important');
+        } else {
+            passFailCheckbox.style.setProperty('background-position', 'left center', 'important');
+        }
+
+
+        passFailCheckbox.addEventListener('change', updateLabelAndStyles);
+        updateLabelAndStyles(); // Initial check and styling
+    });
+  </script>
+</body>
+</html>
