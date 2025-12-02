@@ -303,9 +303,9 @@ env = environ.Env(
     
     # Email settings (Using standard TLS port 587)
     EMAIL_HOST=(str, 'smtp.gmail.com'),
-    EMAIL_PORT=(int, 587),
-    EMAIL_USE_TLS=(bool, True),
-    EMAIL_USE_SSL=(bool, False), # TLS and SSL are mutually exclusive
+    EMAIL_PORT=(int, 465),
+    EMAIL_USE_TLS=(bool, False),
+    EMAIL_USE_SSL=(bool, True), # TLS and SSL are mutually exclusive
     EMAIL_HOST_USER=(str, ''),
     EMAIL_HOST_PASSWORD=(str, ''),
     DEFAULT_FROM_EMAIL=(str, 'noreply@yourapp.com'),
@@ -327,7 +327,7 @@ DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 if DEBUG:
     # Add local development hosts only if DEBUG is True
-    ALLOWED_HOSTS = ['ai-written-test-5tny.onrender.com', 'localhost', '127.0.0.1']
+    ALLOWED_HOSTS += ["127.0.0.1", "localhost", "192.168.1.10", "10.0.0.42"]
     
 # Application definition
 INSTALLED_APPS = [
