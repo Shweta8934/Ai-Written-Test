@@ -491,9 +491,9 @@ class CandidateApplication(models.Model):
     photo_file = models.FileField(
         upload_to='photos/', 
         null=True, 
-        blank=True,
+        blank=True, # ✅ यह पहले से ही वैकल्पिक है
         help_text="Candidate Photo"
-    ) 
+    )
     
     # Add Foreign Key to QuestionPaper (for Interview Applications)
     linked_paper = models.ForeignKey(

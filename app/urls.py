@@ -172,4 +172,5 @@ path('update-candidate-stage/<int:candidate_id>/', views.update_candidate_stage,
     path('application/<int:application_id>/evaluate/<str:round_name>/', 
          views.evaluation_form_view, 
          name='evaluation_form'),
+
 ]

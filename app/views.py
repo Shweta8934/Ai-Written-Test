@@ -736,6 +736,174 @@ def paper_detail_view(request, paper_id):
     return render(request, "question_generator/paper_detail.html", context)
 
 
+# @login_required
+# @transaction.atomic
+# def paper_edit_view(request, paper_id):
+#     """
+#     Handles editing of a question paper's metadata and its questions.
+#     NOW ALSO SAVES MCQ OPTIONS!
+#     """
+#     paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
+
+#     if request.method == "POST":
+#         form = QuestionPaperEditForm(request.POST, instance=paper)
+
+#         if form.is_valid():
+#             updated_paper = form.save()
+
+#             total_questions_count = 0
+
+#             for section in paper.paper_sections.all():
+#                 # ▼▼▼ YEH NAYA LOGIC ADD KAREIN ▼▼▼
+#                 # Section ka weightage save karein
+#                 weightage_key = f"section-weightage-{section.id}"
+#                 if weightage_key in request.POST:
+#                     try:
+#                         # Value ko float mein convert karein, default 0.0
+#                         new_weightage = float(request.POST[weightage_key] or 0.0)
+#                         section.weightage = new_weightage
+#                         # Section ko database mein save karein
+#                         section.save(update_fields=["weightage"]) # <--- यह सेव कर रहा है
+#                     except (ValueError, TypeError):
+#                         # Agar koi galat value (jaise text) daalta hai, toh use ignore karein
+#                         pass
+#                 # ▲▲▲ NAYA LOGIC KHATAM ▲▲▲
+#                 for question in section.questions.all():
+#                     question_text_name = f"question-text-{question.id}"
+#                     question_answer_name = f"question-answer-{question.id}"
+
+#                     if question_text_name in request.POST:
+#                         new_text = request.POST[question_text_name].strip()
+#                         if new_text:  
+#                             question.text = new_text
+
+#                     if question_answer_name in request.POST:
+#                         new_answer = request.POST[question_answer_name].strip()
+#                         if new_answer:  
+#                             question.answer = new_answer
+#                         if question.question_type == "MCQ":
+#                             options = []
+#                             for opt_num in range(1, 11):  
+#                                 option_key = f"option-{question.id}-{opt_num}"
+#                                 if option_key in request.POST:
+#                                     option_value = request.POST[option_key].strip()
+#                                     if option_value:
+#                                         options.append(option_value)
+#                             if options:
+#                                 question.options = options
+
+#                         question.save()
+                   
+#                     total_questions_count += 1
+
+#             updated_paper.total_questions = total_questions_count
+#             updated_paper.save(update_fields=["total_questions"])
+
+#             messages.success(
+#                 request,
+#                 f"✅ Paper '{updated_paper.title}' successfully updated with {total_questions_count} questions!",
+#             )
+#             return redirect("paper_detail", paper_id=paper.id)
+
+#         else:
+#             messages.error(
+#                 request,
+#                 "❌ There were errors in your submission. Please check the form.",
+#             )
+
+#     else:
+#         form = QuestionPaperEditForm(instance=paper)
+
+#     context = {"form": form, "paper": paper, "title": f"Edit {paper.title}"}
+
+#     return render(request, "question_generator/paper_edit.html", context)
+import re
+IMAGE_BLOCK_REGEX = re.compile(r'(<p[^>]*>.*?<img[^>]*>.*?</p>|<img[^>]*>)', re.DOTALL | re.IGNORECASE)
+
+# def _process_question_text(question_text: str):
+#     """
+#     Extracts the image HTML (for preview) and cleans the text (for textarea).
+#     Returns a dictionary: {'image_preview': '...', 'clean_text': '...', 'raw_text': '...'}
+#     """
+#     if not question_text:
+#         return {'image_preview': '', 'clean_text': '', 'raw_text': ''}
+
+#     # 1. Try to find the image block
+#     match = IMAGE_BLOCK_REGEX.search(question_text)
+    
+#     if match:
+#         image_html = match.group(0)
+        
+#         # 2. Generate clean text by removing the image block
+#         # The clean text is what the user sees in the editor.
+#         clean_text = IMAGE_BLOCK_REGEX.sub('', question_text).strip()
+        
+#         # 3. Ensure the original HTML (raw_text) is still saved/used for POST.
+#         return {
+#             'image_preview': image_html,
+#             'clean_text': clean_text,
+#             'raw_text': question_text.strip()
+#         }
+    
+#     # If no image is found
+#     return {
+#         'image_preview': '',
+#         'clean_text': question_text.strip(),
+#         'raw_text': question_text.strip()
+#     }
+# app/views.py
+
+import re
+# ... (rest of imports)
+
+# Regex to find an img tag within a p tag, capturing the entire block
+IMAGE_BLOCK_REGEX = re.compile(r'(<p[^>]*>.*?<img[^>]*>.*?</p>|<img[^>]*>)', re.DOTALL | re.IGNORECASE)
+
+# ✨ नया/अपडेटेड कोड ब्लॉक Regex ✨ (जो आपके कोड ब्लॉक को कैप्चर करेगा)
+CODE_BLOCK_REGEX = re.compile(r'(<div[^>]*class="code-block-wrapper[^>]*>.*?</div>)', re.DOTALL | re.IGNORECASE)
+
+def _process_question_text(question_text: str):
+    """
+    Extracts the image HTML (for preview) and cleans the text (for textarea).
+    
+    CRITICAL: It must remove *both* IMAGE blocks and CODE blocks, 
+    otherwise, the raw HTML of the code block will show in the edit text area.
+    """
+    if not question_text:
+        return {'image_preview': '', 'clean_text': '', 'raw_text': ''}
+
+    raw_text = question_text.strip()
+    
+    # 1. Image Block खोजें
+    image_match = IMAGE_BLOCK_REGEX.search(raw_text)
+    image_html = image_match.group(0) if image_match else ''
+    
+    # 2. Image और Code Block दोनों को हटा दें
+    clean_text = IMAGE_BLOCK_REGEX.sub('', raw_text)
+    clean_text = CODE_BLOCK_REGEX.sub('', clean_text).strip()
+    
+    # 3. साफ़ करें और potential leftover paragraph tags हटाएँ
+    clean_text = re.sub(r'</?p[^>]*>', '', clean_text)
+
+    # अगर clean_text बहुत छोटा हो गया है (जैसे केवल 1), तो original raw_text का उपयोग करें
+    # यह सुनिश्चित करने के लिए कि बाकी का प्रश्न टेक्स्ट (जैसे ') She don't like apples.')
+    # edit box में आ जाए।
+    if len(clean_text) < 5:
+        # Fallback: सिर्फ़ पहला HTML टैग हटाएँ और बाकी का टेक्स्ट रखें
+        clean_text = re.sub(r'<div[^>]*>.*?</div>', '', raw_text, 1)
+        clean_text = re.sub(r'<p[^>]*>.*?<br></p>', '', clean_text, 1).strip()
+        # पहले कोड ब्लॉक HTML को एक बार हटाकर बाकी टेक्स्ट को रखें
+    
+    # प्रश्न के शुरुआत में आने वाले नंबर/कोष्ठक को हटाएँ (जैसे '1)')
+    clean_text = re.sub(r'^\d+\) ?', '', clean_text).strip()
+    
+    # अंतिम परिणाम
+    return {
+        'image_preview': image_html,
+        'clean_text': clean_text,
+        'raw_text': raw_text
+    }
+
 @login_required
 @transaction.atomic
 def paper_edit_view(request, paper_id):
@@ -748,39 +916,39 @@ def paper_edit_view(request, paper_id):
     if request.method == "POST":
         form = QuestionPaperEditForm(request.POST, instance=paper)
 
+        # --- POST LOGIC (Saving Changes) ---
         if form.is_valid():
             updated_paper = form.save()
-
             total_questions_count = 0
 
             for section in paper.paper_sections.all():
-                # ▼▼▼ YEH NAYA LOGIC ADD KAREIN ▼▼▼
-                # Section ka weightage save karein
+                # Section weightage save logic (existing)
                 weightage_key = f"section-weightage-{section.id}"
                 if weightage_key in request.POST:
                     try:
-                        # Value ko float mein convert karein, default 0.0
                         new_weightage = float(request.POST[weightage_key] or 0.0)
                         section.weightage = new_weightage
-                        # Section ko database mein save karein
-                        section.save(update_fields=["weightage"]) # <--- यह सेव कर रहा है
+                        section.save(update_fields=["weightage"])
                     except (ValueError, TypeError):
-                        # Agar koi galat value (jaise text) daalta hai, toh use ignore karein
                         pass
-                # ▲▲▲ NAYA LOGIC KHATAM ▲▲▲
+                
                 for question in section.questions.all():
                     question_text_name = f"question-text-{question.id}"
                     question_answer_name = f"question-answer-{question.id}"
 
+                    # Update Question Text
                     if question_text_name in request.POST:
                         new_text = request.POST[question_text_name].strip()
                         if new_text:  
                             question.text = new_text
 
+                    # Update Answer Text
                     if question_answer_name in request.POST:
                         new_answer = request.POST[question_answer_name].strip()
                         if new_answer:  
                             question.answer = new_answer
+                        
+                        # Update MCQ Options
                         if question.question_type == "MCQ":
                             options = []
                             for opt_num in range(1, 11):  
@@ -811,12 +979,87 @@ def paper_edit_view(request, paper_id):
                 "❌ There were errors in your submission. Please check the form.",
             )
 
-    else:
-        form = QuestionPaperEditForm(instance=paper)
+    # --- GET LOGIC (Page Load) ---
+    # app/views.py (inside the GET logic of paper_edit_view)
 
-    context = {"form": form, "paper": paper, "title": f"Edit {paper.title}"}
+    # --- GET LOGIC (Page Load) ---
+    form = QuestionPaperEditForm(instance=paper)
+    
+    # 💡 NEW LOGIC: Pre-process question data for template rendering
+    processed_sections = []
+    for section in paper.paper_sections.all():
+        processed_questions = []
+        for question in section.questions.all():
+            # Process the question text to separate image HTML for preview
+            processed_text = _process_question_text(question.text)
+            
+            # Create a dict combining question object data with processed text
+            processed_q = {
+                'id': question.id,
+                'question_type': question.question_type,
+                'options': question.options,
+                'answer': question.answer,
+                # New: Image preview (rendered)
+                'image_preview': processed_text['image_preview'],
+                # New: Clean text (for the textarea input)
+                'clean_text': processed_text['clean_text'], 
+            }
+            processed_questions.append(processed_q)
+            
+        processed_sections.append({
+            'id': section.id,
+            'title': section.title,
+            'weightage': section.weightage,
+            'questions': processed_questions
+        })
+        
+    context = {
+        "form": form, 
+        "paper": paper, 
+        "processed_sections": processed_sections, # Pass the processed data
+        "title": f"Edit {paper.title}"
+    }
 
     return render(request, "question_generator/paper_edit.html", context)
+    # form = QuestionPaperEditForm(instance=paper)
+    
+    # # 💡 NEW LOGIC: Pre-process question data for template rendering
+    # processed_sections = []
+    # for section in paper.paper_sections.all():
+    #     processed_questions = []
+    #     for question in section.questions.all():
+    #         # Process the question text to separate image HTML for preview
+    #         processed_text = _process_question_text(question.text)
+            
+    #         # Create a dict combining question object data with processed text
+    #         processed_q = {
+    #             'id': question.id,
+    #             'question_type': question.question_type,
+    #             'options': question.options,
+    #             'answer': question.answer,
+    #             # Add the new processed fields
+    #             'image_preview': processed_text['image_preview'],
+    #             'raw_text': processed_text['raw_text'], 
+    #         }
+    #         processed_questions.append(processed_q)
+            
+    #     processed_sections.append({
+    #         'id': section.id,
+    #         'title': section.title,
+    #         'weightage': section.weightage,
+    #         'questions': processed_questions # This is the new list we loop over
+    #     })
+        
+    # context = {
+    #     "form": form, 
+    #     "paper": paper, 
+    #     "processed_sections": processed_sections, # Pass the processed data
+    #     "title": f"Edit {paper.title}"
+    # }
+
+    # return render(request, "question_generator/paper_edit.html", context)
+
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -3818,3 +4061,45 @@ def evaluation_form_view(request, application_id, round_name):
     
     # 3. Dynamic Template Rendering
     return render(request, f'recruitment/{template_suffix}.html', context)
+
+
+
+# app/views.py
+
+import re # Ensure 're' is imported at the top
+
+# Regex to find an img tag within a p tag, capturing the entire block
+IMAGE_BLOCK_REGEX = re.compile(r'(<p[^>]*>.*?<img[^>]*>.*?</p>|<img[^>]*>)', re.DOTALL | re.IGNORECASE)
+
+def process_question_text(question_text: str):
+    """
+    Extracts the image HTML and cleans the text for display in the textarea.
+    Returns a dictionary: {'preview_html': '...', 'clean_text': '...'}
+    """
+    if not question_text:
+        return {'preview_html': '', 'clean_text': ''}
+
+    # 1. Try to find the image block
+    match = IMAGE_BLOCK_REGEX.search(question_text)
+    
+    if match:
+        image_html = match.group(0)
+        
+        # 2. Remove the image block from the text
+        clean_text = IMAGE_BLOCK_REGEX.sub('', question_text).strip()
+        
+        # 3. Clean up potential leftover paragraph tags
+        clean_text = re.sub(r'</?p[^>]*>', '', clean_text)
+        
+        return {
+            'preview_html': image_html,
+            'clean_text': clean_text
+        }
+    
+    # If no image is found, return original text as clean text
+    return {
+        'preview_html': '',
+        'clean_text': question_text.strip()
+    }
+
+# ... rest of the file ...

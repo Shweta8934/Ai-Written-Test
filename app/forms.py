@@ -545,6 +545,64 @@ class InterviewEvaluationForm(forms.ModelForm):
             'feedback': forms.Textarea(attrs={'rows': 4}),
         }
 
+# class CandidateApplicationForm(forms.ModelForm):
+#     # candidateType ko form mein ek temporary field ke roop mein add karein
+#     candidateType = forms.CharField(max_length=20, required=True)
+
+#     class Meta:
+#         model = CandidateApplication
+#         fields = (
+#             'full_name', 'email', 'phone_number', 'total_experience', 
+#             'current_ctc', 'current_ctc_rate', 'expected_ctc', 'expected_ctc_rate',
+#             'skills', 'current_location', 'referral_source', 'resume_file', 
+#             'photo_file', 'cover_letter', 'candidateType' # Temporary field
+#         )
+        
+#     def clean(self):
+#         cleaned_data = super().clean()
+        
+#         # is_experienced ko calculate karein
+#         candidate_type = cleaned_data.get('candidateType')
+#         is_experienced = (candidate_type == 'experienced')
+        
+#         # is_experienced ko cleaned_data mein inject karein
+#         cleaned_data['is_experienced'] = is_experienced 
+
+#         # Experienced logic
+#         if is_experienced:
+#             total_experience = cleaned_data.get('total_experience')
+#             if not total_experience or total_experience <= 0:
+#                  # Ensure total_experience is validated if experienced
+#                  self.add_error('total_experience', 'Total Experience is required for experienced applicants.')
+#         else:
+#             # Fresher ke liye total_experience ko 0 ya None set karein
+#             cleaned_data['total_experience'] = None
+            
+#         # Optional: candidateType ko cleaned_data se hata dein agar model mein yeh field nahi hai
+#         del cleaned_data['candidateType'] 
+        
+#         return cleaned_data
+
+#     def save(self, commit=True):
+#         instance = super().save(commit=False)
+#         # Cleaned data se is_experienced ki calculated value ko instance mein copy karein
+#         instance.is_experienced = self.cleaned_data.get('is_experienced')
+        
+#         # Agar experienced nahi hai, toh optional fields ko clear karein (safeside ke liye)
+#         if not instance.is_experienced:
+#              instance.total_experience = None
+#              instance.current_ctc = None
+#              # ... (other experienced fields ko bhi clear karein) ...
+        
+#         if commit:
+#             instance.save()
+#         return instance
+from django import forms
+from .models import CandidateApplication # मान लें कि यह इम्पोर्टेड है
+from django.core.exceptions import ValidationError
+
+# ... (INPUT_CLASSES और TEXTAREA_CLASSES यहाँ परिभाषित हैं)
+
 class CandidateApplicationForm(forms.ModelForm):
     # candidateType ko form mein ek temporary field ke roop mein add karein
     candidateType = forms.CharField(max_length=20, required=True)
@@ -555,7 +613,8 @@ class CandidateApplicationForm(forms.ModelForm):
             'full_name', 'email', 'phone_number', 'total_experience', 
             'current_ctc', 'current_ctc_rate', 'expected_ctc', 'expected_ctc_rate',
             'skills', 'current_location', 'referral_source', 'resume_file', 
-            'photo_file', 'cover_letter', 'candidateType' # Temporary field
+            'photo_file',  # ✨ 1. photo_file को Meta में शामिल किया गया
+            'cover_letter', 'candidateType' 
         )
         
     def clean(self):
@@ -590,14 +649,22 @@ class CandidateApplicationForm(forms.ModelForm):
         
         # Agar experienced nahi hai, toh optional fields ko clear karein (safeside ke liye)
         if not instance.is_experienced:
+             # ✨ 2. Fresher होने पर सभी Experience/CTC फ़ील्ड्स को None सेट करें
              instance.total_experience = None
              instance.current_ctc = None
-             # ... (other experienced fields ko bhi clear karein) ...
+             instance.current_ctc_rate = None
+             instance.expected_ctc = None
+             instance.expected_ctc_rate = None
+             instance.skills = None
+             instance.current_location = None
+             instance.referral_source = None
+             
+             # Note: resume_file, photo_file, और cover_letter freshers के लिए भी
+             # वैकल्पिक (Optional) रहते हैं क्योंकि वे मॉडल में null=True हैं।
         
         if commit:
             instance.save()
         return instance
-
 
 
 # app/forms.py
