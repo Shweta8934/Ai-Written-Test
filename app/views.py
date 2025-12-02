@@ -818,17 +818,8 @@ def paper_edit_view(request, paper_id):
 
     return render(request, "question_generator/paper_edit.html", context)
 
-
 import logging
-
 logger = logging.getLogger(__name__)
-
-
-
-
-#     context = {"form": form}
-#     return render(request, "partials/department/department_create.html", context)
-# app/views.py
 
 @login_required
 def department_create_view(request):
@@ -1007,8 +998,6 @@ def user_list(request):
     }
     
     return render(request, 'partials/users/user_list.html', context)
-
-
 
 
 def user_detail(request, user_id):

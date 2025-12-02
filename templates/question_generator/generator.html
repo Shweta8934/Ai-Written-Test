@@ -581,6 +581,7 @@
             </div>
         </main>
     </div>
+    <input type="file" id="imageFileInput" accept="image/*" onchange="handleImageFileSelect(event)" style="display: none;">
     <div id="edit-modal"
         class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center p-4 z-50 hidden">
         <div id="edit-modal-content" class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all">
@@ -1192,88 +1193,7 @@ function buildSectionsHTML(sections) {
             }
         }
 
-//         function collectStepData(step) {
-//             if (step === 1) {
-//                 formData.jobTitle = document.getElementById("jobTitle").value;
 
-//                 formData.jobLocation = document.getElementById("jobLocation").value;
-//                 formData.jobType = document.getElementById("jobType").value;
-//                 formData.positions = document.getElementById("positions").value;
-//                 formData.rounds = document.getElementById("rounds").value;
-//                 formData.payScale = document.getElementById("payScale").value;
-//                 formData.endDate = document.getElementById("endDate").value;
-
-//                 const deptSelect = document.getElementById("department");
-//                 formData.departmentId = deptSelect.value;
-//                 formData.departmentName = deptSelect.selectedIndex > 0 ? deptSelect.options[deptSelect.selectedIndex].text : "";
-//                 formData.skills = document.getElementById("skills-hidden-input").value;
-//                 formData.minExp = document.getElementById("minExp").value;
-//                 formData.maxExp = document.getElementById("maxExp").value;
-//        } else if (step === 2) {
-//         formData.sections = {};
-// formData.sectionWeights = {}; // ✅ NAYA: Weightage store karne ke liye
-//         document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
-//             const sectionName = div.dataset.section.trim();
-//             const countInput = div.querySelector('input[type="number"]');
-            
-//             // ✅ FIX 1: Weightage input field ko select karein
-//             const weightInput = div.querySelector('.weightage-input');
-
-//             const count = parseInt(countInput.value, 10);
-//             // ✅ FIX 2: Weightage value ko parse karein
-//             const weight = parseFloat(weightInput?.value) || 0.0; 
-
-//             if (count > 0) {
-//                 formData.sections[sectionName] = count;
-//             }
-            
-//             // ✅ FIX 3: Weightage ko store karein
-//             formData.sectionWeights[sectionName] = weight;
-//         });
-        
-//         const durationSelect = document.getElementById("duration");
-//         formData.duration = parseInt(durationSelect.value, 10) || 0;
-//         formData.durationText =
-//           durationSelect.selectedIndex > 0
-//             ? durationSelect.options[durationSelect.selectedIndex].text
-//             : "";
-//         formData.cutoffScore = document.getElementById("cutoffScore").value;
-        
-//         // Step 4/Save ke liye fullPaperPayload mein weightage inject karein (Generate hone ke baad)
-//         if (fullPaperPayload.sections && formData.sectionWeights) {
-//             fullPaperPayload.sections.forEach(section => {
-//                 const title = section.title.trim();
-//                 const weight = formData.sectionWeights[title];
-//                 if (weight !== undefined) {
-//                     section.weightage = parseFloat(weight);
-//                 }
-//             });
-//         }
-//     }
-//     // ... (rest of the function is fine) ...
-//     saveToSessionStorage();
-// }
-
-
-
-                //     } else if (step === 2) {
-        
-                //         formData.sections = {};
-        //         document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
-        //             const sectionName = div.dataset.section;
-        //             const count = div.querySelector("input").value;
-        //             if (parseInt(count, 10) > 0) {
-        //                 formData.sections[sectionName] = parseInt(count, 10);
-        //             }
-        //         });
-        //         const durationSelect = document.getElementById("duration");
-        //         formData.duration = parseInt(durationSelect.value, 10) || 0;
-        //         formData.durationText = durationSelect.selectedIndex > 0 ? durationSelect.options[durationSelect.selectedIndex].text : "";
-        //         formData.cutoffScore = document.getElementById("cutoffScore").value;
-        //     }
-        //     saveToSessionStorage();
-        // }
-// Function to collect data from Step 1 and Step 2 fields
 function collectStepData(step) {
     if (step === 1) {
         formData.jobTitle = document.getElementById("jobTitle").value;
@@ -1734,7 +1654,6 @@ function collectStepData(step) {
 
             document.getElementById("review-total").textContent = totalQuestions;
         }
-
 
         
         function getCookie(name) {
@@ -2227,10 +2146,12 @@ function displayGeneratedPaper(paperData) {
                                     contenteditable="true">${q.text || "Question text not available."}</div>
                                 
                                 <div class="custom-toolbar hidden mt-2 py-1 flex items-center gap-1 border rounded-lg p-1 bg-slate-50 shadow-sm">
-                                    <button onclick="formatDoc('bold')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Bold"><i class="fas fa-bold h-5 w-5"></i></button>
-                                    <button onclick="formatDoc('italic')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Italic"><i class="fas fa-italic h-5 w-5"></i></button>
-                                    <button onclick="formatDoc('underline')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Underline"><i class="fas fa-underline h-5 w-5"></i></button>
-                                </div>
+    <button onclick="formatDoc('bold')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Bold"><i class="fas fa-bold h-5 w-5"></i></button>
+    <button onclick="formatDoc('italic')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Italic"><i class="fas fa-italic h-5 w-5"></i></button>
+    <button onclick="formatDoc('underline')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Underline"><i class="fas fa-underline h-5 w-5"></i></button>
+    <button onclick="insertImagePrompt(event)" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Insert Image Link"><i class="fas fa-image h-5 w-5"></i></button>
+    <button onclick="insertCodeBlock(event)" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Insert Code Block"><i class="fas fa-code h-5 w-5"></i></button>
+</div>
                                 
                                 ${contentHTML}
 
@@ -2286,177 +2207,7 @@ function displayGeneratedPaper(paperData) {
 }
 
 
-        // async function generatePaper() {
-        //     const generateButton = document.querySelector('#step-3 button[onclick="generatePaper()"]');
-        //     generateButton.disabled = true;
-        //     generateButton.innerHTML = `
-        //         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        //             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        //             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        //         </svg>
-        //         Generating...
-        //         `;
 
-        //     const aiPostData = {
-        //         job_title: formData.jobTitle,
-        //         min_exp: formData.minExp,
-        //         max_exp: formData.maxExp,
-        //         skills: formData.skills,
-        //         sections: formData.sections,
-        //         job_location: formData.jobLocation,
-        //         job_type: formData.jobType,
-        //         positions: formData.positions
-        //     };
-
-        //     try {
-        //         const response = await fetch("{% url 'generate_questions' %}", {
-        //             method: "POST",
-        //             headers: {
-        //                 "Content-Type": "application/json",
-        //                 "X-CSRFToken": getCookie("csrftoken"),
-        //             },
-        //             body: JSON.stringify(aiPostData),
-        //         });
-
-        //         if (!response.ok) {
-        //             const errorText = await response.text();
-        //             throw new Error(`Server error: ${response.status}. Response: ${errorText}`);
-        //         }
-        //         const paperData = await response.json();
-        //         if (paperData.error) throw new Error(paperData.error);
-
-        //         fullPaperPayload = {
-        //             job_title: formData.jobTitle,
-        //             department: formData.departmentName,
-        //             skills: formData.skills,
-        //             min_exp: formData.minExp,
-        //             max_exp: formData.maxExp,
-        //             duration: formData.duration,
-        //             durationText: formData.durationText,
-        //             cutoff_score: formData.cutoffScore,
-        //             title: paperData.title,
-        //             sections: paperData.sections,
-        //             job_location: formData.jobLocation,
-        //             job_type: formData.jobType,
-        //             positions: formData.positions,
-        //             rounds: formData.rounds,
-        //             pay_scale: formData.payScale,
-        //             end_date: formData.endDate
-        //         };
-
-        //         sessionStorage.removeItem("assessmentDraft");
-        //         displayGeneratedPaper(fullPaperPayload);
-        //         currentStep = 4;
-        //         showStep(currentStep);
-        //         showToast("Paper generated!", "success");
-
-        //     } catch (error) {
-        //         console.error("Failed to generate paper:", error);
-        //         showToast(`An error occurred: ${error.message}`, "error");
-        //     } finally {
-        //         generateButton.disabled = false;
-        //         generateButton.innerHTML = "Generate";
-        //     }
-        // }
-// Function to generate the paper and inject the final weightage
-// async function generatePaper() {
-// const roundsSelect = document.getElementById("rounds");
-//     const selectedRoundValue = roundsSelect.value;
-//     const isAssessmentRound = selectedRoundValue === "1";
-//     const generateButton = document.querySelector('#step-3 button[onclick="generatePaper()"]');
-//     generateButton.disabled = true;
-//     generateButton.innerHTML = `
-//         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-//             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-//             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-//         </svg>
-//         Generating...
-//         `;
-
-//     // Ensure Step 2 data is collected one last time before sending
-//     collectStepData(2);
-
-//     const aiPostData = {
-//         job_title: formData.jobTitle,
-//         min_exp: formData.minExp,
-//         max_exp: formData.maxExp,
-//         skills: formData.skills,
-//         sections: formData.sections,
-//         job_location: formData.jobLocation,
-//         job_type: formData.jobType,
-//         positions: formData.positions
-//         // Note: formData.sections mein sirf count hai, weightage nahi.
-//     };
-
-//     try {
-//         const response = await fetch("{% url 'generate_questions' %}", {
-//             method: "POST",
-//             headers: {
-//                 "Content-Type": "application/json",
-//                 "X-CSRFToken": getCookie("csrftoken"),
-//             },
-//             body: JSON.stringify(aiPostData),
-//         });
-
-//         if (!response.ok) {
-//             const errorText = await response.text();
-//             throw new Error(`Server error: ${response.status}. Response: ${errorText}`);
-//         }
-//         const paperData = await response.json();
-//         if (paperData.error) throw new Error(paperData.error);
-
-//         // 1. fullPaperPayload ko AI generated data se populate karein
-//         fullPaperPayload = {
-//             job_title: formData.jobTitle,
-//             department: formData.departmentName,
-//             skills: formData.skills,
-//             min_exp: formData.minExp,
-//             max_exp: formData.maxExp,
-//             duration: formData.duration,
-//             durationText: formData.durationText,
-//             cutoff_score: formData.cutoffScore,
-//             title: paperData.title,
-//             sections: paperData.sections, // AI generated sections (without weightage initially)
-//             job_location: formData.jobLocation,
-//             job_type: formData.jobType,
-//             positions: formData.positions,
-//             rounds: formData.rounds,
-//             pay_scale: formData.payScale,
-//             end_date: formData.endDate
-//         };
-
-//         // 2. ✅ CRITICAL FIX: AI generated sections mein user defined weightage inject karein
-//         if (fullPaperPayload.sections && formData.sectionWeights) {
-//             fullPaperPayload.sections.forEach(section => {
-//                 const title = section.title.trim();
-//                 const weight = formData.sectionWeights[title];
-                
-//                 // Weightage ko section object mein add karein
-//                 if (weight !== undefined) {
-//                     section.weightage = parseFloat(weight); 
-//                 } else {
-//                     // Fallback agar AI section name match na ho paye (unlikely but safe)
-//                     section.weightage = 0.0; 
-//                 }
-//             });
-//         }
-//         // Ab fullPaperPayload mein sections ke saath weightage bhi hai, aur yeh save_paper ko jayega.
-
-//         sessionStorage.removeItem("assessmentDraft");
-//         displayGeneratedPaper(fullPaperPayload);
-//         currentStep = 4;
-//         showStep(currentStep);
-//         showToast("Paper generated!", "success");
-
-//     } catch (error) {
-//         console.error("Failed to generate paper:", error);
-//         showToast(`An error occurred: ${error.message}`, "error");
-//     } finally {
-//         generateButton.disabled = false;
-//         generateButton.innerHTML = "Generate";
-//     }
-// }
-// Function to generate the paper and inject the final weightage
 async function generatePaper() {
     const roundsSelect = document.getElementById("rounds");
     const selectedRoundValue = roundsSelect.value;
@@ -2586,7 +2337,248 @@ async function generatePaper() {
     }
 }
 
-        document.addEventListener("DOMContentLoaded", function () {
+function insertImagePrompt(event) {
+    event.preventDefault(); 
+    event.stopPropagation();
+    
+    // Find the closest parent question block and then the specific editor
+    const button = event.currentTarget;
+    const questionBlock = button.closest('.question-block');
+    const editor = questionBlock ? questionBlock.querySelector('.question-text-editor') : null;
+
+    if (editor) {
+        // Ensure the editor has focus to establish the cursor range
+        editor.focus();
+        
+        sessionStorage.setItem('activeQuestionEditorId', editor.id);
+        console.log(`DEBUG: 1. Image button clicked. Active editor ID saved: ${editor.id}`);
+
+        // Now trigger the hidden file input click event
+        document.getElementById("imageFileInput").click();
+    } else {
+        console.error("DEBUG: ERROR: No active question editor found via DOM traversal.");
+        showToast("Error: Please make sure you click inside a question to select it first.", "error");
+    }
+}
+
+function handleImageFileSelect(event) {
+    console.log("DEBUG: 2. handleImageFileSelect event fired.");
+    const file = event.target.files[0];
+    
+    if (!file) {
+        console.log("DEBUG: No file selected.");
+        event.target.value = null; 
+        return;
+    }
+
+    console.log(`DEBUG: File selected: ${file.name}, Type: ${file.type}`);
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const tempImageUrl = e.target.result;
+        const editorId = sessionStorage.getItem('activeQuestionEditorId');
+        const editor = document.getElementById(editorId);
+
+        console.log("DEBUG: 3. FileReader loaded image data.");
+
+        if (editor) {
+            console.log(`DEBUG: Target editor element found: ${editorId}`);
+            editor.focus();
+
+            try {
+                // 1. Image Element और Wrapper (Paragraph) बनाएं
+                const img = document.createElement('img');
+                img.src = tempImageUrl;
+                img.alt = 'Uploaded Image Preview';
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '250px';
+                img.style.borderRadius = '4px';
+                img.style.display = 'block'; 
+                
+                // **** इमेज को डिलीट करने योग्य (Deletable) बनाने के लिए Listener जोड़ें ****
+                img.addEventListener('click', function(e) {
+                    e.preventDefault(); 
+                    const sel = window.getSelection();
+                    const range = document.createRange();
+                    
+                    // Parent <p> को सेलेक्ट करें
+                    const parentP = e.target.closest('p'); 
+                    if (parentP) {
+                        range.selectNode(parentP);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                        console.log("DEBUG: Image selected via click. User can now delete it with Delete/Backspace.");
+                    }
+                });
+                // *******************************************************
+                
+                const imgWrapper = document.createElement('p');
+                imgWrapper.style.textAlign = 'center';
+                imgWrapper.style.margin = '10px 0';
+                imgWrapper.appendChild(img);
+
+                // 2. Selection API का उपयोग करके Node को डालें
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    
+                    range.deleteContents();
+                    range.insertNode(imgWrapper);
+                    
+                    // कर्सर को नई लाइन पर ले जाने के लिए एक खाली पैराग्राफ डालें
+                    const newParagraph = document.createElement('p');
+                    newParagraph.innerHTML = '<br>';
+                    
+                    imgWrapper.parentNode.insertBefore(newParagraph, imgWrapper.nextSibling);
+
+                    // कर्सर को नए पैराग्राफ में सेट करें
+                    range.setStartAfter(newParagraph);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    console.log("DEBUG: 4. Image inserted successfully and cursor moved.");
+                    showToast("Image inserted successfully!", "success");
+                } else {
+                    // Fallback
+                    editor.appendChild(imgWrapper);
+                    editor.innerHTML += '<p><br></p>';
+                    console.warn("DEBUG: Selection API failed, used fallback insertion.");
+                }
+
+                // Update the model data (full HTML content) after insertion
+                const editorIdParts = editor.id.split('-');
+                const sectionIndex = parseInt(editorIdParts[1]);
+                const questionIndex = parseInt(editorIdParts[2]);
+                if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
+                    fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+                }
+                sessionStorage.removeItem('activeQuestionEditorId');
+            } catch (error) {
+                console.error("DEBUG: FATAL ERROR during image insertion:", error);
+                showToast("Error inserting image into the editor.", "error");
+            }
+        } else {
+            console.error("DEBUG: ERROR: Editor element not found with stored ID.");
+        }
+    };
+    reader.readAsDataURL(file);
+
+    // File input को reset करें 
+    event.target.value = null; 
+}
+
+
+// generator.html - <script> सेक्शन के अंदर
+
+function insertCodeBlock(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    let editor = document.activeElement;
+
+    if (!editor || !editor.classList.contains('question-text-editor')) {
+        const button = event.currentTarget;
+        const toolbar = button.closest('.custom-toolbar');
+        if (toolbar) {
+            editor = toolbar.previousElementSibling;
+        }
+    }
+
+    if (editor && editor.classList.contains('question-text-editor')) {
+        // एडिटर ID से इंडेक्स निकालें
+        const editorIdParts = editor.id.split('-');
+        const sectionIndex = parseInt(editorIdParts[1]);
+        const questionIndex = parseInt(editorIdParts[2]);
+
+        editor.focus();
+
+        const existingCodeBlocks = editor.querySelectorAll('.code-block-wrapper'); // 👈 Wrapper class का उपयोग करें
+        const MAX_CODE_BLOCKS = 3;
+
+        if (existingCodeBlocks.length >= MAX_CODE_BLOCKS) {
+            showToast(`Error: Only ${MAX_CODE_BLOCKS} code blocks are allowed per question.`, "error");
+            return;
+        }
+
+        // 1. Code Block Element बनाएं (Editable Pre)
+        const pre = document.createElement('pre');
+        pre.style.backgroundColor = '#1f2937';
+        pre.style.color = '#a7f3d0';
+        pre.style.padding = '8px';
+        pre.style.borderRadius = '4px';
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.style.fontSize = '0.875rem';
+        pre.setAttribute('contenteditable', 'true'); // कोड को एडिट करने योग्य बनाएं
+        pre.innerHTML = '<code>// Write your code here</code>';
+
+        // 2. Delete button बनाएं
+        const deleteButton = document.createElement('button');
+        deleteButton.innerHTML = '<i class="fas fa-trash-alt h-4 w-4"></i>';
+        deleteButton.className = 'absolute top-1 right-1 p-1 text-red-400 hover:text-red-600 bg-white bg-opacity-80 rounded-full transition-colors opacity-0 group-hover:opacity-100';
+        deleteButton.title = 'Delete Code Block';
+
+        // 3. Wrapper Div बनाएं जिसमें Pre और Delete button हो
+        const codeWrapper = document.createElement('div');
+        codeWrapper.className = 'code-block-wrapper relative group p-2 rounded-lg my-2 border border-dashed border-slate-300';
+        codeWrapper.style.margin = '10px 0';
+
+        codeWrapper.appendChild(pre);
+        codeWrapper.appendChild(deleteButton);
+
+        // 4. Delete button के लिए Event Listener जोड़ें
+        deleteButton.addEventListener('click', function() {
+            if (confirm("Are you sure you want to delete this code block?")) {
+                codeWrapper.remove();
+                // मॉडल डेटा को अपडेट करें
+                if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
+                    fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+                }
+                showToast("Code block deleted.", "success");
+            }
+        });
+
+        // 5. Selection API का उपयोग करके नोड को डालें
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+
+            if (editor.contains(range.commonAncestorContainer) || editor === range.commonAncestorContainer) {
+                range.deleteContents();
+                range.insertNode(codeWrapper);
+
+                // कर्सर को कोड ब्लॉक के ठीक बाद एक नई लाइन पर सेट करें
+                const newParagraph = document.createElement('p');
+                newParagraph.innerHTML = '<br>';
+                codeWrapper.parentNode.insertBefore(newParagraph, codeWrapper.nextSibling);
+
+                range.setStart(newParagraph, 0);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                showToast("Code block added! (Limit: 3)", "success");
+            } else {
+                // Fallback: अगर रेंज एडिटर के बाहर हो तो अंत में जोड़ें
+                editor.appendChild(codeWrapper);
+                editor.innerHTML += '<p><br></p>';
+            }
+        } else {
+            // Fallback insertion
+            editor.appendChild(codeWrapper);
+            editor.innerHTML += '<p><br></p>';
+        }
+
+        // 6. मॉडल डेटा (full HTML content) को अपडेट करें
+        if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
+            fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+        }
+
+    } else {
+        showToast("Please click inside a question text box before adding a code block.", "error");
+    }
+}
+
+
+document.addEventListener("DOMContentLoaded", function () {
             // ... (rest of DOMContentLoaded event listener)
 
             document.getElementById("edit-skills-container").addEventListener("click", () => {

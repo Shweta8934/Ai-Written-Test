@@ -132,20 +132,14 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 # settings.py
 GEMINI_API_KEY = env("GEMINI_API_KEY")
 OPENAI_API_KEY = env("OPENAI_API_KEY")
-print(f"DEBUG: OpenAI Key Loaded: {'Yes' if OPENAI_API_KEY else 'No'}") # DO NOT PRINT THE ACTUAL KEY FOR SECURITY
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
+print(f"DEBUG: OpenAI Key Loaded: {'Yes' if OPENAI_API_KEY else 'No'}") 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
 STATIC_URL = "static/"
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-# Django ko batayein ki global static folder kahan hai
+
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
