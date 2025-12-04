@@ -283,7 +283,7 @@ EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "aiTest",
+        "NAME": "Recruitment",
         "USER": "postgres",
         "PASSWORD": "12345",
         "HOST": "localhost",
