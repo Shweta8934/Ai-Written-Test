@@ -18,6 +18,8 @@ class TestRegistration(models.Model):
     email = models.EmailField(max_length=255)
     phone_number = models.CharField(max_length=15, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
+    score = models.FloatField(null=True, blank=True)
+    is_shortlisted = models.BooleanField(default=False)
 
     question_paper = models.ForeignKey(
         QuestionPaper,
@@ -58,7 +60,7 @@ class UserResponse(models.Model):
     
     # User ne kya answer diya (MCQ ho ya subjective)
     user_answer = models.TextField(blank=True, null=True)
-    
+    is_correct = models.BooleanField(null=True, blank=True)
     class Meta:
         # Ek user ek test mein ek question ka sirf ek hi answer de sakta hai
         unique_together = ('registration', 'question')

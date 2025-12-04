@@ -6,11 +6,18 @@
     <title>Skills Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      #skillModal,
-      #user-menu {
-        transition: opacity 0.3s ease-in-out;
+      .modal-init {
+        visibility: hidden;
+        opacity: 0;
       }
-      #modalContent {
+      #skillModal,
+      #deleteConfirmModal, /* Added new modal ID */
+      #user-menu {
+        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+      }
+      #modalContent,
+      #modalContentDelete {
+        /* Added new modal ID */
         transition: transform 0.3s ease-in-out;
       }
     </style>
@@ -43,13 +50,14 @@
             <div
               class="skill-item bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 rounded-lg shadow-sm transition-all duration-300"
               data-skill-id="{{ skill.id }}"
-              data-skill-name="{{ skill.name }}"
+              data-skill-name="{{ skill.pretty_name }}"
               data-is-active="{{ skill.is_active|yesno:'true,false' }}"
             >
               <span
                 class="skill-name-text text-lg text-slate-700 font-medium mb-3 sm:mb-0"
-                >{{ skill.name }}</span
               >
+                {{ skill.pretty_name }}
+              </span>
               <div class="flex space-x-3">
                 <button
                   class="edit-btn bg-[#9a92b2] text-white text-sm font-medium py-2 px-5 rounded-lg hover:bg-[#8981a1] transition duration-300"
@@ -77,7 +85,7 @@
 
     <div
       id="skillModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 opacity-0 pointer-events-none"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 modal-init"
     >
       <div
         id="modalContent"
@@ -93,8 +101,9 @@
             <label
               for="skillName"
               class="block text-sm font-medium text-slate-600 mb-2"
-              >Name <span class="text-red-500">*</span></label
             >
+              Name <span class="text-red-500">*</span>
+            </label>
             <input
               type="text"
               id="skillName"
@@ -115,9 +124,10 @@
                 checked
               />
               <span class="ml-3 text-sm text-slate-700 select-none"
-                >is Active</span
+                >Is Active</span
               >
             </label>
+            <p id="is-active-error" class="text-red-500 text-sm mt-1"></p>
           </div>
           <div class="flex justify-end space-x-4">
             <button
@@ -138,8 +148,44 @@
       </div>
     </div>
 
+    <div
+      id="deleteConfirmModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 modal-init"
+    >
+      <div
+        id="modalContentDelete"
+        class="bg-white w-full max-w-md p-6 sm:p-8 rounded-xl shadow-2xl transform scale-95"
+      >
+        <h2 class="text-2xl font-bold text-slate-800 mb-4">Confirm Deletion</h2>
+        <p class="text-slate-600 mb-8">
+          Are you sure you want to delete the skill "<span
+            id="skillNameToDelete"
+            class="font-bold"
+          ></span
+          >"? This action cannot be undone.
+        </p>
+        <div class="flex justify-end space-x-4">
+          <button
+            type="button"
+            id="cancelDeleteBtn"
+            class="bg-slate-200 text-slate-800 font-semibold py-2 px-5 rounded-lg hover:bg-slate-300 transition duration-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            id="confirmDeleteBtn"
+            class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-red-700 transition duration-300"
+          >
+            Confirm Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script>
       document.addEventListener("DOMContentLoaded", () => {
+        // --- CSRF Token Function ---
         function getCookie(name) {
           let cookieValue = null;
           if (document.cookie && document.cookie !== "") {
@@ -157,7 +203,7 @@
           return cookieValue;
         }
 
-        // --- Sidebar Toggle Logic ---
+        // --- 💡 SIDEBAR SCRIPT ADDED START ---
         const sidebar = document.getElementById("sidebar");
         const toggleButton = document.getElementById("sidebar-toggle");
         const sidebarLogo = document.getElementById("sidebar-logo");
@@ -169,20 +215,21 @@
             sidebar.classList.toggle("w-64"); // Full width
             sidebar.classList.toggle("w-20"); // Collapsed width
 
-            // Hide/show text and logo
             if (sidebarLogo) sidebarLogo.classList.toggle("hidden");
             if (sidebarTexts)
               sidebarTexts.forEach((text) => text.classList.toggle("hidden"));
 
-            // Adjust header alignment
             if (sidebarHeader) {
               sidebarHeader.classList.toggle("justify-between");
               sidebarHeader.classList.toggle("justify-center");
             }
           });
         }
+        // --- 💡 SIDEBAR SCRIPT ADDED END ---
+
         const csrftoken = getCookie("csrftoken");
 
+        // --- Add/Edit Modal Elements ---
         const addSkillBtn = document.getElementById("addSkillBtn");
         const skillModal = document.getElementById("skillModal");
         const modalContent = document.getElementById("modalContent");
@@ -194,12 +241,32 @@
         const skillNameInput = document.getElementById("skillName");
         const isActiveInput = document.getElementById("isActive");
         const nameError = document.getElementById("skill-name-error");
+        const isActiveError = document.getElementById("is-active-error");
 
+        // --- 💡 NEW: Delete Confirmation Modal Elements ---
+        const deleteConfirmModal =
+          document.getElementById("deleteConfirmModal");
+        const modalContentDelete =
+          document.getElementById("modalContentDelete");
+        const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+        const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+        const skillNameToDelete = document.getElementById("skillNameToDelete");
+        let skillToDeleteElement = null; // To store the element to be deleted
+
+        // Prepare the modals (hide them properly on load)
+        skillModal.classList.remove("modal-init");
+        skillModal.classList.add("invisible", "opacity-0");
+        deleteConfirmModal.classList.remove("modal-init");
+        deleteConfirmModal.classList.add("invisible", "opacity-0");
+
+        // --- Add/Edit Modal Functions ---
         const openModal = (mode = "add", skill = null) => {
           skillForm.reset();
           skillIdInput.value = "";
           nameError.textContent = "";
+          isActiveError.textContent = "";
           skillNameInput.classList.remove("border-red-500");
+
           if (mode === "edit" && skill) {
             modalTitle.textContent = "Edit Skill";
             skillIdInput.value = skill.id;
@@ -209,7 +276,8 @@
             modalTitle.textContent = "Add New Skill";
             isActiveInput.checked = true;
           }
-          skillModal.classList.remove("opacity-0", "pointer-events-none");
+
+          skillModal.classList.remove("opacity-0", "invisible");
           modalContent.classList.remove("scale-95");
           skillNameInput.focus();
         };
@@ -218,27 +286,69 @@
           modalContent.classList.add("scale-95");
           skillModal.classList.add("opacity-0");
           setTimeout(() => {
-            skillModal.classList.add("pointer-events-none");
+            skillModal.classList.add("invisible");
           }, 300);
         };
 
+        // --- 💡 NEW: Delete Confirmation Modal Functions ---
+        const openDeleteModal = () => {
+          deleteConfirmModal.classList.remove("opacity-0", "invisible");
+          modalContentDelete.classList.remove("scale-95");
+        };
+
+        const closeDeleteModal = () => {
+          modalContentDelete.classList.add("scale-95");
+          deleteConfirmModal.classList.add("opacity-0");
+          setTimeout(() => {
+            deleteConfirmModal.classList.add("invisible");
+            skillToDeleteElement = null; // Clear the stored element
+          }, 300);
+        };
+
+        // --- Event Listeners for Add/Edit Modal ---
         addSkillBtn.addEventListener("click", () => openModal("add"));
         cancelBtn.addEventListener("click", closeModal);
         skillModal.addEventListener("click", (e) => {
           if (e.target === skillModal) closeModal();
         });
+
+        // --- 💡 NEW: Event Listeners for Delete Modal ---
+        cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+        deleteConfirmModal.addEventListener("click", (e) => {
+          if (e.target === deleteConfirmModal) closeDeleteModal();
+        });
+
         document.addEventListener("keydown", (e) => {
-          if (e.key === "Escape") closeModal();
+          if (e.key === "Escape") {
+            closeModal();
+            closeDeleteModal();
+          }
         });
 
         skillForm.addEventListener("submit", (e) => {
           e.preventDefault();
+          nameError.textContent = "";
+          skillNameInput.classList.remove("border-red-500");
+          isActiveError.textContent = "";
+
           const id = skillIdInput.value;
           const name = skillNameInput.value.trim();
           const is_active = isActiveInput.checked;
+          let isValid = true;
+
+          if (!name) {
+            nameError.textContent = "Skill name is required.";
+            skillNameInput.classList.add("border-red-500");
+            isValid = false;
+          }
+          if (!is_active) {
+            isActiveError.textContent =
+              "The skill must be set to active to save.";
+            isValid = false;
+          }
+          if (!isValid) return;
 
           const url = id ? `/skills/update/${id}/` : "{% url 'skill_create' %}";
-
           fetch(url, {
             method: "POST",
             headers: {
@@ -251,7 +361,7 @@
             .then((data) => {
               if (data.status === "success") {
                 location.reload();
-              } else {
+              } else if (data.errors && data.errors.name) {
                 nameError.textContent = data.errors.name[0];
                 skillNameInput.classList.add("border-red-500");
               }
@@ -273,47 +383,62 @@
             openModal("edit", skill);
           }
 
+          // --- 💡 MODIFIED: Open modal instead of confirm() ---
           if (e.target.classList.contains("delete-btn")) {
-            if (confirm("Are you sure you want to delete this skill?")) {
-              fetch(`/skills/delete/${skillId}/`, {
-                method: "POST",
-                headers: { "X-CSRFToken": csrftoken },
-              })
-                .then((response) => response.json())
-                .then((data) => {
-                  if (data.status === "success") {
-                    skillItem.style.transition =
-                      "opacity 0.3s ease, transform 0.3s ease";
-                    skillItem.style.opacity = "0";
-                    skillItem.style.transform = "translateX(20px)";
-                    setTimeout(() => {
-                      skillItem.remove();
-                    }, 300);
-                  } else {
-                    alert(data.message || "Failed to delete skill.");
-                  }
-                })
-                .catch((error) => console.error("Error:", error));
-            }
+            skillToDeleteElement = skillItem; // Store the item
+            skillNameToDelete.textContent = skillItem.dataset.skillName; // Set name in modal
+            openDeleteModal(); // Open the new confirmation modal
           }
         });
 
-        // User menu toggle
+        // --- 💡 NEW: Handle the final delete confirmation ---
+        confirmDeleteBtn.addEventListener("click", () => {
+          if (!skillToDeleteElement) return;
+
+          const skillId = skillToDeleteElement.dataset.skillId;
+          fetch(`/skills/delete/${skillId}/`, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrftoken },
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.status === "success") {
+                skillToDeleteElement.style.transition =
+                  "opacity 0.3s ease, transform 0.3s ease";
+                skillToDeleteElement.style.opacity = "0";
+                skillToDeleteElement.style.transform = "translateX(20px)";
+                setTimeout(() => skillToDeleteElement.remove(), 300);
+              } else {
+                alert(data.message || "Failed to delete skill.");
+              }
+              closeDeleteModal();
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+              closeDeleteModal();
+            });
+        });
+
+        // --- 💡 HEADER (USER MENU) SCRIPT ADDED START ---
         const userMenuButton = document.getElementById("user-menu-button");
         const userMenu = document.getElementById("user-menu");
+
         if (userMenuButton && userMenu) {
           userMenuButton.addEventListener("click", () =>
             userMenu.classList.toggle("hidden")
           );
+
           document.addEventListener("click", (e) => {
             if (
               !userMenu.classList.contains("hidden") &&
-              !userMenuButton.contains(e.target)
+              !userMenuButton.contains(e.target) &&
+              !userMenu.contains(e.target)
             ) {
               userMenu.classList.add("hidden");
             }
           });
         }
+        // --- 💡 HEADER (USER MENU) SCRIPT ADDED END ---
       });
     </script>
   </body>
