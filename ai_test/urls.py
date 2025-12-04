@@ -6,5 +6,5 @@ urlpatterns = [
     # Root URL (/) par request 'app' ke urls.py mein bhej do
     path("", include("app.urls")),
     path('test/', include('user_tests.urls')), 
-
+path('recruitment/', include('recruitment.urls')),
 ]

@@ -1,0 +1,207 @@
+
+{% load static %}
+
+
+
+{% block content %}
+<div class="container mx-auto">
+    <a href="{% url 'job_list' %}" class="text-blue-600 hover:text-blue-800 font-medium mb-4 inline-block transition flex items-center">
+        <i class="fas fa-arrow-left mr-2"></i> Back to Job Listings
+    </a>
+    
+    <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
+        <i class="fas fa-users-cog mr-3 text-theme-dark"></i> Candidates for: {{ job.title }}
+    </h1>
+    <p class="text-lg text-gray-600 mb-6 border-b pb-4">Total Candidates: **{{ candidates.count }}**</p>
+
+    <div id="feedback-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300">
+            <div class="flex justify-between items-center border-b p-4">
+                <h3 class="text-xl font-bold text-theme-dark" id="modal-title">Submit Feedback</h3>
+                <button type="button" onclick="$('#feedback-modal').removeClass('flex').addClass('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="modal-body" class="p-6 max-h-[70vh] overflow-y-auto">
+                <div class="flex items-center justify-center h-32 text-theme-primary">
+                    <i class="fas fa-spinner fa-spin text-2xl"></i> <span class="ml-2">Loading Form...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto bg-white rounded-xl shadow-lg border border-gray-100">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Candidate Details</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Score</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Current Round</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for candidate in candidates %}
+                <tr class="hover:bg-gray-50 transition duration-150" data-candidate-id="{{ candidate.pk }}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-semibold text-gray-900">{{ candidate.name }}</div>
+                        <div class="text-xs text-gray-500">{{ candidate.test_registration.email }} | {{ candidate.test_registration.phone_number|default:"N/A" }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold 
+                        {% if candidate.test_registration.score|default:0 > job.question_paper.cutoff_score|default:0 %}text-green-600{% else %}text-red-600{% endif %}">
+                        {{ candidate.test_registration.score|default:"N/A" }}%
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        {% if 'Offer' in candidate.current_round or 'Hired' in candidate.current_round %}bg-green-100 text-green-800
+                        {% elif 'Rejected' in candidate.current_round %}bg-red-100 text-red-800
+                        {% elif 'Test' in candidate.current_round %}bg-blue-100 text-blue-800
+                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ candidate.get_current_round_display }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-3 items-center">
+                        
+                        <div class="relative w-40">
+                            <select id="move-round-{{ candidate.pk }}" 
+                                data-candidate-id="{{ candidate.pk }}" 
+                                class="move-round-select block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 text-xs focus:outline-none focus:ring-theme-primary focus:border-theme-primary">
+                                <option value="" disabled selected>Move To...</option>
+                                {% for round_val, round_label in round_choices %}
+                                    {% if round_val != 'Applied' %}
+                                    <option value="{{ round_val }}" {% if candidate.current_round == round_val %}disabled class="bg-gray-200"{% endif %}>
+                                        {{ round_label }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        {% if candidate.current_round != 'Applied' and candidate.current_round != 'Rejected' and candidate.current_round != 'Final Offer' %}
+                        <button 
+                            data-candidate-id="{{ candidate.pk }}" 
+                            data-round-name="{{ candidate.current_round }}"
+                            class="open-feedback-modal flex items-center text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md text-xs px-3 py-2 shadow-sm transition duration-150">
+                            <i class="fas fa-comment-dots mr-1"></i> Feedback ({{ candidate.current_round|cut:" " }})
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    const CSRF_TOKEN = '{{ csrf_token }}';
+
+    $(document).ready(function() {
+        // --- 1. Candidate Round Movement ---
+        $('.move-round-select').on('change', function() {
+            const selectedRound = $(this).val();
+            const candidateId = $(this).data('candidate-id');
+            const currentRoundText = $(this).closest('tr').find('.rounded-full').text().trim();
+            
+            if (selectedRound) {
+                if (confirm(`Are you sure you want to move candidate (currently in ${currentRoundText}) to the ${selectedRound} round?`)) {
+                    const url = `/candidate/${candidateId}/move_to/${selectedRound}/`; 
+                    
+                    $.ajax({
+                        url: url,
+                        method: 'POST',
+                        data: { 'csrfmiddlewaretoken': CSRF_TOKEN },
+                        success: function(response) {
+                            window.location.reload(); 
+                        },
+                        error: function(xhr) {
+                            alert('Error moving candidate: Check console for details.');
+                            console.error(xhr.responseText);
+                            $(this).val(''); // Reset select box on error
+                        }
+                    });
+                } else {
+                    $(this).val(''); // Reset the select box
+                }
+            }
+        });
+
+        // --- 2. Open Feedback Modal and Load Form via AJAX ---
+        $('.open-feedback-modal').on('click', function() {
+            const candidateId = $(this).data('candidate-id');
+            const roundName = $(this).data('round-name');
+            
+            $('#modal-title').text(`Submit Feedback for: ${roundName}`);
+            $('#feedback-modal').removeClass('hidden').addClass('flex');
+            $('#modal-body').html('<div class="flex items-center justify-center h-32 text-theme-primary"><i class="fas fa-spinner fa-spin text-2xl"></i> <span class="ml-2">Loading Form...</span></div>');
+
+            const feedbackUrl = "{% url 'submit_feedback' %}?candidate_id=" + candidateId;
+            
+            $.ajax({
+                url: feedbackUrl,
+                method: 'GET',
+                success: function(data) {
+                    $('#modal-body').html(data);
+                    
+                    // Attach submit handler to the newly loaded form
+                    $('#modal-body form').on('submit', function(e) {
+                        e.preventDefault();
+                        submitFeedbackForm($(this));
+                    });
+                },
+                error: function(xhr) {
+                    $('#modal-body').html('<p class="text-red-500">Could not load feedback form. Error: ' + xhr.statusText + '</p>');
+                }
+            });
+        });
+
+        // --- 3. Close Modal on ESC key ---
+        $(document).on('keydown', function(e) {
+            if (e.key === 'Escape') {
+                $('#feedback-modal').removeClass('flex').addClass('hidden');
+            }
+        });
+
+        // --- 4. AJAX Submission Handler ---
+        function submitFeedbackForm(form) {
+            $.ajax({
+                url: form.attr('action'),
+                method: form.attr('method'),
+                data: form.serialize(),
+                // Expecting a full HTML response (either success redirect or form with errors)
+                success: function(response, status, xhr) { 
+                    if (xhr.getResponseHeader('Content-Type').includes('text/html')) {
+                        // If it's HTML, it likely contains the form with validation errors
+                        $('#modal-body').html(response);
+                        $('#modal-body form').on('submit', function(e) {
+                            e.preventDefault();
+                            submitFeedbackForm($(this));
+                        });
+                        // Optional: Add a visual alert for errors here if Django doesn't handle messages in the form response
+                    } else {
+                         // Fallback for unexpected success/redirect response
+                         $('#feedback-modal').removeClass('flex').addClass('hidden');
+                         alert('Feedback submitted successfully and candidate status updated!');
+                         window.location.reload(); 
+                    }
+                },
+                error: function(xhr) {
+                    // This often catches the case where Django returns the form with errors (400)
+                    if (xhr.status === 400 || xhr.status === 200) { 
+                         $('#modal-body').html(xhr.responseText);
+                         $('#modal-body form').on('submit', function(e) {
+                            e.preventDefault();
+                            submitFeedbackForm($(this));
+                         });
+                         // Use a toast message to show errors like "Feedback already exists"
+                    } else {
+                        alert('An unexpected server error occurred.');
+                        $('#feedback-modal').removeClass('flex').addClass('hidden');
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock content %}

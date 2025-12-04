@@ -1,0 +1,209 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for file inputs to match the image's button style */
+        .file-upload-wrapper input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        .file-upload-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .file-upload-wrapper .browse-btn {
+            background-color: white;
+            border: 1px solid #d1d5db; /* gray-300 */
+            color: #4b5563; /* gray-700 */
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .file-upload-wrapper .browse-btn:hover {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-4xl">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">
+            Job Application: {{ job.title }}
+        </h1>
+        
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="p-3 rounded-lg text-sm {% if message.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+            
+            <h2 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Personal Information</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label for="{{ form.full_name.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.full_name.label }}</label>
+                    {{ form.full_name }}
+                    {% if form.full_name.errors %}<p class="mt-1 text-xs text-red-600">{{ form.full_name.errors.as_text }}</p>{% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.email.label }}</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<p class="mt-1 text-xs text-red-600">{{ form.email.errors.as_text }}</p>{% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.mobile.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.mobile.label }}</label>
+                    {{ form.mobile }}
+                    {% if form.mobile.errors %}<p class="mt-1 text-xs text-red-600">{{ form.mobile.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.your_skills.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.your_skills.label }}</label>
+                    {{ form.your_skills }}
+                    {% if form.your_skills.errors %}<p class="mt-1 text-xs text-red-600">{{ form.your_skills.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.total_experience.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.total_experience.label }}</label>
+                    {{ form.total_experience }}
+                    {% if form.total_experience.errors %}<p class="mt-1 text-xs text-red-600">{{ form.total_experience.errors.as_text }}</p> {% endif %}
+                </div>
+
+                <div>
+                    <label for="{{ form.current_location.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.current_location.label }}</label>
+                    {{ form.current_location }}
+                    {% if form.current_location.errors %}<p class="mt-1 text-xs text-red-600">{{ form.current_location.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.current_ctc.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.current_ctc.label }}</label>
+                    {{ form.current_ctc }}
+                    {% if form.current_ctc.errors %}<p class="mt-1 text-xs text-red-600">{{ form.current_ctc.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.current_ctc_rate.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.current_ctc_rate.label }}</label>
+                    {{ form.current_ctc_rate }}
+                    {% if form.current_ctc_rate.errors %}<p class="mt-1 text-xs text-red-600">{{ form.current_ctc_rate.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.expected_ctc.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.expected_ctc.label }}</label>
+                    {{ form.expected_ctc }}
+                    {% if form.expected_ctc.errors %}<p class="mt-1 text-xs text-red-600">{{ form.expected_ctc.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.expected_ctc_rate.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.expected_ctc_rate.label }}</label>
+                    {{ form.expected_ctc_rate }}
+                    {% if form.expected_ctc_rate.errors %}<p class="mt-1 text-xs text-red-600">{{ form.expected_ctc_rate.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.notice_period.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.notice_period.label }}</label>
+                    {{ form.notice_period }}
+                    {% if form.notice_period.errors %}<p class="mt-1 text-xs text-red-600">{{ form.notice_period.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.hear_about_us.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.hear_about_us.label }}</label>
+                    {{ form.hear_about_us }}
+                    {% if form.hear_about_us.errors %}<p class="mt-1 text-xs text-red-600">{{ form.hear_about_us.errors.as_text }}</p> {% endif %}
+                </div>
+
+                <div>
+                    <label for="{{ form.cv_or_resume.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.cv_or_resume.label }}</label>
+                    <div class="file-upload-wrapper mt-1">
+                        <input type="text" id="resume-filename" class="w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder="No file chosen" readonly>
+                        <label for="{{ form.cv_or_resume.id_for_label }}" class="browse-btn absolute right-0 m-1">Browse</label>
+                        {{ form.cv_or_resume }}
+                    </div>
+                    {% if form.cv_or_resume.errors %}<p class="mt-1 text-xs text-red-600">{{ form.cv_or_resume.errors.as_text }}</p> {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.photo.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.photo.label }}</label>
+                    <div class="file-upload-wrapper mt-1">
+                        <input type="text" id="photo-filename" class="w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder="No file chosen" readonly>
+                        <label for="{{ form.photo.id_for_label }}" class="browse-btn absolute right-0 m-1">Browse</label>
+                        {{ form.photo }}
+                    </div>
+                    {% if form.photo.errors %}<p class="mt-1 text-xs text-red-600">{{ form.photo.errors.as_text }}</p> {% endif %}
+                </div>
+            </div>
+
+            <div class="pt-6">
+                <label for="{{ form.cover_letter.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.cover_letter.label }}</label>
+                {{ form.cover_letter }}
+                {% if form.cover_letter.errors %}<p class="mt-1 text-xs text-red-600">{{ form.cover_letter.errors.as_text }}</p> {% endif %}
+            </div>
+
+            <div class="flex items-center justify-start space-x-4 pt-4">
+                <button type="submit" class="px-6 py-2 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 transition duration-150 shadow-md">
+                    Apply
+                </button>
+                <a href="{% url 'job_detail' pk=job.pk %}" class="text-gray-600 hover:text-gray-900 transition duration-150">
+                    Cancel
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            function updateFileNameDisplay(fileInputId, textInputId) {
+                const fileInput = document.getElementById(fileInputId);
+                const textInput = document.getElementById(textInputId);
+
+                if (fileInput && textInput) {
+                    fileInput.addEventListener('change', function() {
+                        if (this.files.length > 0) {
+                            textInput.value = this.files[0].name;
+                        } else {
+                            textInput.value = 'No file chosen';
+                        }
+                    });
+                }
+            }
+
+            // Call function for Resume/CV and Photo fields
+            updateFileNameDisplay('id_cv_or_resume', 'resume-filename');
+            updateFileNameDisplay('id_photo', 'photo-filename');
+        });
+    </script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Apply Tailwind classes to all standard form fields (excluding file inputs which are custom styled)
+            const fields = document.querySelectorAll('input:not([type="file"]), select, textarea');
+            fields.forEach(field => {
+                if (!field.classList.contains('no-style')) {
+                    field.classList.add('mt-1', 'block', 'w-full', 'px-3', 'py-2', 'border', 'border-gray-300', 'rounded-md', 'shadow-sm', 'focus:outline-none', 'focus:ring-indigo-500', 'focus:border-indigo-500', 'sm:text-sm');
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>

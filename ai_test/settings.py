@@ -240,6 +240,7 @@ INSTALLED_APPS = [
     "app",
     "user_tests",
     "widget_tweaks",
+    'recruitment',
 ]
 
 MIDDLEWARE = [
