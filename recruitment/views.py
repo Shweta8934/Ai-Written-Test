@@ -11,12 +11,15 @@ from django.db import IntegrityError
 from django.contrib import messages
 from django.utils.text import slugify 
 from .models import JobPost, Candidate, RoundFeedback
-from .forms import JobPostForm, RoundFeedbackForm
-
+from .forms import JobPostForm, RoundFeedbackForm, CandidateApplicationForm # <-- यह line critical है
 from user_tests.forms import TestRegistrationForm 
 from user_tests.models import TestRegistration 
 
-
+from django.shortcuts import render, redirect, get_object_or_404
+from django.db import IntegrityError
+from django.contrib import messages
+from django.urls import reverse
+from user_tests.models import TestRegistration, QuestionPaper # QuestionPaper added
 class JobPostListView(LoginRequiredMixin, ListView):
     model = JobPost
     template_name = 'partials/recruiter/job_list.html'
@@ -27,7 +30,11 @@ class JobPostCreateView(LoginRequiredMixin, CreateView):
     form_class = JobPostForm
     template_name = 'partials/recruiter/job_Create.html'    
     success_url = reverse_lazy('job_list')
-
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # सभी उपलब्ध प्रश्न पत्रों को फ़ेच करें
+        context['question_papers'] = QuestionPaper.objects.all().order_by('id')
+        return context
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         
@@ -72,7 +79,6 @@ class JobPostDetailView(LoginRequiredMixin, DetailView):
         
         return context
 
-
 class CandidateListView(LoginRequiredMixin, ListView):
     model = Candidate
     template_name = 'partials/recruiter/candidate_list.html'
@@ -81,14 +87,41 @@ class CandidateListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         # Fetch the job post based on the job_pk in the URL
         self.job_post = get_object_or_404(JobPost, pk=self.kwargs['job_pk'])
-        # Filter candidates for this job, ordering them by round and score
-        return Candidate.objects.filter(job_post=self.job_post).order_by('current_round', '-test_registration__score')
+        
+        # Start with all candidates for the current job
+        queryset = Candidate.objects.filter(job_post=self.job_post)
+        
+        # --- 1. Round Filtering Logic ---
+        round_filter = self.request.GET.get('round')
+        if round_filter:
+            # Check if the requested round is valid (optional but good practice)
+            valid_rounds = [choice[0] for choice in Candidate.ROUND_CHOICES]
+            if round_filter in valid_rounds:
+                queryset = queryset.filter(current_round=round_filter)
+        
+        # --- 2. Search Logic (for name or email) ---
+        search_query = self.request.GET.get('search')
+        if search_query:
+            # Use Q objects for complex OR logic (name OR email search)
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(test_registration__name__icontains=search_query) |
+                Q(test_registration__email__icontains=search_query)
+            )
+            
+        # Order the final queryset
+        # Note: Order by current_round first, then by score descending (as per existing logic)
+        return queryset.order_by('current_round', '-test_registration__score')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['job'] = self.job_post
         context['round_choices'] = Candidate.ROUND_CHOICES 
+        
+        # Pass the current search query to the context for preserving it in the input field
+        context['current_search'] = self.request.GET.get('search', '') 
         return context
+
 
 @login_required 
 def move_candidate_round(request, pk, round_name):
@@ -107,7 +140,6 @@ def move_candidate_round(request, pk, round_name):
     
     messages.success(request, f"Candidate {candidate.name} moved to **{round_name}**.")
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('job_list')))
-
 
 class FeedbackCreateView(LoginRequiredMixin, CreateView):
     model = RoundFeedback
@@ -178,54 +210,90 @@ class FeedbackCreateView(LoginRequiredMixin, CreateView):
              messages.error(self.request, f"Feedback already exists for {candidate.name} in the **{candidate.current_round}** round by you.")
              return self.form_invalid(form)
 
-
-
 def job_application_view(request, slug):
-    """Public view for candidate to register for the written test linked to a job."""
+    """Public view for candidate to apply for a job using the detailed form."""
+    
     job_post = get_object_or_404(JobPost, public_link_slug=slug, status='Open')
     
-    if not job_post.question_paper:
-        messages.error(request, "This job is not currently accepting applications.")
-        return redirect('candidate_register') 
-
     if request.method == 'POST':
-        form = TestRegistrationForm(request.POST) # Use the form from user_tests app
+        # request.FILES is crucial for handling file uploads (CV/Photo)
+        form = CandidateApplicationForm(request.POST, request.FILES)
+        
+        # Manually set job_post_pk
+        form.data = form.data.copy()
+        form.data['job_post_pk'] = job_post.pk
+        
         if form.is_valid():
-            email = form.cleaned_data['email']
-            question_paper = job_post.question_paper
+            
+            cleaned_data = form.cleaned_data
+            email = cleaned_data['email']
             
             try:
-                # 1. Check if registration already exists to avoid duplicate submission
-                if TestRegistration.objects.filter(email=email, question_paper=question_paper).exists():
-                    messages.warning(request, "You have already registered for this test. Please check your email or resume your test.")
-                    # Redirect to a status page or test resume page
-                    return redirect('test_status_page') # **Ensure 'test_status_page' is a defined URL**
+                # 1. Check for duplicate application
+                # Assuming TestRegistration has an 'email' field.
+                if Candidate.objects.filter(job_post=job_post, test_registration__email=email).exists():
+                    messages.warning(request, "You have already applied for this job.")
+                    return redirect('job_application', slug=slug)
 
-                # 2. Create/Save TestRegistration
-                registration = form.save(commit=False)
-                registration.question_paper = question_paper
-                registration.save()
                 
-                # 3. Create Candidate profile for tracking (Default round is 'Applied')
-                Candidate.objects.create(
-                    test_registration=registration,
-                    job_post=job_post,
-                    current_round='Applied'
+                # Step A: Create the TestRegistration object (required by Candidate's FK)
+                registration = TestRegistration.objects.create(
+                    name=cleaned_data['full_name'],
+                    email=email,
+                    question_paper=job_post.question_paper if job_post.question_paper else None 
                 )
                 
-                # Redirect to the test start page (assuming your 'user_tests' app handles this)
-                messages.success(request, "Registration successful! Starting your written test now.")
-                return redirect('test_start_page', paper_id=question_paper.id) 
+                # Step B: Create the Candidate profile, saving ALL the form data.
+                candidate = Candidate.objects.create(
+                    test_registration=registration,
+                    job_post=job_post,
+                    current_round='Applied',
+                    
+                    # Mapping the new fields from the form to the Candidate model:
+                    is_experienced=cleaned_data['is_experienced'],
+                    mobile=cleaned_data['mobile'],
+                    your_skills=cleaned_data.get('your_skills'),
+                    total_experience=cleaned_data.get('total_experience'),
+                    current_location=cleaned_data.get('current_location'),
+                    current_ctc=cleaned_data.get('current_ctc'),
+                    current_ctc_rate=cleaned_data.get('current_ctc_rate'),
+                    expected_ctc=cleaned_data.get('expected_ctc'),
+                    expected_ctc_rate=cleaned_data.get('expected_ctc_rate'),
+                    notice_period=cleaned_data.get('notice_period'),
+                    heard_about_us=cleaned_data.get('heard_about_us'),
+                    cover_letter=cleaned_data.get('cover_letter'),
+                    
+                    # Handle FileFields (files are in cleaned_data directly if present)
+                    cv_or_resume=cleaned_data.get('cv_or_resume'),
+                    photo=cleaned_data.get('photo'),
+                )
                 
-            except IntegrityError:
-                # Should be caught by the explicit check above, but serves as a final guard
-                messages.warning(request, "An unexpected error occurred. Please try again or contact support.")
-                return redirect('login') 
+                
+                messages.success(request, "Application submitted successfully! We will contact you soon.")
+                
+                if job_post.question_paper:
+                     # If a test is linked, redirect to the test start page
+                     return redirect('test_start_page', paper_id=job_post.question_paper.id)
+                else:
+                    # Assuming you have an application_success.html template
+                    return render(request, 'partials/public/application_success.html', {'job': job_post, 'candidate': candidate}) 
+                
+            except IntegrityError as e:
+                # Handle database errors, including unique constraints
+                print(f"Database Error: {e}") 
+                messages.error(request, "An unexpected error occurred. Please contact support.")
+                # If registration was created but candidate failed, clean up registration
+                if 'registration' in locals():
+                    registration.delete()
+                return redirect('job_application', slug=slug) 
+            except Exception as e:
+                print(f"General Error: {e}")
+                messages.error(request, "An application error occurred. Please try again.")
+                return redirect('job_application', slug=slug) 
 
     else:
-        form = TestRegistrationForm()
+        initial_data = {'job_post_pk': job_post.pk, 'is_experienced': 'fresher'}
+        form = CandidateApplicationForm(initial=initial_data)
 
-    return render(request, 'partials/recruiter/candidate_list.html', {'job': job_post, 'form': form})
-
-
-
+    # Use the correct template path you provided earlier:
+    return render(request, 'partials/recruiter/job_application.html', {'job': job_post, 'form': form})

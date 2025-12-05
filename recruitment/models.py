@@ -78,7 +78,24 @@ class Candidate(models.Model):
     ]
     current_round = models.CharField(max_length=50, choices=ROUND_CHOICES, default='Applied')
     is_hired = models.BooleanField(default=False)
+    is_experienced = models.CharField(max_length=15, default='fresher', null=True, blank=True)
+    # The 'mobile' field that caused the error:
+    mobile = models.CharField(max_length=15, null=True, blank=True) 
     
+    your_skills = models.TextField(blank=True, null=True)
+    total_experience = models.IntegerField(default=0, blank=True, null=True)
+    current_location = models.CharField(max_length=100, blank=True, null=True)
+    current_ctc = models.CharField(max_length=50, blank=True, null=True)
+    current_ctc_rate = models.CharField(max_length=50, blank=True, null=True)
+    expected_ctc = models.CharField(max_length=50, blank=True, null=True)
+    expected_ctc_rate = models.CharField(max_length=50, blank=True, null=True)
+    notice_period = models.CharField(max_length=50, blank=True, null=True)
+    heard_about_us = models.CharField(max_length=255, blank=True, null=True)
+    cover_letter = models.TextField(blank=True, null=True)
+    
+    # FileFields are already nullable, confirm they are set correctly:
+    cv_or_resume = models.FileField(upload_to='resumes/', blank=True, null=True)
+    photo = models.FileField(upload_to='photos/', blank=True, null=True)
     @property
     def name(self):
         return self.test_registration.name

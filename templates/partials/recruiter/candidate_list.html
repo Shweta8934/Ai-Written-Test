@@ -1,207 +1,212 @@
-
 {% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidates for {{ job.title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for better aesthetics */
+        .overflow-y-auto {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f7fafc;
+        }
+        .candidate-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .text-truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="flex h-screen overflow-hidden">
+        
+        {% include 'partials/sidebar.html' %} 
+        <div class="flex-1 flex flex-col overflow-hidden">
+            
+            {% include 'partials/header.html' with page_title="Candidates | " job_title=job.title %}
 
+            <main class="flex-1 overflow-y-auto p-6">
+                
+                <div class="max-w-7xl mx-auto">
+                    
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b pb-4">
+                        <h1 class="text-2xl font-bold text-gray-900">
+                            Candidates for: <span class="text-indigo-600">{{ job.title }}</span>
+                        </h1>
+                        <div class="mt-3 sm:mt-0 flex space-x-2">
+                            <a href="{% url 'job_detail' pk=job.pk %}" class="px-4 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition duration-150">
+                                ← Back to Job Detail
+                            </a>
+                            </div>
+                    </div>
 
+                    <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <span class="text-sm font-medium text-gray-700 mr-2">Filter by Round:</span>
+                            
+                            <a href="{% url 'candidate_list' job_pk=job.pk %}" 
+                               class="px-3 py-1 text-xs rounded-full {% if not request.GET.round %}bg-indigo-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                                All ({{ candidates|length }})
+                            </a>
 
-{% block content %}
-<div class="container mx-auto">
-    <a href="{% url 'job_list' %}" class="text-blue-600 hover:text-blue-800 font-medium mb-4 inline-block transition flex items-center">
-        <i class="fas fa-arrow-left mr-2"></i> Back to Job Listings
-    </a>
-    
-    <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
-        <i class="fas fa-users-cog mr-3 text-theme-dark"></i> Candidates for: {{ job.title }}
-    </h1>
-    <p class="text-lg text-gray-600 mb-6 border-b pb-4">Total Candidates: **{{ candidates.count }}**</p>
+                            {% for key, value in round_choices %}
+                                <a href="{% url 'candidate_list' job_pk=job.pk %}?round={{ key }}" 
+                                   class="px-3 py-1 text-xs rounded-full 
+                                   {% if request.GET.round == key %}bg-indigo-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                                    {{ value }}
+                                </a>
+                            {% endfor %}
+                            
+                            <form method="get" class="ml-auto flex items-center">
+                                <input type="text" name="search" placeholder="Search by name/email" 
+                                    class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                    value="{{ request.GET.search|default:'' }}">
+                                <button type="submit" class="ml-2 p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.446 4.606l2.126 2.126a.75.75 0 11-1.06 1.06l-2.126-2.126A7 7 0 012 9z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
 
-    <div id="feedback-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300">
-            <div class="flex justify-between items-center border-b p-4">
-                <h3 class="text-xl font-bold text-theme-dark" id="modal-title">Submit Feedback</h3>
-                <button type="button" onclick="$('#feedback-modal').removeClass('flex').addClass('hidden')" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-            <div id="modal-body" class="p-6 max-h-[70vh] overflow-y-auto">
-                <div class="flex items-center justify-center h-32 text-theme-primary">
-                    <i class="fas fa-spinner fa-spin text-2xl"></i> <span class="ml-2">Loading Form...</span>
+                    <div class="space-y-4">
+                        {% for candidate in candidates %}
+                        
+                        <div class="candidate-card bg-white p-5 rounded-lg shadow transition duration-200 border-l-4 border-{{ candidate.current_round|lower|slugify|default:'gray' }}-500">
+                            <div class="flex flex-wrap items-center justify-between">
+                                
+                                <div class="w-full sm:w-1/2 lg:w-1/4 mb-3 sm:mb-0">
+                                    <p class="text-lg font-semibold text-gray-900 text-truncate" title="{{ candidate.name }}">{{ candidate.name }}</p>
+                                    <p class="text-sm text-indigo-600 text-truncate" title="{{ candidate.test_registration.email }}">{{ candidate.test_registration.email }}</p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        {{ candidate.get_is_experienced_display|default:'N/A' }} | Exp: {{ candidate.total_experience|default:0 }} Yrs
+                                    </p>
+                                </div>
+
+                                <div class="w-1/2 sm:w-1/4 lg:w-1/4">
+                                    <p class="text-xs text-gray-500">Current Round</p>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium 
+                                        {% if candidate.current_round == 'Final Offer' %}bg-green-100 text-green-800{% elif candidate.current_round == 'Rejected' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                        {{ candidate.get_current_round_display }}
+                                    </span>
+                                </div>
+                                
+                                <div class="w-1/2 sm:w-1/4 lg:w-1/6 text-right sm:text-left">
+                                    <p class="text-xs text-gray-500">Test Score</p>
+                                    <p class="text-lg font-bold text-gray-900">
+                                        {% if candidate.test_registration.score %}
+                                            {{ candidate.test_registration.score|floatformat:1 }} <span class="text-sm text-gray-500">/ 100</span>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                </div>
+
+                                <div class="w-full sm:w-1/4 lg:w-1/4 mt-3 sm:mt-0 flex justify-end space-x-2">
+                                    
+                                    <a href="#" class="px-3 py-1 text-sm text-indigo-600 border border-indigo-300 rounded-md hover:bg-indigo-50 transition duration-150" title="View Candidate Details">
+                                        View CV
+                                    </a>
+                                    
+                                    <div class="relative inline-block text-left" x-data="{ open: false }" @click.away="open = false">
+                                        <button @click="open = !open" type="button" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" id="menu-button-{{ candidate.pk }}" aria-expanded="true" aria-haspopup="true">
+                                            Actions
+                                            <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                
+                                        <div x-show="open" 
+                                            x-transition:enter="transition ease-out duration-100" 
+                                            x-transition:enter-start="transform opacity-0 scale-95" 
+                                            x-transition:enter-end="transform opacity-100 scale-100" 
+                                            x-transition:leave="transition ease-in duration-75" 
+                                            x-transition:leave-start="transform opacity-100 scale-100" 
+                                            x-transition:leave-end="transform opacity-0 scale-95" 
+                                            class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10" 
+                                            role="menu" aria-orientation="vertical" aria-labelledby="menu-button-{{ candidate.pk }}" tabindex="-1">
+                                            <div class="py-1" role="none">
+                                                
+<a href="{% url 'submit_feedback' pk=candidate.pk %}?candidate_id={{ candidate.pk }}" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">                                                    Submit Feedback
+                                                </a>
+
+                                                <div class="border-t border-gray-100"></div>
+
+                                                {% comment %} 
+                                                // Example of listing move options (assuming rounds are sequential)
+                                                // NOTE: The move_candidate_round function handles the logic: 
+                                                // We can list *all* valid rounds for manual override.
+                                                {% endcomment %}
+                                                
+                                                {% for key, value in round_choices %}
+                                                    {% if key != candidate.current_round and key != 'Rejected' and key != 'Applied' %}
+                                                        <a href="{% url 'candidate_move_round' pk=candidate.pk round_name=key %}" 
+                                                           class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">
+                                                            → Move to {{ value }}
+                                                        </a>
+                                                    {% endif %}
+                                                {% endfor %}
+
+                                                <div class="border-t border-gray-100"></div>
+
+                                                {% if candidate.current_round != 'Rejected' %}
+                                                    <a href="{% url 'candidate_move_round' pk=candidate.pk round_name='Rejected' %}" 
+                                                        class="text-red-600 block px-4 py-2 text-sm hover:bg-red-50" role="menuitem" tabindex="-1" onclick="return confirm('Are you sure you want to reject {{ candidate.name }}?');">
+                                                        ❌ Reject Candidate
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center p-10 bg-white rounded-lg shadow-md">
+                            <p class="text-xl text-gray-500">No candidates have applied for this job yet.</p>
+                            <a href="{% url 'job_detail' pk=job.pk %}" class="mt-4 inline-block px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50">
+                                Share Application Link
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
-            </div>
+
+                {% if messages %}
+                    <div id="django-messages" class="fixed bottom-4 right-4 z-50 space-y-2">
+                        {% for message in messages %}
+                            <div class="p-3 rounded-lg shadow-lg text-white text-sm font-medium 
+                                {% if message.tags == 'success' %}bg-green-500{% elif message.tags == 'error' %}bg-red-600{% elif message.tags == 'warning' %}bg-yellow-500{% else %}bg-indigo-500{% endif %}"
+                                role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </main>
         </div>
     </div>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
-    <div class="overflow-x-auto bg-white rounded-xl shadow-lg border border-gray-100">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Candidate Details</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Score</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Current Round</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for candidate in candidates %}
-                <tr class="hover:bg-gray-50 transition duration-150" data-candidate-id="{{ candidate.pk }}">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-semibold text-gray-900">{{ candidate.name }}</div>
-                        <div class="text-xs text-gray-500">{{ candidate.test_registration.email }} | {{ candidate.test_registration.phone_number|default:"N/A" }}</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold 
-                        {% if candidate.test_registration.score|default:0 > job.question_paper.cutoff_score|default:0 %}text-green-600{% else %}text-red-600{% endif %}">
-                        {{ candidate.test_registration.score|default:"N/A" }}%
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        {% if 'Offer' in candidate.current_round or 'Hired' in candidate.current_round %}bg-green-100 text-green-800
-                        {% elif 'Rejected' in candidate.current_round %}bg-red-100 text-red-800
-                        {% elif 'Test' in candidate.current_round %}bg-blue-100 text-blue-800
-                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
-                            {{ candidate.get_current_round_display }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-3 items-center">
-                        
-                        <div class="relative w-40">
-                            <select id="move-round-{{ candidate.pk }}" 
-                                data-candidate-id="{{ candidate.pk }}" 
-                                class="move-round-select block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 text-xs focus:outline-none focus:ring-theme-primary focus:border-theme-primary">
-                                <option value="" disabled selected>Move To...</option>
-                                {% for round_val, round_label in round_choices %}
-                                    {% if round_val != 'Applied' %}
-                                    <option value="{{ round_val }}" {% if candidate.current_round == round_val %}disabled class="bg-gray-200"{% endif %}>
-                                        {{ round_label }}
-                                    </option>
-                                    {% endif %}
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        {% if candidate.current_round != 'Applied' and candidate.current_round != 'Rejected' and candidate.current_round != 'Final Offer' %}
-                        <button 
-                            data-candidate-id="{{ candidate.pk }}" 
-                            data-round-name="{{ candidate.current_round }}"
-                            class="open-feedback-modal flex items-center text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md text-xs px-3 py-2 shadow-sm transition duration-150">
-                            <i class="fas fa-comment-dots mr-1"></i> Feedback ({{ candidate.current_round|cut:" " }})
-                        </button>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-    const CSRF_TOKEN = '{{ csrf_token }}';
-
-    $(document).ready(function() {
-        // --- 1. Candidate Round Movement ---
-        $('.move-round-select').on('change', function() {
-            const selectedRound = $(this).val();
-            const candidateId = $(this).data('candidate-id');
-            const currentRoundText = $(this).closest('tr').find('.rounded-full').text().trim();
-            
-            if (selectedRound) {
-                if (confirm(`Are you sure you want to move candidate (currently in ${currentRoundText}) to the ${selectedRound} round?`)) {
-                    const url = `/candidate/${candidateId}/move_to/${selectedRound}/`; 
-                    
-                    $.ajax({
-                        url: url,
-                        method: 'POST',
-                        data: { 'csrfmiddlewaretoken': CSRF_TOKEN },
-                        success: function(response) {
-                            window.location.reload(); 
-                        },
-                        error: function(xhr) {
-                            alert('Error moving candidate: Check console for details.');
-                            console.error(xhr.responseText);
-                            $(this).val(''); // Reset select box on error
-                        }
-                    });
-                } else {
-                    $(this).val(''); // Reset the select box
-                }
+    <script>
+        // Simple script to dismiss messages after a delay
+        document.addEventListener('DOMContentLoaded', function() {
+            const messages = document.getElementById('django-messages');
+            if (messages) {
+                setTimeout(() => {
+                    messages.style.display = 'none';
+                }, 5000);
             }
         });
+    </script>
 
-        // --- 2. Open Feedback Modal and Load Form via AJAX ---
-        $('.open-feedback-modal').on('click', function() {
-            const candidateId = $(this).data('candidate-id');
-            const roundName = $(this).data('round-name');
-            
-            $('#modal-title').text(`Submit Feedback for: ${roundName}`);
-            $('#feedback-modal').removeClass('hidden').addClass('flex');
-            $('#modal-body').html('<div class="flex items-center justify-center h-32 text-theme-primary"><i class="fas fa-spinner fa-spin text-2xl"></i> <span class="ml-2">Loading Form...</span></div>');
-
-            const feedbackUrl = "{% url 'submit_feedback' %}?candidate_id=" + candidateId;
-            
-            $.ajax({
-                url: feedbackUrl,
-                method: 'GET',
-                success: function(data) {
-                    $('#modal-body').html(data);
-                    
-                    // Attach submit handler to the newly loaded form
-                    $('#modal-body form').on('submit', function(e) {
-                        e.preventDefault();
-                        submitFeedbackForm($(this));
-                    });
-                },
-                error: function(xhr) {
-                    $('#modal-body').html('<p class="text-red-500">Could not load feedback form. Error: ' + xhr.statusText + '</p>');
-                }
-            });
-        });
-
-        // --- 3. Close Modal on ESC key ---
-        $(document).on('keydown', function(e) {
-            if (e.key === 'Escape') {
-                $('#feedback-modal').removeClass('flex').addClass('hidden');
-            }
-        });
-
-        // --- 4. AJAX Submission Handler ---
-        function submitFeedbackForm(form) {
-            $.ajax({
-                url: form.attr('action'),
-                method: form.attr('method'),
-                data: form.serialize(),
-                // Expecting a full HTML response (either success redirect or form with errors)
-                success: function(response, status, xhr) { 
-                    if (xhr.getResponseHeader('Content-Type').includes('text/html')) {
-                        // If it's HTML, it likely contains the form with validation errors
-                        $('#modal-body').html(response);
-                        $('#modal-body form').on('submit', function(e) {
-                            e.preventDefault();
-                            submitFeedbackForm($(this));
-                        });
-                        // Optional: Add a visual alert for errors here if Django doesn't handle messages in the form response
-                    } else {
-                         // Fallback for unexpected success/redirect response
-                         $('#feedback-modal').removeClass('flex').addClass('hidden');
-                         alert('Feedback submitted successfully and candidate status updated!');
-                         window.location.reload(); 
-                    }
-                },
-                error: function(xhr) {
-                    // This often catches the case where Django returns the form with errors (400)
-                    if (xhr.status === 400 || xhr.status === 200) { 
-                         $('#modal-body').html(xhr.responseText);
-                         $('#modal-body form').on('submit', function(e) {
-                            e.preventDefault();
-                            submitFeedbackForm($(this));
-                         });
-                         // Use a toast message to show errors like "Feedback already exists"
-                    } else {
-                        alert('An unexpected server error occurred.');
-                        $('#feedback-modal').removeClass('flex').addClass('hidden');
-                    }
-                }
-            });
-        }
-    });
-</script>
-{% endblock content %}
+</body>
+</html>
