@@ -144,8 +144,17 @@ def generate_questions(request):
             min_exp = data.get("min_exp")
             max_exp = data.get("max_exp")
             skills_raw = data.get("skills")
+            # ✨ CHANGE: sections_data को सही तरीके से पढ़ना
             sections_data = data.get("sections", {})
-            total_questions = sum(sections_data.values())
+            
+            # total_questions sum of counts hai
+            total_questions = sum(item.get("count", 0) for item in sections_data.values())
+            
+            # AI Prompt ke liye sirf Section Titles aur Counts use karein
+            ai_sections_data = {
+                title: item.get("count", 0) 
+                for title, item in sections_data.items()
+            }
 
             seniority = "Junior"
             if int(max_exp) > 5:
@@ -241,6 +250,88 @@ def generate_questions(request):
     return render(request, "question_generator/generator.html", context)
 
 
+# @login_required
+# @require_POST
+# @transaction.atomic
+# def save_paper(request):
+#     """Saves the generated paper and calculates the total question count."""
+#     try:
+#         data = json.loads(request.body)
+
+#         total_questions_count = 0
+#         for section_data in data.get("sections", []):
+#             total_questions_count += len(section_data.get("questions", []))
+
+#         paper = QuestionPaper.objects.create(
+#             created_by=request.user,
+#             title=data.get("title", "Generated Assessment"),
+#             job_title=data.get("job_title"),
+#             department_name=data.get("department"),
+#             min_exp=data.get("min_exp"),
+#             max_exp=data.get("max_exp"),
+#             is_active=True,
+#             duration=data.get("duration"),
+#             is_public_active=False,
+#             is_private_link_active=False,  
+#             skills_list=(
+#                 ", ".join(data.get("skills", []))
+#                 if isinstance(data.get("skills"), list)
+#                 else data.get("skills")
+#             ),
+#             total_questions=total_questions_count,
+#         )
+#         # ✨ CHANGE: weightage field ko section_data se nikal kar PaperSection mein save karein
+#         section_list_data = data.get("sections", {}).items() # Agar sections dictionary hai
+        
+#         # Agar sections array of objects hai (front-end par depend karta hai)
+#         # Assuming sections is a DICT of {title: {count: N, weightage: W}}
+#         section_items = list(data.get("sections", {}).items())
+
+
+#         for section_index, (section_title, section_content) in enumerate(section_items):
+            
+#             # Extract weightage
+#             section_weightage = section_content.get("weightage", 0) 
+
+#             section = PaperSection.objects.create(
+#                 question_paper=paper,
+#                 title=section_title,
+#                 order=section_index,
+#                 weightage=section_weightage, # ✨ YAHAN WEIGHTAGE SAVE HUA
+#             )
+#         # for section_index, section_data in enumerate(data.get("sections", [])):
+#         #     section = PaperSection.objects.create(
+#         #         question_paper=paper,
+#         #         title=section_data.get("title"),
+#         #         order=section_index,
+#         #     )
+#             for q_index, question_data in enumerate(section_data.get("questions", [])):
+
+#                 Question.objects.create(
+#                     section=section,
+#                     text=question_data.get("text"),
+#                     answer=question_data.get("answer"),
+#                     options=question_data.get("options"),
+#                     order=q_index,
+#                     question_type=question_data.get("type", "UN"),
+#                 )
+
+#         return JsonResponse(
+#             {
+#                 "success": True,
+#                 "message": "Paper saved successfully!",
+#                 "redirect_url": "/dashboard/",
+#             }
+#         )
+#     except Exception as e:
+#         print(f"Error saving paper: {e}")
+#         return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+import json
+import logging # <-- NEW
+
+logger = logging.getLogger(__name__) # <-- NEW
+
 @login_required
 @require_POST
 @transaction.atomic
@@ -248,11 +339,37 @@ def save_paper(request):
     """Saves the generated paper and calculates the total question count."""
     try:
         data = json.loads(request.body)
-
-        total_questions_count = 0
-        for section_data in data.get("sections", []):
-            total_questions_count += len(section_data.get("questions", []))
-
+        
+        # Sections data is expected to be a DICT: {section_title: {count: N, weightage: W, questions: [...]}}
+        sections_data = data.get("sections", {})
+        
+        # 🟢 LOGGING FOR DEBUGGING 🟢
+        logger.info(f"--- START SAVING PAPER DEBUG ---")
+        logger.info(f"Received sections_data TYPE: {type(sections_data)}") # List or Dict?
+        
+        # यदि sections_data एक लिस्ट है (जो ट्रेसबैक के अनुसार है), तो उसे ऐसे ही इस्तेमाल करें
+        if isinstance(sections_data, list):
+            # यदि यह एक लिस्ट है, तो हमें उसे प्रोसेस करने के लिए keys (title) की आवश्यकता होगी।
+            # लेकिन AI से आया sections का लिस्ट फॉर्मेट अक्सर Dicts की List होती है।
+            section_items_list = sections_data
+            
+            # **हम इसे लिस्ट मानकर आगे बढ़ते हैं**
+            total_questions_count = sum(len(item.get("questions", [])) for item in section_items_list)
+            
+            # अगर यह लिस्ट है, तो हम items() का उपयोग नहीं कर सकते, हमें सीधे लिस्ट को iterate करना होगा।
+            section_data_iterator = enumerate(section_items_list)
+            
+        else: # Dictionary होने पर
+            # यह वह ब्लॉक है जो पहले अपेक्षित था
+            section_items_list = list(sections_data.values())
+            total_questions_count = sum(len(item.get("questions", [])) for item in sections_data.values())
+            section_data_iterator = sections_data.items() # (title, content_dict)
+            
+        # ⚠️ यह लॉग हमें दिखाएगा कि sections_data में क्या आया है:
+        logger.info(f"Sections Data (First 2 items): {section_items_list[:2]}")
+        logger.info(f"Total Questions Count: {total_questions_count}")
+        
+        # 2. QuestionPaper ऑब्जेक्ट बनाएं (UNCHANGED)
         paper = QuestionPaper.objects.create(
             created_by=request.user,
             title=data.get("title", "Generated Assessment"),
@@ -264,21 +381,34 @@ def save_paper(request):
             duration=data.get("duration"),
             is_public_active=False,
             is_private_link_active=False,  
-            skills_list=(
-                ", ".join(data.get("skills", []))
-                if isinstance(data.get("skills"), list)
-                else data.get("skills")
-            ),
+            skills_list=data.get("skills"), 
             total_questions=total_questions_count,
         )
+        
+        # 3. PaperSection और Question ऑब्जेक्ट बनाएं 
+        
+        # हम मानते हैं कि आपका JavaScript अब LIST OF DICTS भेज रहा है (जैसा कि AI output से सीधे आया था)
+        
+        # 🛑 पुराने कोड को हटाएँ जो `sections_data.items()` पर निर्भर था
+        
+        # ✨ FIX: अब हम सीधे sections_data (LIST) को iterate करते हैं
+        for section_index, section_content in enumerate(sections_data):
+            
+            # List of Dicts के लिए, हम title को key के बजाय content dict से निकालते हैं
+            section_title = section_content.get("title")
+            
+            # Extract weightage (यह मान अब section_content dict में होना चाहिए)
+            section_weightage = section_content.get("weightage", 0) 
+            questions_list = section_content.get("questions", [])
 
-        for section_index, section_data in enumerate(data.get("sections", [])):
             section = PaperSection.objects.create(
                 question_paper=paper,
-                title=section_data.get("title"),
+                title=section_title,
                 order=section_index,
+                weightage=section_weightage, 
             )
-            for q_index, question_data in enumerate(section_data.get("questions", [])):
+            
+            for q_index, question_data in enumerate(questions_list):
 
                 Question.objects.create(
                     section=section,
@@ -286,9 +416,10 @@ def save_paper(request):
                     answer=question_data.get("answer"),
                     options=question_data.get("options"),
                     order=q_index,
-                    question_type=question_data.get("type", "UN"),
+                    question_type=question_data.get("type", "MCQ"), 
                 )
-
+        
+        logger.info(f"--- END SAVING PAPER DEBUG: Success ---")
         return JsonResponse(
             {
                 "success": True,
@@ -297,10 +428,9 @@ def save_paper(request):
             }
         )
     except Exception as e:
+        logger.error(f"Error saving paper: {str(e)}", exc_info=True) # Log full traceback
         print(f"Error saving paper: {e}")
         return JsonResponse({"success": False, "error": str(e)}, status=400)
-
-
 @login_required
 def list_papers(request):
     papers = QuestionPaper.objects.filter(created_by=request.user).order_by(
@@ -346,6 +476,115 @@ from .models import QuestionPaper, TestRegistration
 from .models import UserResponse
 
 
+# @login_required
+# def paper_detail_view(request, paper_id):
+#     """
+#     Displays the details of a single question paper with FIXED MCQ matching.
+#     """
+#     paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
+#     status_filter = request.GET.get("status", "all")
+#     shortlist_filter = request.GET.get("shortlist_status", "all")
+
+#     skills = [skill.strip() for skill in paper.skills_list.split(",") if skill.strip()]
+#     # ✨ NAYA: Sections ko weightage ke saath fetch karein
+#     sections_with_weightage = paper.paper_sections.all().annotate(
+#         question_count=Count('questions')
+#     ).order_by('order')
+#     # Note: Template filters (striptags, lower) will handle normalization
+
+#     all_participants = list(
+#         TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
+#     )
+
+#     # ▼▼▼ THE FINAL, CORRECTED SCORING LOGIC ▼▼▼
+#     for p in all_participants:
+#         if p.is_completed:
+#             user_responses = UserResponse.objects.filter(registration=p)
+#             correct_answers_count = 0
+
+#             for response in user_responses:
+#                 question = response.question
+#                 user_answer = response.user_answer.strip()
+#                 is_correct = False
+
+#                 if not user_answer:
+#                     is_correct = False
+#                 elif question and question.answer:
+#                     if question.question_type == "MCQ":
+
+#                         cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
+#                         is_correct = user_answer.lower() == cleaned_answer.lower()
+#                         # cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
+#                         # is_correct = user_answer.lower() == cleaned_answer.lower()
+#                     else:
+#                         qtype = question.question_type.upper()
+#                         if qtype in ("CODE", "CODING"):
+#                             evaluator_type = "coding"
+#                         elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
+#                             evaluator_type = "short"
+#                         elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
+#                             evaluator_type = "true_false"
+#                         else:
+#                             evaluator_type = "short"
+
+#                         is_correct, _ = evaluate_answer_with_ai(
+#                             question_text=question.text,
+#                             user_answer=user_answer,
+#                             model_answer=question.answer.strip(),
+#                             question_type=evaluator_type,
+#                         )
+
+#                 if is_correct:
+#                     correct_answers_count += 1
+
+#             total_questions = p.question_paper.total_questions
+#             live_percentage = 0
+#             if total_questions > 0:
+#                 live_percentage = round((correct_answers_count / total_questions) * 100)
+
+#             p.score = live_percentage
+#             cutoff = p.question_paper.cutoff_score
+
+#             if cutoff is not None:
+#                 if live_percentage >= cutoff:
+#                     p.status = "pass"
+#                 else:
+#                     p.status = "fail"
+#             else:
+#                 p.status = "pass"
+#         else:
+#             p.status = "pending"
+#     # ▲▲▲ END OF CORRECTED LOGIC ▲▲▲
+
+#     if status_filter != "all":
+#         filtered_participants = [
+#             p for p in all_participants if p.status == status_filter
+#         ]
+#     else:
+#         filtered_participants = all_participants
+
+#     if shortlist_filter == "shortlisted":
+#         final_participants = [p for p in filtered_participants if p.is_shortlisted]
+#     elif shortlist_filter == "not_shortlisted":
+#         final_participants = [p for p in filtered_participants if not p.is_shortlisted]
+#     else:
+#         final_participants = filtered_participants
+
+#     context = {
+#         "paper": paper,
+#         "skills": skills,
+#         "participants": final_participants,
+#         "title": f"Details for {paper.title}",
+#         "selected_status": status_filter,
+#         "selected_shortlist_status": shortlist_filter,
+#         "sections": sections_with_weightage, # ✨ CONTEXT MEIN SECTIONS ADD KIYE
+#     }
+#     return render(request, "question_generator/paper_detail.html", context)
+
+from django.db.models import Count # Ensure this import exists
+
+# ... other imports ...
+
 @login_required
 def paper_detail_view(request, paper_id):
     """
@@ -356,14 +595,21 @@ def paper_detail_view(request, paper_id):
     shortlist_filter = request.GET.get("shortlist_status", "all")
 
     skills = [skill.strip() for skill in paper.skills_list.split(",") if skill.strip()]
-
-    # Note: Template filters (striptags, lower) will handle normalization
+    
+    # ✅ FIX/CONFIRMATION: Sections को उनके weightage के साथ Fetch करें
+    # annotate(question_count=Count('questions')) सुनिश्चित करता है कि प्रत्येक सेक्शन में
+    # प्रश्नों की संख्या भी उपलब्ध हो (जो आमतौर पर उपयोगी होती है)
+    sections_with_weightage = paper.paper_sections.all().annotate(
+        question_count=Count('questions')
+    ).order_by('order') 
+    # Note: 'weightage' field is automatically available since it's a field on PaperSection model.
 
     all_participants = list(
         TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
     )
 
-    # ▼▼▼ THE FINAL, CORRECTED SCORING LOGIC ▼▼▼
+    # ▼▼▼ THE FINAL, CORRECTED SCORING LOGIC (UNCHANGED) ▼▼▼
+    # ... (Scoring logic remains the same) ...
     for p in all_participants:
         if p.is_completed:
             user_responses = UserResponse.objects.filter(registration=p)
@@ -381,8 +627,6 @@ def paper_detail_view(request, paper_id):
 
                         cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
                         is_correct = user_answer.lower() == cleaned_answer.lower()
-                        # cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
-                        # is_correct = user_answer.lower() == cleaned_answer.lower()
                     else:
                         qtype = question.question_type.upper()
                         if qtype in ("CODE", "CODING"):
@@ -444,43 +688,160 @@ def paper_detail_view(request, paper_id):
         "title": f"Details for {paper.title}",
         "selected_status": status_filter,
         "selected_shortlist_status": shortlist_filter,
+        "sections": sections_with_weightage, # ✨ Context में sections_with_weightage भेजा गया
     }
     return render(request, "question_generator/paper_detail.html", context)
 
 
+# @login_required
+# @transaction.atomic
+# def paper_edit_view(request, paper_id):
+#     """
+#     Handles editing of a question paper's metadata and its questions.
+#     NOW ALSO SAVES MCQ OPTIONS!
+#     """
+#     paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
 
+#     if request.method == "POST":
+#         form = QuestionPaperEditForm(request.POST, instance=paper)
+
+#         if form.is_valid():
+#             updated_paper = form.save()
+
+#             total_questions_count = 0
+
+#             # for section in paper.paper_sections.all():
+#             #     # ✨ CHANGE: PaperSection का weightage अपडेट करना
+#         for section in paper.paper_sections.all():
+#             weightage_name = f"section-weightage-{section.id}"
+            
+#             if weightage_name in request.POST:
+#                 try:
+#                     new_weightage = int(request.POST[weightage_name])
+#                     if 0 <= new_weightage <= 100:
+#                         section.weightage = new_weightage
+#                         section.save(update_fields=["weightage"]) # Weightage save karein
+#                 except ValueError:
+#                     # Handle invalid weightage input if necessary
+#                     pass
+#                 for question in section.questions.all():
+#                     question_text_name = f"question-text-{question.id}"
+#                     question_answer_name = f"question-answer-{question.id}"
+
+#                     if question_text_name in request.POST:
+#                         new_text = request.POST[question_text_name].strip()
+#                         if new_text:  
+#                             question.text = new_text
+
+#                     if question_answer_name in request.POST:
+#                         new_answer = request.POST[question_answer_name].strip()
+#                         if new_answer:  
+#                             question.answer = new_answer
+#                         if question.question_type == "MCQ":
+#                             options = []
+#                             for opt_num in range(1, 11):  
+#                                 option_key = f"option-{question.id}-{opt_num}"
+#                                 if option_key in request.POST:
+#                                     option_value = request.POST[option_key].strip()
+#                                     if option_value:
+#                                         options.append(option_value)
+#                             if options:
+#                                 question.options = options
+
+#                         question.save()
+                   
+#                     total_questions_count += 1
+
+#             updated_paper.total_questions = total_questions_count
+#             updated_paper.save(update_fields=["total_questions"])
+
+#             messages.success(
+#                 request,
+#                 f"✅ Paper '{updated_paper.title}' successfully updated with {total_questions_count} questions!",
+#             )
+#             return redirect("paper_detail", paper_id=paper.id)
+
+#         else:
+#             messages.error(
+#                 request,
+#                 "❌ There were errors in your submission. Please check the form.",
+#             )
+
+#     else:
+#         form = QuestionPaperEditForm(instance=paper)
+#     paper_sections = paper.paper_sections.all().prefetch_related('questions')
+
+#     context = {
+#         "form": form, 
+#         "paper": paper, 
+#         "paper_sections": paper_sections, # Sections context mein bhejein
+#         "title": f"Edit {paper.title}"
+#     }
+#     context = {"form": form, "paper": paper, "title": f"Edit {paper.title}"}
+
+#     return render(request, "question_generator/paper_edit.html", context)
+
+# ... imports ...
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.contrib import messages
+# from .forms import QuestionPaperEditForm # Ensure this import is present
 
 @login_required
 @transaction.atomic
 def paper_edit_view(request, paper_id):
     """
-    Handles editing of a question paper's metadata and its questions.
-    NOW ALSO SAVES MCQ OPTIONS!
+    Handles editing of a question paper's metadata and its questions, including weightage.
     """
     paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
 
     if request.method == "POST":
+        # Ensure QuestionPaperEditForm is imported/defined elsewhere
         form = QuestionPaperEditForm(request.POST, instance=paper)
 
         if form.is_valid():
             updated_paper = form.save()
-
             total_questions_count = 0
 
-            for section in paper.paper_sections.all():
+            # 1. Iterate over existing sections to update weightage and questions
+            for section in updated_paper.paper_sections.all():
+                
+                # ✅ WEIGHTAGE UPDATE LOGIC: POST data से weightage प्राप्त करें
+                weightage_name = f"section-weightage-{section.id}"
+                
+                if weightage_name in request.POST:
+                    try:
+                        new_weightage = int(request.POST[weightage_name])
+                        if 0 <= new_weightage <= 100:
+                            section.weightage = new_weightage
+                            section.save(update_fields=["weightage"]) # Weightage save करें
+                    except ValueError:
+                        messages.warning(request, f"Invalid weightage provided for section {section.title}. Not saved.")
+                        pass # Ignore invalid inputs, but continue processing
+                
+                # 2. Iterate over questions to update text/answer/options
                 for question in section.questions.all():
                     question_text_name = f"question-text-{question.id}"
                     question_answer_name = f"question-answer-{question.id}"
 
+                    question_updated = False
+                    
+                    # Update Question Text
                     if question_text_name in request.POST:
                         new_text = request.POST[question_text_name].strip()
-                        if new_text:  
+                        if new_text and new_text != question.text:  
                             question.text = new_text
+                            question_updated = True
 
+                    # Update Question Answer
                     if question_answer_name in request.POST:
                         new_answer = request.POST[question_answer_name].strip()
-                        if new_answer:  
+                        if new_answer and new_answer != question.answer:  
                             question.answer = new_answer
+                            question_updated = True
+
+                        # Update MCQ Options if type is MCQ
                         if question.question_type == "MCQ":
                             options = []
                             for opt_num in range(1, 11):  
@@ -489,13 +850,18 @@ def paper_edit_view(request, paper_id):
                                     option_value = request.POST[option_key].strip()
                                     if option_value:
                                         options.append(option_value)
-                            if options:
+                            
+                            if options and options != question.options:
                                 question.options = options
+                                question_updated = True
 
+                    if question_updated:
                         question.save()
                    
+                    # This count needs to be updated regardless of whether the question was edited
                     total_questions_count += 1
 
+            # 3. Save total questions count back to the paper model
             updated_paper.total_questions = total_questions_count
             updated_paper.save(update_fields=["total_questions"])
 
@@ -510,15 +876,22 @@ def paper_edit_view(request, paper_id):
                 request,
                 "❌ There were errors in your submission. Please check the form.",
             )
-
+    
+    # GET request handler (Display form)
     else:
         form = QuestionPaperEditForm(instance=paper)
+    
+    # ✅ FIX: Fetch sections to pass to the edit template
+    paper_sections = paper.paper_sections.all().prefetch_related('questions')
 
-    context = {"form": form, "paper": paper, "title": f"Edit {paper.title}"}
+    context = {
+        "form": form, 
+        "paper": paper, 
+        "paper_sections": paper_sections, # Sections को template में पास किया गया
+        "title": f"Edit {paper.title}"
+    }
 
     return render(request, "question_generator/paper_edit.html", context)
-
-
 import logging
 
 logger = logging.getLogger(__name__)

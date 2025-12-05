@@ -126,8 +126,7 @@ class PaperSection(models.Model):
         ordering = ["order"]
 
     def __str__(self):
-        return f"Section '{self.title}' of paper '{self.question_paper.title}'"
-
+        return f"Section '{self.title}' of paper '{self.question_paper.title}' (Weightage: {self.weightage}%)"
 
 class Question(models.Model):
     """
