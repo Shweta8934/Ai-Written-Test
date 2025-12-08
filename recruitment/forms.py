@@ -2,7 +2,7 @@
 from django import forms
 from .models import JobPost, RoundFeedback
 from django.core.exceptions import ValidationError
-
+from .models import JobPost, JobRound, RoundMaster  
 INPUT_CLASSES = (
     "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm "
     "placeholder-gray-400 focus:outline-none focus:ring-blue-primary "
@@ -45,7 +45,7 @@ class JobPostForm(forms.ModelForm):
             'experience_min', 'experience_max', 'skills_required', 'positions_available',
             
            
-            'total_rounds', 'pay_scale', 'end_date',
+            # 'total_rounds', 'pay_scale', 'end_date',
             
             'description', 'question_paper', 'status', 
            
@@ -64,7 +64,7 @@ class JobPostForm(forms.ModelForm):
             'positions_available': forms.NumberInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Number of Openings', 'min': 1}),
 
            
-            'total_rounds': forms.NumberInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Total Interview Rounds', 'min': 1}),
+            # 'total_rounds': forms.NumberInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Total Interview Rounds', 'min': 1}),
             'pay_scale': forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'e.g., 8LPA - 12LPA or Negotiable'}),
             'end_date': forms.DateInput(attrs={'class': INPUT_CLASSES, 'type': 'date'}),
             
@@ -160,3 +160,115 @@ class CandidateApplicationForm(forms.Form):
     )
     
     job_post_pk = forms.IntegerField(widget=forms.HiddenInput())
+
+
+
+# recruitment/forms.py
+
+from django import forms
+from django.forms import inlineformset_factory
+from .models import EvaluationTemplate, EvaluationParameter
+from django import forms
+from django.forms import inlineformset_factory
+from .models import EvaluationTemplate, EvaluationParameter
+
+from django.core.exceptions import ValidationError
+from .models import EvaluationTemplate, EvaluationParameter
+
+class EvaluationTemplateForm(forms.ModelForm):
+    class Meta:
+        model = EvaluationTemplate
+        fields = ['name', 'cutoff_score']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'w-full border p-2 rounded', 
+                'placeholder': 'Enter Template Name'
+            }),
+            'cutoff_score': forms.NumberInput(attrs={
+                'class': 'w-full border p-2 rounded',
+                'min': '0',    # HTML Limit
+                'max': '100',  # HTML Limit
+                'step': '1'
+            }),
+        }
+
+    # Server-Side Validation (Security ke liye)
+    def clean_cutoff_score(self):
+        score = self.cleaned_data.get('cutoff_score')
+        if score is not None:
+            if score < 0:
+                raise ValidationError("Cutoff score cannot be less than 0.")
+            if score > 100:
+                raise ValidationError("Cutoff score cannot be greater than 100.")
+        return score
+
+
+class EvaluationParameterForm(forms.ModelForm):
+    class Meta:
+        model = EvaluationParameter
+        fields = ['name', 'weight']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'w-full border p-2 rounded', 
+                'placeholder': 'Parameter (e.g. Code Quality)'
+            }),
+            'weight': forms.NumberInput(attrs={
+                'class': 'w-20 border p-2 rounded', 
+                'placeholder': 'Max',
+                'min': '0',   # HTML Limit
+                'max': '10',  # HTML Limit
+                'step': '1'
+            }),
+        }
+
+    # Server-Side Validation (Security ke liye)
+    def clean_weight(self):
+        weight = self.cleaned_data.get('weight')
+        if weight is not None:
+            if weight < 0:
+                raise ValidationError("Weight cannot be negative.")
+            if weight > 10:
+                raise ValidationError("Weight cannot be more than 10.")
+        return weight
+
+EvaluationParameterFormSet = inlineformset_factory(
+    EvaluationTemplate,
+    EvaluationParameter,
+    form=EvaluationParameterForm,
+    extra=1,
+    can_delete=True
+)
+
+
+# recruitment/forms.py में import और class जोड़ें
+from .models import RoundMaster # Ensure RoundMaster is imported
+
+class RoundMasterForm(forms.ModelForm):
+    class Meta:
+        model = RoundMaster
+        fields = ['name', 'round_type', 'evaluation_template']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Round Name (e.g. Initial Screening)'}),
+            'round_type': forms.Select(attrs={'class': INPUT_CLASSES}),
+            'evaluation_template': forms.Select(attrs={'class': INPUT_CLASSES}),
+        }
+
+
+class JobRoundForm(forms.ModelForm):
+    class Meta:
+        model = JobRound
+        fields = ['round_master', 'order']
+        widgets = {
+            'round_master': forms.Select(attrs={
+                'class': 'block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500'
+            }),
+            'order': forms.HiddenInput()
+        }
+
+JobRoundFormSet = inlineformset_factory(
+    JobPost,
+    JobRound,
+    form=JobRoundForm,
+    extra=1,      # Default 1 empty row dikhega
+    can_delete=True
+)

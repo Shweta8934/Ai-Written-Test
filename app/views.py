@@ -1,7 +1,7 @@
 # app/views.py
 
 import json
-from openai import OpenAI  # Import OpenAI instead of google.generativeai
+from openai import OpenAI  
 import re
 from django.conf import settings
 import google.generativeai as genai
@@ -251,88 +251,10 @@ def generate_questions(request):
     return render(request, "question_generator/generator.html", context)
 
 
-# @login_required
-# @require_POST
-# @transaction.atomic
-# def save_paper(request):
-#     """Saves the generated paper and calculates the total question count."""
-#     try:
-#         data = json.loads(request.body)
-
-#         total_questions_count = 0
-#         for section_data in data.get("sections", []):
-#             total_questions_count += len(section_data.get("questions", []))
-
-#         paper = QuestionPaper.objects.create(
-#             created_by=request.user,
-#             title=data.get("title", "Generated Assessment"),
-#             job_title=data.get("job_title"),
-#             department_name=data.get("department"),
-#             min_exp=data.get("min_exp"),
-#             max_exp=data.get("max_exp"),
-#             is_active=True,
-#             duration=data.get("duration"),
-#             is_public_active=False,
-#             is_private_link_active=False,  
-#             skills_list=(
-#                 ", ".join(data.get("skills", []))
-#                 if isinstance(data.get("skills"), list)
-#                 else data.get("skills")
-#             ),
-#             total_questions=total_questions_count,
-#         )
-#         # ✨ CHANGE: weightage field ko section_data se nikal kar PaperSection mein save karein
-#         section_list_data = data.get("sections", {}).items() # Agar sections dictionary hai
-        
-#         # Agar sections array of objects hai (front-end par depend karta hai)
-#         # Assuming sections is a DICT of {title: {count: N, weightage: W}}
-#         section_items = list(data.get("sections", {}).items())
-
-
-#         for section_index, (section_title, section_content) in enumerate(section_items):
-            
-#             # Extract weightage
-#             section_weightage = section_content.get("weightage", 0) 
-
-#             section = PaperSection.objects.create(
-#                 question_paper=paper,
-#                 title=section_title,
-#                 order=section_index,
-#                 weightage=section_weightage, # ✨ YAHAN WEIGHTAGE SAVE HUA
-#             )
-#         # for section_index, section_data in enumerate(data.get("sections", [])):
-#         #     section = PaperSection.objects.create(
-#         #         question_paper=paper,
-#         #         title=section_data.get("title"),
-#         #         order=section_index,
-#         #     )
-#             for q_index, question_data in enumerate(section_data.get("questions", [])):
-
-#                 Question.objects.create(
-#                     section=section,
-#                     text=question_data.get("text"),
-#                     answer=question_data.get("answer"),
-#                     options=question_data.get("options"),
-#                     order=q_index,
-#                     question_type=question_data.get("type", "UN"),
-#                 )
-
-#         return JsonResponse(
-#             {
-#                 "success": True,
-#                 "message": "Paper saved successfully!",
-#                 "redirect_url": "/dashboard/",
-#             }
-#         )
-#     except Exception as e:
-#         print(f"Error saving paper: {e}")
-#         return JsonResponse({"success": False, "error": str(e)}, status=400)
-
 import json
-import logging # <-- NEW
+import logging 
 
-logger = logging.getLogger(__name__) # <-- NEW
-
+logger = logging.getLogger(__name__) 
 @login_required
 @require_POST
 @transaction.atomic
@@ -476,116 +398,7 @@ from .models import QuestionPaper, TestRegistration
 
 from .models import UserResponse
 
-
-# @login_required
-# def paper_detail_view(request, paper_id):
-#     """
-#     Displays the details of a single question paper with FIXED MCQ matching.
-#     """
-#     paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
-#     status_filter = request.GET.get("status", "all")
-#     shortlist_filter = request.GET.get("shortlist_status", "all")
-
-#     skills = [skill.strip() for skill in paper.skills_list.split(",") if skill.strip()]
-#     # ✨ NAYA: Sections ko weightage ke saath fetch karein
-#     sections_with_weightage = paper.paper_sections.all().annotate(
-#         question_count=Count('questions')
-#     ).order_by('order')
-#     # Note: Template filters (striptags, lower) will handle normalization
-
-#     all_participants = list(
-#         TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
-#     )
-
-#     # ▼▼▼ THE FINAL, CORRECTED SCORING LOGIC ▼▼▼
-#     for p in all_participants:
-#         if p.is_completed:
-#             user_responses = UserResponse.objects.filter(registration=p)
-#             correct_answers_count = 0
-
-#             for response in user_responses:
-#                 question = response.question
-#                 user_answer = response.user_answer.strip()
-#                 is_correct = False
-
-#                 if not user_answer:
-#                     is_correct = False
-#                 elif question and question.answer:
-#                     if question.question_type == "MCQ":
-
-#                         cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
-#                         is_correct = user_answer.lower() == cleaned_answer.lower()
-#                         # cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
-#                         # is_correct = user_answer.lower() == cleaned_answer.lower()
-#                     else:
-#                         qtype = question.question_type.upper()
-#                         if qtype in ("CODE", "CODING"):
-#                             evaluator_type = "coding"
-#                         elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
-#                             evaluator_type = "short"
-#                         elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
-#                             evaluator_type = "true_false"
-#                         else:
-#                             evaluator_type = "short"
-
-#                         is_correct, _ = evaluate_answer_with_ai(
-#                             question_text=question.text,
-#                             user_answer=user_answer,
-#                             model_answer=question.answer.strip(),
-#                             question_type=evaluator_type,
-#                         )
-
-#                 if is_correct:
-#                     correct_answers_count += 1
-
-#             total_questions = p.question_paper.total_questions
-#             live_percentage = 0
-#             if total_questions > 0:
-#                 live_percentage = round((correct_answers_count / total_questions) * 100)
-
-#             p.score = live_percentage
-#             cutoff = p.question_paper.cutoff_score
-
-#             if cutoff is not None:
-#                 if live_percentage >= cutoff:
-#                     p.status = "pass"
-#                 else:
-#                     p.status = "fail"
-#             else:
-#                 p.status = "pass"
-#         else:
-#             p.status = "pending"
-#     # ▲▲▲ END OF CORRECTED LOGIC ▲▲▲
-
-#     if status_filter != "all":
-#         filtered_participants = [
-#             p for p in all_participants if p.status == status_filter
-#         ]
-#     else:
-#         filtered_participants = all_participants
-
-#     if shortlist_filter == "shortlisted":
-#         final_participants = [p for p in filtered_participants if p.is_shortlisted]
-#     elif shortlist_filter == "not_shortlisted":
-#         final_participants = [p for p in filtered_participants if not p.is_shortlisted]
-#     else:
-#         final_participants = filtered_participants
-
-#     context = {
-#         "paper": paper,
-#         "skills": skills,
-#         "participants": final_participants,
-#         "title": f"Details for {paper.title}",
-#         "selected_status": status_filter,
-#         "selected_shortlist_status": shortlist_filter,
-#         "sections": sections_with_weightage, # ✨ CONTEXT MEIN SECTIONS ADD KIYE
-#     }
-#     return render(request, "question_generator/paper_detail.html", context)
-
-from django.db.models import Count # Ensure this import exists
-
-# ... other imports ...
-
+from django.db.models import Count 
 @login_required
 def paper_detail_view(request, paper_id):
     """
@@ -597,20 +410,15 @@ def paper_detail_view(request, paper_id):
 
     skills = [skill.strip() for skill in paper.skills_list.split(",") if skill.strip()]
     
-    # ✅ FIX/CONFIRMATION: Sections को उनके weightage के साथ Fetch करें
-    # annotate(question_count=Count('questions')) सुनिश्चित करता है कि प्रत्येक सेक्शन में
-    # प्रश्नों की संख्या भी उपलब्ध हो (जो आमतौर पर उपयोगी होती है)
+    
     sections_with_weightage = paper.paper_sections.all().annotate(
         question_count=Count('questions')
     ).order_by('order') 
-    # Note: 'weightage' field is automatically available since it's a field on PaperSection model.
-
+   
     all_participants = list(
         TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
     )
 
-    # ▼▼▼ THE FINAL, CORRECTED SCORING LOGIC (UNCHANGED) ▼▼▼
-    # ... (Scoring logic remains the same) ...
     for p in all_participants:
         if p.is_completed:
             user_responses = UserResponse.objects.filter(registration=p)
@@ -694,100 +502,10 @@ def paper_detail_view(request, paper_id):
     return render(request, "question_generator/paper_detail.html", context)
 
 
-# @login_required
-# @transaction.atomic
-# def paper_edit_view(request, paper_id):
-#     """
-#     Handles editing of a question paper's metadata and its questions.
-#     NOW ALSO SAVES MCQ OPTIONS!
-#     """
-#     paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
-
-#     if request.method == "POST":
-#         form = QuestionPaperEditForm(request.POST, instance=paper)
-
-#         if form.is_valid():
-#             updated_paper = form.save()
-
-#             total_questions_count = 0
-
-#             # for section in paper.paper_sections.all():
-#             #     # ✨ CHANGE: PaperSection का weightage अपडेट करना
-#         for section in paper.paper_sections.all():
-#             weightage_name = f"section-weightage-{section.id}"
-            
-#             if weightage_name in request.POST:
-#                 try:
-#                     new_weightage = int(request.POST[weightage_name])
-#                     if 0 <= new_weightage <= 100:
-#                         section.weightage = new_weightage
-#                         section.save(update_fields=["weightage"]) # Weightage save karein
-#                 except ValueError:
-#                     # Handle invalid weightage input if necessary
-#                     pass
-#                 for question in section.questions.all():
-#                     question_text_name = f"question-text-{question.id}"
-#                     question_answer_name = f"question-answer-{question.id}"
-
-#                     if question_text_name in request.POST:
-#                         new_text = request.POST[question_text_name].strip()
-#                         if new_text:  
-#                             question.text = new_text
-
-#                     if question_answer_name in request.POST:
-#                         new_answer = request.POST[question_answer_name].strip()
-#                         if new_answer:  
-#                             question.answer = new_answer
-#                         if question.question_type == "MCQ":
-#                             options = []
-#                             for opt_num in range(1, 11):  
-#                                 option_key = f"option-{question.id}-{opt_num}"
-#                                 if option_key in request.POST:
-#                                     option_value = request.POST[option_key].strip()
-#                                     if option_value:
-#                                         options.append(option_value)
-#                             if options:
-#                                 question.options = options
-
-#                         question.save()
-                   
-#                     total_questions_count += 1
-
-#             updated_paper.total_questions = total_questions_count
-#             updated_paper.save(update_fields=["total_questions"])
-
-#             messages.success(
-#                 request,
-#                 f"✅ Paper '{updated_paper.title}' successfully updated with {total_questions_count} questions!",
-#             )
-#             return redirect("paper_detail", paper_id=paper.id)
-
-#         else:
-#             messages.error(
-#                 request,
-#                 "❌ There were errors in your submission. Please check the form.",
-#             )
-
-#     else:
-#         form = QuestionPaperEditForm(instance=paper)
-#     paper_sections = paper.paper_sections.all().prefetch_related('questions')
-
-#     context = {
-#         "form": form, 
-#         "paper": paper, 
-#         "paper_sections": paper_sections, # Sections context mein bhejein
-#         "title": f"Edit {paper.title}"
-#     }
-#     context = {"form": form, "paper": paper, "title": f"Edit {paper.title}"}
-
-#     return render(request, "question_generator/paper_edit.html", context)
-
-# ... imports ...
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.contrib import messages
-# from .forms import QuestionPaperEditForm # Ensure this import is present
 
 @login_required
 @transaction.atomic
@@ -898,34 +616,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# def department_create_view(request):
-#     if request.method == "POST":
-#         form = DepartmentForm(request.POST)
-#         if form.is_valid():
-#             try:
-#                 form.save()
 
-#                 messages.success(request, "Department created successfully!")
-#                 return redirect("dashboard")
-#             except Exception as e:
-
-#                 logger.error(f"Error creating department: {e}", exc_info=True)
-
-#                 messages.error(
-#                     request,
-#                     "Could not create the department. Please try again or contact support.",
-#                 )
-
-#                 return redirect("department_create")
-#         else:
-
-#             messages.warning(request, "Please correct the errors below.")
-#     else:
-#         form = DepartmentForm()
-
-#     context = {"form": form}
-#     return render(request, "partials/department/department_create.html", context)
-# app/views.py
 
 @login_required
 def department_create_view(request):
@@ -1311,42 +1002,8 @@ def regenerate_question(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-# @login_required
-# @require_POST
-# def deactivate_paper(request, paper_id):
-#     """
-#     Soft deletes a question paper by setting its is_active flag to False.
-#     """
-#     try:
-
-#         paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
-
-#         paper.is_active = False
-#         paper.save()
-
-#         return JsonResponse(
-#             {
-#                 "status": "success",
-#                 "message": f'Paper "{paper.title}" has been deactivated successfully.',
-#             }
-#         )
-
-#     except QuestionPaper.DoesNotExist:
-#         return JsonResponse(
-#             {
-#                 "status": "error",
-#                 "message": "Paper not found or you do not have permission to perform this action.",
-#             },
-#             status=404,
-#         )
-#     except Exception as e:
-#         return JsonResponse({"status": "error", "message": str(e)}, status=500)
-# app/views.py
-
-# ... (baaki saare imports)
-from django.utils import timezone  # Yeh add karein
-import datetime  # Yeh add karein
-# ... (baaki saare imports)
+from django.utils import timezone  
+import datetime  
 
 
 @login_required
@@ -1359,24 +1016,15 @@ def deactivate_paper(request, paper_id):
     try:
         paper = get_object_or_404(QuestionPaper, pk=paper_id, created_by=request.user)
 
-        # --- YEH HAI BEHTAR CHECK ---
         
-        # 1. Paper ka duration (minutes mein) lein
         duration_minutes = paper.duration
         
         active_takers_exist = False  # Pehle se False maan lein
 
         if duration_minutes and duration_minutes > 0:
-            # 2. "Cutoff" time calculate karein.
-            # Agar test 60 min ka hai, toh hum sirf unhe dhoondhenge
-            # jinhone pichle 60 minute ke andar test start kiya tha.
-            # Jo 60 min se pehle start kiye the, unka time waise hi khatam ho chuka hai.
             cutoff_time = timezone.now() - datetime.timedelta(minutes=duration_minutes)
 
-            # 3. Query: Kya koi aisa user hai jo...
-            #    - test complete nahi kiya hai (is_completed=False)
-            #    - AND test pichle [duration] minutes ke andar start kiya tha? 
-            #      (matlab unka time abhi chal raha hai)
+           
             active_takers_exist = TestRegistration.objects.filter(
                 question_paper=paper,
                 is_completed=False,
@@ -1384,8 +1032,7 @@ def deactivate_paper(request, paper_id):
             ).exists()
 
         else:
-            # 4. Agar paper ka duration 0 ya None hai, toh purana (safe) logic use karein
-            #    (jo check karta hai ki kya koi bhi incomplete test hai)
+        
             active_takers_exist = TestRegistration.objects.filter(
                 question_paper=paper,
                 is_completed=False,
@@ -1520,86 +1167,15 @@ import google.generativeai as genai
 from django.conf import settings
 
 
-# def evaluate_answer_with_ai(
-#     question_text: str,
-#     user_answer: str,
-#     model_answer: str,
-#     question_type: str = "short",
-# ) -> Tuple[bool, Dict[str, Any]]:
-#     """
-#     Uses Gemini AI to evaluate if a user's answer is conceptually correct.
 
-#     Args:
-#         question_text: The question being asked
-#         user_answer: User's submitted answer
-#         model_answer: Correct/reference answer
-#         question_type: Type of question - "mcq", "short", "coding", "true_false"
 
-#     Returns:
-#         Tuple of (is_correct: bool, details: dict with confidence and reason)
-#     """
-#     # Empty answer check
-#     if not user_answer or not user_answer.strip():
-#         return False, {
-#             "is_correct": False,
-#             "confidence": 100,
-#             "reason": "Answer is empty",
-#         }
 
-#     # Normalize inputs
-#     user_answer = user_answer.strip()
-#     model_answer = model_answer.strip()
-
-#     try:
-#         # Quick checks for specific question types before AI call
-#         if question_type.lower() == "mcq":
-#             return _evaluate_mcq(user_answer, model_answer)
-
-#         elif question_type.lower() in ["true_false", "boolean"]:
-#             return _evaluate_boolean(user_answer, model_answer)
-
-#         # AI evaluation for short answer and coding
-#         genai.configure(api_key=settings.GEMINI_API_KEY)
-#         model = genai.GenerativeModel("gemini-2.0-flash-exp")
-
-#         # Different prompts for different question types
-#         if question_type.lower() == "coding":
-#             prompt = _get_coding_prompt(question_text, user_answer, model_answer)
-#         else:
-#             prompt = _get_short_answer_prompt(question_text, user_answer, model_answer)
-
-#         response = model.generate_content(prompt)
-#         cleaned_text = response.text.strip()
-
-#         # Remove markdown code blocks if present
-#         if cleaned_text.startswith("```json"):
-#             cleaned_text = cleaned_text[7:]
-#         elif cleaned_text.startswith("```"):
-#             cleaned_text = cleaned_text[3:]
-#         if cleaned_text.endswith("```"):
-#             cleaned_text = cleaned_text[:-3]
-#         cleaned_text = cleaned_text.strip()
-
-#         result = json.loads(cleaned_text)
-
-#         is_correct = result.get("is_correct", False)
-#         return is_correct, result
-
-#     except json.JSONDecodeError as e:
-
-#         return _fallback_evaluation(user_answer, model_answer, question_type)
-
-#     except Exception as e:
-#         print(f"AI Evaluation Error: {e}")
-#         return _fallback_evaluation(user_answer, model_answer, question_type)
 
 import json
 import re
 from typing import Tuple, Dict, Any
 from django.conf import settings
-from openai import OpenAI  # Import OpenAI instead of google.generativeai
-
-# OpenAI Client initialize karein
+from openai import OpenAI 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 def evaluate_answer_with_ai(
@@ -1611,7 +1187,7 @@ def evaluate_answer_with_ai(
     """
     Uses OpenAI GPT-4o-mini to evaluate if a user's answer is conceptually correct.
     """
-    # Empty answer check
+    
     if not user_answer or not user_answer.strip():
         return False, {
             "is_correct": False,
@@ -1853,7 +1429,7 @@ def _evaluate_mcq(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
             if model_match:
                 model_option = model_match.group(1)
 
-    # Compare extracted options
+
     if user_option and model_option:
         if user_option == model_option:
             return True, {
@@ -1868,7 +1444,6 @@ def _evaluate_mcq(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
                 "reason": f"Wrong option: {user_option.upper()} (correct: {model_option.upper()})",
             }
 
-    # Full text comparison (if user wrote full option text)
     if len(user_clean) > 3 and len(model_clean) > 3:
         if user_clean in model_clean or model_clean in user_clean:
             return True, {
@@ -1877,7 +1452,6 @@ def _evaluate_mcq(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
                 "reason": "Answer matches option text",
             }
 
-        # Word overlap check
         user_words = set(user_clean.split())
         model_words = set(model_clean.split())
         if len(model_words) > 0:
@@ -1895,7 +1469,6 @@ def _evaluate_mcq(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
 def _evaluate_boolean(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
     """Evaluate True/False questions with support for multiple formats"""
 
-    # Define variants for True
     true_variants = [
         "true",
         "t",
@@ -1914,7 +1487,6 @@ def _evaluate_boolean(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
         "check",
     ]
 
-    # Define variants for False
     false_variants = [
         "false",
         "f",
@@ -1936,15 +1508,12 @@ def _evaluate_boolean(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
     user_clean = user_answer.lower().strip()
     model_clean = model_answer.lower().strip()
 
-    # Check what user answered
     user_is_true = any(variant in user_clean for variant in true_variants)
     user_is_false = any(variant in user_clean for variant in false_variants)
 
-    # Check correct answer
     model_is_true = any(variant in model_clean for variant in true_variants)
     model_is_false = any(variant in model_clean for variant in false_variants)
 
-    # If both detected in user answer, take first occurrence
     if user_is_true and user_is_false:
         first_true = min(
             (user_clean.find(v) for v in true_variants if v in user_clean), default=999
@@ -1955,7 +1524,6 @@ def _evaluate_boolean(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
         user_is_true = first_true < first_false
         user_is_false = not user_is_true
 
-    # Compare answers
     if model_is_true and user_is_true:
         return True, {"is_correct": True, "confidence": 100, "reason": "Correct: True"}
     elif model_is_false and user_is_false:
@@ -1973,7 +1541,6 @@ def _evaluate_boolean(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
             "reason": "Incorrect: answered True (correct: False)",
         }
 
-    # If we can't determine, return False
     return False, {
         "is_correct": False,
         "confidence": 50,
@@ -1989,7 +1556,6 @@ def _fallback_evaluation(
     user_clean = user_answer.lower().strip()
     model_clean = model_answer.lower().strip()
 
-    # Exact match
     if user_clean == model_clean:
         return True, {
             "is_correct": True,
@@ -1997,7 +1563,6 @@ def _fallback_evaluation(
             "reason": "Exact match (fallback mode)",
         }
 
-    # Substring match for longer answers
     if len(user_clean) > 10 and (
         user_clean in model_clean or model_clean in user_clean
     ):
@@ -2007,11 +1572,9 @@ def _fallback_evaluation(
             "reason": "Substring match (fallback mode)",
         }
 
-    # Word overlap for short answers
     user_words = set(re.findall(r"\w+", user_clean))
     model_words = set(re.findall(r"\w+", model_clean))
 
-    # Remove common stop words
     stop_words = {
         "the",
         "a",
@@ -2036,7 +1599,6 @@ def _fallback_evaluation(
     if len(model_words) > 0:
         overlap = len(user_words & model_words) / len(model_words)
 
-        # For coding, be more strict
         threshold = 0.4 if question_type.lower() == "coding" else 0.6
 
         if overlap >= threshold:
@@ -2046,7 +1608,6 @@ def _fallback_evaluation(
                 "reason": f"Word overlap: {overlap:.0%} (fallback mode)",
             }
 
-    # For very short answers, check if user answer is substring
     if len(model_words) <= 3 and len(user_words & model_words) >= 1:
         return True, {
             "is_correct": True,
@@ -2061,7 +1622,6 @@ def _fallback_evaluation(
     }
 
 
-# Backward compatible wrapper (returns only boolean like your original)
 def evaluate_answer_simple(
     question_text: str, user_answer: str, model_answer: str
 ) -> bool:
@@ -2101,7 +1661,6 @@ def submit_test(request, registration_id):
                 model_answer = question.answer.strip()
                 is_correct = user_answer.lower() == model_answer.lower()
             else:
-                # Map internal question type to evaluator type
                 qtype = question.question_type.upper()
                 if qtype in ("CODE", "CODING"):
                     evaluator_type = "coding"
@@ -2112,7 +1671,6 @@ def submit_test(request, registration_id):
                 else:
                     evaluator_type = "short"
 
-                # evaluate_answer_with_ai returns (is_correct, details)
                 is_correct, _ = evaluate_answer_with_ai(
                     question_text=question.text,
                     user_answer=user_answer,
@@ -2123,12 +1681,10 @@ def submit_test(request, registration_id):
             if is_correct:
                 correct_answers_count += 1
 
-    # Calculate score
     percentage_score = 0
     if total_questions > 0:
         percentage_score = round((correct_answers_count / total_questions) * 100, 2)
 
-    # Save results
     registration.is_completed = True
     registration.end_time = timezone.now()
     registration.score = percentage_score
@@ -2320,48 +1876,10 @@ def create_section_ajax(request):
             "message": "Invalid JSON"
         }, status=400)
 
-# @login_required
-# def search_skills_with_suggestions(request):
-#     '''User type करे तो AI suggest करे'''
-#     query = request.GET.get('q', '').strip().lower()
-    
-#     if not query or len(query) < 2:
-#         return JsonResponse({'skills': [], 'suggestions': []})
-    
-#     try:
-#         # DB में खोजो
-#         db_skills = Skill.objects.filter(
-#             name__icontains=query,
-#             is_active=True
-#         ).values_list('name', flat=True)[:5]
-        
-#         db_list = list(db_skills)
-        
-#         if len(db_list) >= 3:
-#             return JsonResponse({'skills': db_list, 'suggestions': []})
-        
-#         genai.configure(api_key=settings.GEMINI_API_KEY)
-#         model = genai.GenerativeModel('gemini-2.5-pro')
-        
-#         prompt = f'Technical recruiting expert: User typed "{query}". Suggest 7-10 related tech skills. Only skill names, one per line.'
-        
-#         response = model.generate_content(prompt)
-#         ai_suggestions = [
-#             s.strip() for s in response.text.split('\n')
-#             if s.strip() and len(s.strip()) > 2
-#         ][:6]
-        
-#         return JsonResponse({
-#             'skills': db_list,
-#             'suggestions': ai_suggestions
-#         })
-    
-#     except Exception as e:
-#         return JsonResponse({'skills': [], 'suggestions': []}, status=500)
+
 
 
 from openai import OpenAI
-
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -2445,7 +1963,7 @@ def get_chatgpt_suggestions(query, db_list):
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.4,
-            max_tokens=200 # Tokens badha diye kyunki 15 skills zyada space lengi
+            max_tokens=200 
         )
         
         content = response.choices[0].message.content
@@ -2465,17 +1983,11 @@ def get_chatgpt_suggestions(query, db_list):
         return []
 
 
-
-# app/views.py (File ke ant mein ya kisi bhi suitable jagah)
-
-# Ensure 'from django.views.decorators.csrf import csrf_exempt' is already imported (it is)
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import os
 import base64
 import uuid
-
-# ... (other imports)
 import base64
 import uuid
 from django.core.files.base import ContentFile
@@ -2485,18 +1997,11 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.conf import settings
 import os
-# app/views.py
-
 import json
-# ... (अन्य imports)
-import logging # <-- यह सुनिश्चित करें कि यह आयात हो
+import logging 
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-# ... (अन्य imports)
-
-logger = logging.getLogger(__name__) # <-- यह सुनिश्चित करें कि यह फ़ाइल के टॉप पर मौजूद हो
-
-# ... (अन्य views)
+logger = logging.getLogger(__name__) 
 
 @login_required
 @require_POST
@@ -2510,18 +2015,16 @@ def upload_image_ajax(request):
         image_data = data.get('image_data')
 
         if not image_data:
-            logger.warning("Image upload failed: No image data provided.") # <-- LOG ADDED
+            logger.warning("Image upload failed: No image data provided.") 
             return JsonResponse({"status": "error", "message": "No image data provided."}, status=400)
 
-        # Base64 string से image content निकालना
         if ';base64,' in image_data:
             header, base64_data = image_data.split(';base64,')
         else:
-             # Agar data:image/png;base64, header nahi hai to
+             
             header, base64_data = '', image_data
             
         
-        # Determine file extension based on header or default to png
         try:
             ext = header.split('/')[-1] if header else 'png'
             if ext not in ['png', 'jpeg', 'jpg', 'gif']:
@@ -2531,16 +2034,11 @@ def upload_image_ajax(request):
             
         file_content = ContentFile(base64.b64decode(base64_data))
         
-        # Unique filename create karein
         file_name = f'questions/{request.user.id}/{uuid.uuid4()}.{ext}'
         
-        # Default storage mein save karein (MEDIA_ROOT/media files)
         path = default_storage.save(file_name, file_content)
         
-        # Image ka public URL return karein
-        # image_url = request.build_absolute_uri(settings.MEDIA_URL + path)
         image_url = request.build_absolute_uri(settings.MEDIA_URL + path) 
-        # ✅ SUCCESS LOGGING
         logger.info(f"Image uploaded successfully. Filename: {path}, URL: {image_url}")
         
         
@@ -2548,10 +2046,10 @@ def upload_image_ajax(request):
         return JsonResponse({"status": "success", "url": image_url})
 
     except json.JSONDecodeError:
-        logger.error("Image upload failed: Invalid JSON payload received.", exc_info=True) # <-- LOG ADDED
+        logger.error("Image upload failed: Invalid JSON payload received.", exc_info=True) 
         return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
     except Exception as e:
-        logger.error(f"Image Upload Server Error: {e}", exc_info=True) # <-- LOG ADDED
+        logger.error(f"Image Upload Server Error: {e}", exc_info=True)
         return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"}, status=500)
 
   

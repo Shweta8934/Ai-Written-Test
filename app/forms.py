@@ -8,11 +8,27 @@ from .models import Department, Skill
 from .models import Section
 from .models import QuestionPaper
 import re
+from django import forms
+from django import forms
+from .models import Skill
+from django import forms
+from .models import Department, Section
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
+from django import forms
+from django.contrib.auth.forms import UserCreationForm as BaseUserCreationForm
+from django.contrib.auth import get_user_model
+from .models import User, UserProfile
+from .models import Department, Skill
+from .models import Section
+from .models import QuestionPaper
 
+User = get_user_model()
+from django.contrib.auth.forms import AuthenticationForm
+from django.core.exceptions import ValidationError
 
 class LoginForm(AuthenticationForm):
     """
@@ -177,10 +193,6 @@ class UserProfileRegistrationForm(forms.ModelForm):
         fields = ("phone_number", "address")
 
 
-from django import forms
-from .models import Department, Section
-
-
 class DepartmentForm(forms.ModelForm):
     sections = forms.ModelMultipleChoiceField(
         queryset=Section.objects.all(),
@@ -225,22 +237,6 @@ class SkillForm(forms.ModelForm):
 
 
 text_input_class = "w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-theme-primary focus:border-theme-primary"
-
-
-from django import forms
-from django.contrib.auth.forms import UserCreationForm as BaseUserCreationForm
-from django.contrib.auth import get_user_model
-from .models import User, UserProfile
-from .models import Department, Skill
-from .models import Section
-from .models import QuestionPaper
-
-User = get_user_model()
-from django.contrib.auth.forms import AuthenticationForm
-from django.core.exceptions import ValidationError
-
-
-
 
 text_input_class = "w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-theme-primary focus:border-theme-primary"
 
@@ -318,11 +314,6 @@ SKILL_ALIASES = {
     "node js": "nodejs",
     "angular js": "angular",
 }
-
-
-from django import forms
-from .models import Skill
-
 SKILL_ALIASES = {
     "reactjs": "react",
     "vuejs": "vue",
@@ -334,7 +325,6 @@ SKILL_ALIASES = {
 class SkillForm(forms.ModelForm):
     class Meta:
         model = Skill
-        # ✅ CHANGE: 'is_active' ko yahan add karein
         fields = ["name", "is_active"]
 
     def clean_name(self):
@@ -346,9 +336,8 @@ class SkillForm(forms.ModelForm):
         """
         name = self.cleaned_data.get("name")
         if name:
-            # self.instance ko check karna zaroori hai update ke time existing name ko allow karne ke liye
             if self.instance and self.instance.name.lower() == name.strip().lower():
-                return name  # Agar naam change nahi hua hai, to validation skip karein
+                return name  
 
             cleaned_name = name.strip().lower()
 
@@ -365,10 +354,6 @@ class SkillForm(forms.ModelForm):
 
 
 text_input_class = "w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-theme-primary focus:border-theme-primary"
-
-
-from django import forms
-
 
 class ForgotPasswordForm(forms.Form):
     email = forms.EmailField(
@@ -389,7 +374,6 @@ class ForgotPasswordForm(forms.Form):
             )
         return email
 
-from django.core.exceptions import ValidationError
 
 class InviteCandidateForm(forms.Form):
     """

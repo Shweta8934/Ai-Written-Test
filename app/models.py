@@ -112,7 +112,6 @@ class PaperSection(models.Model):
     )
     title = models.CharField(max_length=200)
     order = models.PositiveIntegerField(default=0)
-    # ✨ NAYA FIELD: Weightage percentage ke liye
     weightage = models.PositiveIntegerField(
         default=0, help_text="Weightage in percentage for this section"
     )
@@ -174,7 +173,6 @@ class TestRegistration(models.Model):
 
     def __str__(self):
         return f"{self.email} - Paper ID: {self.question_paper.id}"
-
 
 class UserResponse(models.Model):
     user_answer = models.TextField()

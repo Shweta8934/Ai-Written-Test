@@ -1,7 +1,7 @@
 # recruitment/models.py
 from django.db import models
 from django.conf import settings
-from app.models import QuestionPaper # Existing QuestionPaper model
+from app.models import QuestionPaper 
 from user_tests.models import TestRegistration 
 class JobPost(models.Model):
     STATUS_CHOICES = [
@@ -52,8 +52,7 @@ class JobPost(models.Model):
     def __str__(self):
         return self.title
 
-# ... rest of the models (Candidate, RoundFeedback) remain the same for now ...
-# 2. Candidate Model: Central Tracking
+
 class Candidate(models.Model):
     # This links the candidate to the initial Test Registration details
     test_registration = models.OneToOneField(
@@ -110,7 +109,7 @@ class RoundFeedback(models.Model):
         on_delete=models.CASCADE, 
         related_name='feedbacks'
     )
-    round_name = models.CharField(max_length=50) # e.g., 'GD Round', 'Interview Round'
+    round_name = models.CharField(max_length=50) 
     interviewer = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL, 
@@ -130,5 +129,83 @@ class RoundFeedback(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        # Ensures one feedback per interviewer per candidate per round
         unique_together = ('candidate', 'round_name', 'interviewer')
+
+
+from django.db import models
+from django.conf import settings
+
+class EvaluationTemplate(models.Model):
+    name = models.CharField(max_length=255, unique=True, verbose_name="Template Name") 
+   
+    cutoff_score = models.IntegerField(default=60, help_text="Minimum score required to pass")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class EvaluationParameter(models.Model):
+    template = models.ForeignKey(
+        EvaluationTemplate, 
+        on_delete=models.CASCADE, 
+        related_name='parameters'
+    )
+    name = models.CharField(max_length=255, verbose_name="Parameter Name") # e.g., "Communication", "Coding Logic"
+    weight = models.IntegerField(default=10, help_text="Max score for this parameter")
+
+    def __str__(self):
+        return self.name
+
+
+
+class RoundMaster(models.Model):
+    ROUND_TYPE_CHOICES = Candidate.ROUND_CHOICES 
+
+    name = models.CharField(max_length=255, verbose_name="Round Name") # e.g., "Senior Tech Round - Java"
+    round_type = models.CharField(max_length=50, choices=ROUND_TYPE_CHOICES, verbose_name="Round Type")
+    
+   
+    evaluation_template = models.ForeignKey(
+        EvaluationTemplate, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True,
+        related_name='linked_rounds',
+        verbose_name="Linked Evaluation Template"
+    )
+    
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_round_type_display()})"
+
+
+# recruitment/models.py ke end mein ye add karein
+
+from .models import RoundMaster # Ensure RoundMaster is imported
+
+# ... existing JobPost class ...
+
+# recruitment/models.py
+
+# ... existing code ...
+
+class JobRound(models.Model):
+    job_post = models.ForeignKey(
+        JobPost, 
+        on_delete=models.CASCADE, 
+        related_name='rounds'
+    )
+    round_master = models.ForeignKey(
+        RoundMaster, 
+        on_delete=models.CASCADE,
+        verbose_name="Round Type"
+    )
+    order = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"{self.job_post.title} - Round {self.order}: {self.round_master.name}"

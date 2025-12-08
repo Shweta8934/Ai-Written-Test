@@ -24,38 +24,89 @@ class JobPostListView(LoginRequiredMixin, ListView):
     model = JobPost
     template_name = 'partials/recruiter/job_list.html'
     context_object_name = 'jobs'
-    
+    # recruitment/views.py mein JobPostCreateView ko replace/update karein
+
+from .forms import JobPostForm, JobRoundFormSet # Import FormSet
+
 class JobPostCreateView(LoginRequiredMixin, CreateView):
     model = JobPost
     form_class = JobPostForm
     template_name = 'partials/recruiter/job_Create.html'    
     success_url = reverse_lazy('job_list')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # सभी उपलब्ध प्रश्न पत्रों को फ़ेच करें
         context['question_papers'] = QuestionPaper.objects.all().order_by('id')
+        
+        # FormSet ko context mein pass karein
+        if self.request.POST:
+            context['rounds_formset'] = JobRoundFormSet(self.request.POST)
+        else:
+            context['rounds_formset'] = JobRoundFormSet()
         return context
+
     def form_valid(self, form):
-        form.instance.created_by = self.request.user
-        
-        # SLUG GENERATION LOGIC:
-        base_slug = slugify(form.instance.title)
-        unique_slug = base_slug
-        num = 1
-        
-        # Ensure the slug is unique before saving
-        while JobPost.objects.filter(public_link_slug=unique_slug).exists():
-            unique_slug = f'{base_slug}-{num}'
-            num += 1
+        context = self.get_context_data()
+        rounds_formset = context['rounds_formset']
+
+        # Dono form valid hone chahiye
+        if form.is_valid() and rounds_formset.is_valid():
+            form.instance.created_by = self.request.user
             
-        form.instance.public_link_slug = unique_slug 
+            # Slug Generation Logic (Existing)
+            base_slug = slugify(form.instance.title)
+            unique_slug = base_slug
+            num = 1
+            while JobPost.objects.filter(public_link_slug=unique_slug).exists():
+                unique_slug = f'{base_slug}-{num}'
+                num += 1
+            form.instance.public_link_slug = unique_slug 
+            
+            # 1. Job Post Save karein
+            self.object = form.save()
+            
+            # 2. Rounds Save karein (Link them to this Job Post)
+            rounds_formset.instance = self.object
+            rounds_formset.save()
+            
+            # Optional: Total rounds count update kar sakte hain model mein agar field rakha hai
+            self.object.total_rounds = self.object.rounds.count()
+            self.object.save()
+
+            messages.success(self.request, f"Job '{form.instance.title}' created successfully!")
+            return redirect(self.success_url)
+        else:
+            # Agar error hai to wapis form dikhayein
+            return self.render_to_response(self.get_context_data(form=form))
+# class JobPostCreateView(LoginRequiredMixin, CreateView):
+#     model = JobPost
+#     form_class = JobPostForm
+#     template_name = 'partials/recruiter/job_Create.html'    
+#     success_url = reverse_lazy('job_list')
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         # सभी उपलब्ध प्रश्न पत्रों को फ़ेच करें
+#         context['question_papers'] = QuestionPaper.objects.all().order_by('id')
+#         return context
+#     def form_valid(self, form):
+#         form.instance.created_by = self.request.user
         
-        # Save the form instance with the generated slug
-        response = super().form_valid(form)
-        messages.success(self.request, f"Job '{form.instance.title}' created successfully!")
-        return response
-
-
+#         # SLUG GENERATION LOGIC:
+#         base_slug = slugify(form.instance.title)
+#         unique_slug = base_slug
+#         num = 1
+        
+#         # Ensure the slug is unique before saving
+#         while JobPost.objects.filter(public_link_slug=unique_slug).exists():
+#             unique_slug = f'{base_slug}-{num}'
+#             num += 1
+            
+#         form.instance.public_link_slug = unique_slug 
+        
+#         # Save the form instance with the generated slug
+#         response = super().form_valid(form)
+#         messages.success(self.request, f"Job '{form.instance.title}' created successfully!")
+#         return response
 
 class JobPostDetailView(LoginRequiredMixin, DetailView):
     model = JobPost
@@ -298,11 +349,6 @@ def job_application_view(request, slug):
     # Use the correct template path you provided earlier:
     return render(request, 'partials/recruiter/job_application.html', {'job': job_post, 'form': form})
 
-
-
-
-
-
 class CandidateDetailView(LoginRequiredMixin, DetailView):
     model = Candidate
     template_name = 'partials/recruiter/candidate_detail.html'
@@ -361,7 +407,6 @@ class CandidateKanbanView(LoginRequiredMixin, DetailView):
         context['kanban_columns'] = json.dumps(columns)
         return context
 
-
 @csrf_exempt 
 @login_required
 def update_candidate_kanban_status(request):
@@ -395,3 +440,100 @@ def update_candidate_kanban_status(request):
             return JsonResponse({'success': False, 'message': str(e)})
             
     return JsonResponse({'success': False})
+
+from django.shortcuts import render, redirect
+from django.views.generic import ListView, CreateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
+from django.db import transaction
+from django.contrib import messages
+from .models import EvaluationTemplate
+from .forms import EvaluationTemplateForm, EvaluationParameterFormSet
+
+class EvaluationTemplateListView(LoginRequiredMixin, ListView):
+    model = EvaluationTemplate
+    template_name = 'partials/recruiter/evaluation_template_list.html'
+    context_object_name = 'templates'
+
+class EvaluationTemplateCreateView(LoginRequiredMixin, CreateView):
+    model = EvaluationTemplate
+    form_class = EvaluationTemplateForm
+    template_name = 'partials/recruiter/evaluation_template_create.html'
+    success_url = reverse_lazy('evaluation_template_list')
+
+    def get_context_data(self, **kwargs):
+        data = super().get_context_data(**kwargs)
+        if self.request.POST:
+            data['parameters'] = EvaluationParameterFormSet(self.request.POST)
+        else:
+            data['parameters'] = EvaluationParameterFormSet()
+        return data
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        parameters = context['parameters']
+        
+        with transaction.atomic():
+            form.instance.created_by = self.request.user
+            self.object = form.save()
+            
+            if parameters.is_valid():
+                parameters.instance = self.object
+                parameters.save()
+            else:
+                # अगर पैरामीटर्स में एरर है तो वापस फॉर्म दिखाएं
+                return self.render_to_response(self.get_context_data(form=form))
+        
+        messages.success(self.request, "Evaluation Template created successfully!")
+        return super().form_valid(form)
+    model = EvaluationTemplate
+    form_class = EvaluationTemplateForm
+    template_name = 'partials/recruiter/evaluation_template_create.html'
+    success_url = reverse_lazy('evaluation_template_list')
+
+    def get_context_data(self, **kwargs):
+        data = super().get_context_data(**kwargs)
+        if self.request.POST:
+            data['parameters'] = EvaluationParameterFormSet(self.request.POST)
+        else:
+            data['parameters'] = EvaluationParameterFormSet()
+        return data
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        parameters = context['parameters']
+        
+        with transaction.atomic():
+            form.instance.created_by = self.request.user
+            self.object = form.save()
+            
+            if parameters.is_valid():
+                parameters.instance = self.object
+                parameters.save()
+        
+        messages.success(self.request, "Evaluation Template created successfully!")
+        return super().form_valid(form)
+
+
+# recruitment/views.py में ये import और classes जोड़ें
+
+from .models import RoundMaster
+from .forms import RoundMasterForm
+
+class RoundMasterListView(LoginRequiredMixin, ListView):
+    model = RoundMaster
+    template_name = 'partials/recruiter/round_master_list.html'
+    context_object_name = 'rounds'
+
+class RoundMasterCreateView(LoginRequiredMixin, CreateView):
+    model = RoundMaster
+    form_class = RoundMasterForm
+    template_name = 'partials/recruiter/round_master_create.html'
+    success_url = reverse_lazy('round_master_list')
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        messages.success(self.request, f"Round '{form.instance.name}' created successfully!")
+        return super().form_valid(form)
+
+
