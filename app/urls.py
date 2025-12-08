@@ -95,5 +95,5 @@ urlpatterns = [
     name="create_section_ajax"
 ),
 path('api/skills/search/', views.search_skills_with_suggestions, name='search_skills_suggestions'),
-
+    path('ajax/upload_image/', views.upload_image_ajax, name='upload_image_ajax'),
 ]

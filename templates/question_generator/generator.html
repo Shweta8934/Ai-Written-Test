@@ -78,6 +78,58 @@
       opacity: 1;
       transform: translateX(0);
     }
+   <style>
+/* ✅ CRITICAL FIX: Custom elements को block बनाएं */
+image-wrapper,
+code-block,
+code-content {
+    display: block !important; /* Force block display */
+}
+
+/* ✅ Image को visible और centered रखें */
+image-wrapper {
+    width: 100%;
+    max-width: 500px;
+    margin: 15px auto;
+    padding: 10px;
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+image-wrapper img {
+    display: block !important;
+    width: 100%;
+    height: auto;
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+/* Remove button styling */
+image-wrapper button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+/* Code block styling */
+code-block {
+    margin: 15px 0;
+    padding: 12px;
+    background-color: #1e293b;
+    border-radius: 8px;
+}
+
+code-content {
+    display: block !important;
+    color: #86efac;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+</style>
   </style>
 </head>
 
@@ -576,7 +628,7 @@
     </div>
   </div>
  
-<script>
+<!-- <script>
     // --- START: DATA AND CONFIGURATION ---
     const sectionCache = {};
     let currentStep = 1;
@@ -2346,10 +2398,14 @@ initSkillsAutoSuggest();
         }
     });
 </script>
-<!-- <script>
+ -->
+
+
+<script>
     // --- START: DATA AND CONFIGURATION ---
     const sectionCache = {};
     let currentStep = 1;
+    // formData.sections now stores { sectionName: { count: N, weightage: W } }
     let formData = { sections: {} };
     let fullPaperPayload = {};
     let allSkills = [];
@@ -2359,6 +2415,813 @@ initSkillsAutoSuggest();
     let isReviewSkillsExpanded = false;
     // ---------------------------------------------------------
 
+    // --- NEW: Custom Editor Configuration ---
+    const MAX_CODE_BLOCKS = 3; // MAX code blocks allowed per question
+
+    function getCodeBlockCount(htmlContent) {
+        // Use a temporary div to reliably count custom elements
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        return tempDiv.querySelectorAll('code-block').length;
+    }
+
+    function focusEditor(element) {
+        if (element) {
+            element.focus();
+            // Cursor ko end mein le jane ke liye
+            const range = document.createRange();
+            const selection = window.getSelection();
+            if (element.childNodes.length > 0) {
+                 range.setStart(element, element.childNodes.length);
+            } else {
+                 range.setStart(element, 0);
+            }
+            range.collapse(true); // end
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    }
+
+    // --- NEW: Image and Code Block functions ---
+async function insertImage(event, sectionIndex, questionIndex) {
+    const file = event.target.files[0];
+    // अगर कोई फाइल नहीं चुनी, तो वापस लौटें
+    if (!file) return;
+
+    // 1. साइज चेक (Max 2MB)
+    if (file.size > 2 * 1024 * 1024) { 
+        showToast("Image size must be less than 2MB.", "error");
+        // इनपुट को रिसेट करें ताकि वही फाइल दोबारा चुनने पर भी इवेंट फायर हो
+        event.target.value = ''; 
+        return;
+    }
+
+    // 2. प्रीव्यू के लिए अस्थाई URL बनाएं
+    const tempUrl = URL.createObjectURL(file);
+    const editor = document.getElementById(`editor-${sectionIndex}-${questionIndex}`);
+    
+    // एक यूनिक ID जनरेट करें ताकि हम इस स्पेसिफिक इमेज को बाद में ढूंढ सकें
+    const uniqueId = `img-${Date.now()}`;
+
+    // 3. एडिटर में तुरंत इमेज (Loading State के साथ) दिखाएं
+    // contenteditable="false" wrapper पर जरूरी है ताकि कर्सर अंदर न फंसे
+    const tempHtml = `
+    <image-wrapper id="${uniqueId}" contenteditable="false" class="block w-full max-w-sm my-3 mx-auto p-2 bg-slate-50 rounded-lg border border-slate-300 relative group opacity-60">
+        <div class="absolute inset-0 flex items-center justify-center z-10" id="${uniqueId}-loader">
+            <svg class="animate-spin h-8 w-8 text-[#736b8e]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+        <img src="${tempUrl}" alt="Uploading..." class="w-full h-auto object-contain rounded-md block" style="max-height: 200px;">
+    </image-wrapper><br>`; // <br> कर्सर को इमेज के बाद ले जाने में मदद करता है
+
+    // कर्सर जहां है, वहां HTML डालें
+    focusEditor(editor); // सुनिश्चित करें कि फोकस एडिटर पर है
+    document.execCommand('insertHTML', false, tempHtml);
+
+    // 4. फाइल को सर्वर पर भेजने के लिए तैयार करें
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const base64Image = e.target.result;
+
+        try {
+            const response = await fetch("/ajax/upload_image/", { // अपना सही URL चेक करें
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken"),
+                },
+                body: JSON.stringify({ image_data: base64Image }),
+            });
+
+            const result = await response.json();
+
+            // अपलोड खत्म होने पर DOM में वो इमेज wrapper ढूंढें
+            const wrapper = document.getElementById(uniqueId);
+
+            if (result.status === "success" && wrapper) {
+                // A. इमेज का सोर्स बदलें (Local -> Server URL)
+                const imgTag = wrapper.querySelector('img');
+                if(imgTag) imgTag.src = result.url;
+
+                // B. लोडर हटाएं और Opacity ठीक करें
+                const loader = document.getElementById(`${uniqueId}-loader`);
+                if(loader) loader.remove();
+                wrapper.classList.remove('opacity-60', 'bg-slate-50');
+                wrapper.classList.add('bg-f8fafc'); // Default bg वापस लाएं
+
+                // C. डिलीट बटन जोड़ें (जो अपलोड के बाद ही दिखना चाहिए)
+                const deleteBtnHtml = `
+                <button onclick="removeImage(this, ${sectionIndex}, ${questionIndex})" class="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600" title="Remove Image">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>`;
+                wrapper.insertAdjacentHTML('beforeend', deleteBtnHtml);
+
+                // D. ID हटा दें (सफाई के लिए)
+                wrapper.removeAttribute('id');
+
+                // E. Payload अपडेट करें (ताकि सेव करने पर इमेज डेटाबेस में जाए)
+                fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+                
+                showToast("Image uploaded successfully!", "success");
+            } else {
+                throw new Error(result.message || "Upload failed");
+            }
+        } catch (error) {
+            console.error("Upload Error:", error);
+            showToast("Upload failed. Please try again.", "error");
+            
+            // अगर फेल हुआ, तो इमेज को एडिटर से हटा दें
+            const wrapper = document.getElementById(uniqueId);
+            if (wrapper) wrapper.remove();
+        }
+        
+        // इनपुट को खाली करें
+        event.target.value = '';
+    };
+
+    // फाइल को Base64 में पढ़ना शुरू करें
+    reader.readAsDataURL(file);
+}
+    function removeImage(button, sectionIndex, questionIndex) {
+        event.stopPropagation();
+        if (confirm("Are you sure you want to remove this image?")) {
+            const imageWrapper = button.closest('image-wrapper');
+            if (imageWrapper) {
+                imageWrapper.remove();
+                const editor = document.getElementById(`editor-${sectionIndex}-${questionIndex}`);
+                // Payload aur UI update karein
+                fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+            }
+            showToast("Image removed.", "success");
+        }
+    }
+
+    function insertCodeBlock(button, sectionIndex, questionIndex) {
+        event.stopPropagation();
+        const editor = document.getElementById(`editor-${sectionIndex}-${questionIndex}`);
+        const currentCount = getCodeBlockCount(editor.innerHTML);
+        
+        if (currentCount >= MAX_CODE_BLOCKS) {
+            showToast(`You can add a maximum of ${MAX_CODE_BLOCKS} code blocks per question.`, "error");
+            return;
+        }
+
+        // Code block HTML (contenteditable="true" is on a child span)
+        const codeHtml = `
+        <code-block contenteditable="false" class="block w-full my-3 p-3 bg-slate-800 text-green-300 font-mono text-sm rounded-md relative group">
+            <code-content contenteditable="true" class="block whitespace-pre-wrap outline-none p-1 bg-slate-700 rounded-sm" style="min-height: 20px;">// Write your code snippet here</code-content>
+            <button onclick="removeCodeBlock(this, ${sectionIndex}, ${questionIndex})" class="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" title="Remove Code Block">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </code-block><br>`;
+        
+        document.execCommand('insertHTML', false, codeHtml);
+        
+        // Payload aur UI update karein
+        fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+        updateCodeBlockButtonState(editor);
+        focusEditor(editor.querySelector('code-content:last-child'));
+    }
+
+    function removeCodeBlock(button, sectionIndex, questionIndex) {
+        event.stopPropagation();
+        if (confirm("Are you sure you want to remove this code block?")) {
+            const codeBlock = button.closest('code-block');
+            if (codeBlock) {
+                codeBlock.remove();
+                const editor = document.getElementById(`editor-${sectionIndex}-${questionIndex}`);
+                // Payload aur UI update karein
+                fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+                updateCodeBlockButtonState(editor);
+            }
+            showToast("Code block removed.", "success");
+        }
+    }
+
+    function updateCodeBlockButtonState(editor) {
+        const currentCount = getCodeBlockCount(editor.innerHTML);
+        // Extract sectionIndex and questionIndex from editor.id
+        const idParts = editor.id.split('-');
+        const sectionIndex = idParts[1];
+        const questionIndex = idParts[2];
+        const buttonId = `code-btn-${sectionIndex}-${questionIndex}`;
+        const button = document.getElementById(buttonId);
+
+        if (button) {
+            if (currentCount >= MAX_CODE_BLOCKS) {
+                button.disabled = true;
+                button.classList.add('opacity-50', 'cursor-not-allowed', 'bg-slate-100');
+                button.classList.remove('hover:bg-slate-200');
+                button.title = `Code Block Limit Reached (${MAX_CODE_BLOCKS})`;
+            } else {
+                button.disabled = false;
+                button.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-slate-100');
+                button.classList.add('hover:bg-slate-200');
+                button.title = `Insert Code Block (Max ${MAX_CODE_BLOCKS})`;
+            }
+        }
+    }
+    
+    // --- EXISTING SCRIPT MODIFICATIONS ---
+    
+    // NOTE: This section has been modified to include the new buttons and logic.
+//     function displayGeneratedPaper(paperData) {
+//         document.getElementById("form-container").classList.add("hidden");
+//         const paperContainer = document.getElementById("paper-container");
+//         paperContainer.classList.remove("hidden");
+//         document.getElementById("paper-header").textContent =
+//             paperData.title || "Generated Question Paper";
+        
+//         // Use fullPaperPayload for paper details
+//         document.getElementById("paper-jobTitle").textContent =
+//             fullPaperPayload.job_title || "N/A";
+//         document.getElementById("paper-department").textContent =
+//             fullPaperPayload.department || "N/A";
+//         document.getElementById("paper-duration").textContent =
+//             fullPaperPayload.durationText || "N/A";
+//         document.getElementById(
+//             "paper-experience"
+//         ).textContent = `${fullPaperPayload.min_exp} - ${fullPaperPayload.max_exp} years`;
+//         document.getElementById("paper-cutoffScore").textContent = `${fullPaperPayload.cutoff_score}%`;
+//         const skillsContainer = document.getElementById("paper-skills");
+//         skillsContainer.innerHTML = "";
+//         if (fullPaperPayload.skills) {
+//             fullPaperPayload.skills.split(",").forEach((skill) => {
+//                 if (skill.trim()) {
+//                     const skillTag = document.createElement("span");
+//                     skillTag.className =
+//                         "bg-slate-200 text-slate-700 text-sm font-medium px-3 py-1 rounded-full";
+//                     skillTag.textContent = skill.trim();
+//                     skillsContainer.appendChild(skillTag);
+//                 }
+//             });
+//         }
+//         const questionsContainer = document.getElementById("paper-questions");
+//         questionsContainer.innerHTML = "";
+//         let questionCounter = 1;
+//         if (Array.isArray(paperData.sections)) {
+//             paperData.sections.forEach((section, sectionIndex) => {
+//                 if (!section) return;
+//                 const sectionTitle = document.createElement("h3");
+//                 sectionTitle.className =
+//                     "text-xl font-bold text-slate-700 mb-4 pb-2 border-b-2 border-[#736b8e]";
+//                 sectionTitle.textContent = section.title || "Unnamed Section";
+//                 questionsContainer.appendChild(sectionTitle);
+//                 if (Array.isArray(section.questions)) {
+//                     section.questions.forEach((q, questionIndex) => {
+//                         if (!q) return;
+//                         const questionBlock = document.createElement("div");
+//                         questionBlock.className =
+//                             "question-block relative p-4 border border-slate-200 rounded-lg bg-white transition-all duration-200";
+//                         let contentHTML = "";
+                    
+//                         if (q.type === "MCQ" && Array.isArray(q.options)) {
+//                             let optionsHTML = '<div class="mt-4 space-y-3">';
+//                             q.options.forEach((option, optionIndex) => {
+                                
+//                                 // 🚨 FIX APPLIED HERE: Ensure both sides are trimmed for reliable comparison
+//                                 const isCorrect = (option && option.trim()) === (q.answer && q.answer.trim());
+                                
+//                                 optionsHTML += `
+//                                     <div class="flex items-center group">
+//                                         <input type="radio" name="correct_answer_${sectionIndex}_${questionIndex}"
+//                                                              id="radio_${sectionIndex}_${questionIndex}_${optionIndex}"
+//                                                              class="form-radio h-4 w-4 text-[#736b8e] focus:ring-[#9a92b0] flex-shrink-0"
+//                                                              onchange="setCorrectAnswer(${sectionIndex}, ${questionIndex}, ${optionIndex})"
+//                                                              ${isCorrect ? "checked" : ""}>
+//                                         <div class="ml-3 flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md"
+//                                                              contenteditable="true"
+//                                                              oninput="updateMcqOption(event, ${sectionIndex}, ${questionIndex}, ${optionIndex})">${option}</div>
+//                                         <button onclick="deleteMcqOption(${sectionIndex}, ${questionIndex}, ${optionIndex})"
+//                                                              class="ml-2 p-1 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+//                                                              title="Delete Option">
+//                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+//                                         </button>
+//                                     </div>
+//                                 `;
+//                             });
+//                             optionsHTML += `</div>
+//                                 <div class="mt-4">
+//                                     <button onclick="addMcqOption(${sectionIndex}, ${questionIndex})" class="text-sm font-medium text-[#736b8e] hover:text-[#5f5778]">
+//                                         + Add Option
+//                                     </button>
+//                                 </div>`;
+//                             contentHTML = optionsHTML;
+//                         }
+
+//                         else if (q.type === "Short Answer") {
+//                             contentHTML = `
+//                                 <div class="mt-4 pt-3 border-t border-slate-100">
+//                                     <p class="text-sm flex items-start">
+//                                         <strong class="font-medium text-slate-500 mr-2 mt-1 flex-shrink-0">Answer:</strong>
+//                                         <div class="flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md bg-green-50 text-green-800 font-mono"
+//                                                              contenteditable="true"
+//                                                              oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || ""
+//                                                              }</div>
+//                                     </p>
+//                                 </div>
+//                             `;
+//                         } else if (q.type === "CODE") { // ✅ NEW CODE QUESTION RENDERING
+//                             contentHTML = `
+//                                 <div class="mt-4 pt-3 border-t border-slate-100">
+//                                     <p class="text-sm font-medium text-slate-500 mb-2">Expected Solution / Code Editor (Reference):</p>
+//                                     <div class="flex-grow p-3 outline-none border border-slate-300 focus-within:border-[#736b8e] rounded-md bg-slate-800 text-green-300 font-mono text-sm whitespace-pre-wrap"
+//                                                              contenteditable="true"
+//                                                              style="min-height: 100px; tab-size: 4;"
+//                                                              oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || "// Write sample code solution here..."
+//                                                              }</div>
+//                                     <p class="text-xs text-slate-500 mt-2">Note: This box simulates the code editor/reference answer.</p>
+//                                 </div>
+//                                 `;
+//                         } else { // Default/Fallback
+//                             contentHTML = `<div class="mt-4 pt-3 border-t border-slate-100"><p class="text-sm"><strong class="font-medium text-slate-500">Answer:</strong> <span class="text-green-700 font-mono bg-green-50 p-1 rounded">${q.answer || "N/A"
+//                                 }</span></p></div>`;
+//                         }
+//                         const isRequired = q.required || false;
+//                         const contextualAddToolbar = `
+//                             <div class="contextual-add-toolbar absolute top-2 right-2 z-10 flex-col items-center gap-1 p-1.5 bg-white border border-slate-200 rounded-lg shadow-lg lg:top-1/2 lg:-translate-y-1/2 lg:left-full lg:right-auto lg:ml-4">
+//                                 <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'MCQ')" title="Add Multiple Choice" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+//                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+//                                 </button>
+//                                 <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'Short Answer')" title="Add Short Answer" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+//                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16" /></svg>
+//                                 </button>
+//                                 <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'CODE')" title="Add Code Question" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+//                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+//                                 </button>
+//                             </div>
+//                         `;
+                        
+//                         // questionBlock.innerHTML = `
+//                         //     ${contextualAddToolbar}
+//                         //     <div class="flex items-start">
+//                         //         <span class="font-semibold text-slate-800 pt-1">${questionCounter}.</span>
+//                         //         <div class="ml-2 w-full">
+//                         //             <div class="question-text-editor outline-none p-1 border border-transparent focus:border-slate-300 rounded-md"
+//                         //                                      id="editor-${sectionIndex}-${questionIndex}"
+//                         //                                      contenteditable="true">${q.text || "Question text not available."
+//                         //                                      }</div>
+//                         //             <div class="custom-toolbar hidden mt-2 py-1 flex flex-wrap items-center gap-1 border rounded-lg p-1 bg-slate-50 shadow-sm">
+//                         //                 <button onclick="formatDoc('bold')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Bold"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg></button>
+//                         //                 <button onclick="formatDoc('italic')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Italic"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" y2="20"></line></svg></button>
+//                         //                 <button onclick="formatDoc('underline')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Underline"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path><line x1="4" y1="21" x2="20" y2="21"></line></svg></button>
+//                         //                 <div class="border-l h-6 border-slate-200 mx-1"></div>
+                                        
+//                         //                 <label class="p-2 rounded-md hover:bg-slate-200 transition-colors cursor-pointer" title="Insert Image">
+//                         //                     <input type="file" accept="image/*" class="hidden" onchange="insertImage(event, ${sectionIndex}, ${questionIndex})">
+//                         //                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+//                         //                 </label>
+                                        
+//                         //                 <button 
+//                         //                     class="p-2 rounded-md hover:bg-slate-200 transition-colors code-block-button" 
+//                         //                     onclick="insertCodeBlock(this, ${sectionIndex}, ${questionIndex})" 
+//                         //                     title="Insert Code Block (Max ${MAX_CODE_BLOCKS})"
+//                         //                     id="code-btn-${sectionIndex}-${questionIndex}">
+//                         //                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+//                         //                 </button>
+//                         //             </div>
+//                         //             ${contentHTML}
+//                         //             <div class="question-toolbar mt-4 pt-3 border-t border-slate-100 flex flex-wrap justify-center sm:justify-end items-center gap-x-4 gap-y-2 text-sm">
+//                         //                 <button onclick="copyQuestion(${sectionIndex}, ${questionIndex})" title="Copy Question" class="p-2 text-slate-500 hover:text-[#736b8e] hover:bg-slate-100 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
+//                         //                 <button onclick="deleteQuestion(${sectionIndex}, ${questionIndex})" title="Delete Question" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+//                         //                 <div class="border-l h-6 border-slate-200 hidden mx-2 hidden sm:block"></div>
+//                         //                 <div class="flex items-center gap-2 hidden">
+//                         //                     <span class="font-medium text-slate-600">Required</span>
+//                         //                     <label class="relative inline-flex items-center cursor-pointer">
+//                         //                         <input type="checkbox" onchange="toggleRequired(this, ${sectionIndex}, ${questionIndex})" class="sr-only peer" ${isRequired ? "checked" : ""
+//                         //                         }>
+//                         //                         <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-[#9a92b0] peer-checked:after:translate-x-full peer-checked:after:border-white after:content[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#736b8e]"></div>
+//                         //                     </label>
+//                         //                 </div>
+//                         //             </div>
+//                         //         </div>
+//                         //     </div>`;
+//                         // ...inside displayGeneratedPaper function...
+
+// // Question Block HTML Rendering part:
+// questionBlock.innerHTML = `
+//     ${contextualAddToolbar}
+//     <div class="flex items-start">
+//         <span class="font-semibold text-slate-800 pt-1">${questionCounter}.</span>
+//         <div class="ml-2 w-full">
+//             <div class="question-text-editor outline-none p-1 border border-transparent focus:border-slate-300 rounded-md"
+//                 id="editor-${sectionIndex}-${questionIndex}"
+//                 contenteditable="true">${q.text || "Question text not available."}</div> 
+            
+//             <div class="custom-toolbar hidden mt-2 py-1 flex flex-wrap items-center gap-1 border rounded-lg p-1 bg-slate-50 shadow-sm">
+                
+//                 <label class="p-2 rounded-md hover:bg-slate-200 transition-colors cursor-pointer" title="Insert Image">
+//                     <input type="file" accept="image/*" class="hidden" onchange="insertImage(event, ${sectionIndex}, ${questionIndex})">
+//                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+//                 </label>
+                
+//                 // ... other toolbar buttons ...
+//             </div>
+            
+//             // ... contentHTML for options/answer/code blocks ...
+            
+//         </div>
+//     </div>`;
+
+// // ... rest of the function ...
+                        
+//                             questionsContainer.appendChild(questionBlock);
+                        
+//                         // Event Listeners for the Question Block
+//                         const customToolbar = questionBlock.querySelector(".custom-toolbar");
+
+//                         editorDiv.addEventListener("focus", () => {
+//                             document.querySelectorAll(".question-block").forEach((el) => {
+//                                 el.classList.remove(
+//                                     "question-active",
+//                                     "ring-2",
+//                                     "ring-[#736b8e]"
+//                                 );
+//                             });
+//                             questionBlock.classList.add(
+//                                 "question-active",
+//                                 "ring-2",
+//                                 "ring-[#736b8e]"
+//                             );
+//                             customToolbar.classList.remove("hidden");
+//                         });
+                        
+//                         editorDiv.addEventListener("blur", (e) => {
+//                              // If focus moves within the same block (e.g. to a toolbar button or code content), don't hide
+//                             setTimeout(() => { // Small delay to check if focus moved to a child element
+//                                 if (!questionBlock.contains(document.activeElement)) {
+//                                     customToolbar.classList.add("hidden");
+//                                     questionBlock.classList.remove("ring-2", "ring-[#736b8e]");
+//                                 }
+//                             }, 50);
+//                         });
+
+//                         editorDiv.addEventListener("input", (e) => {
+//                             if (
+//                                 fullPaperPayload.sections[sectionIndex]?.questions[
+//                                 questionIndex
+//                                 ]
+//                             ) {
+//                                 fullPaperPayload.sections[sectionIndex].questions[
+//                                     questionIndex
+//                                 ].text = editorDiv.innerHTML;
+//                             }
+//                             updateCodeBlockButtonState(editorDiv);
+//                             // NOTE: We are NOT saving the updated payload to session storage.
+//                         });
+                        
+//                         // Initial state check for code block button
+//                         updateCodeBlockButtonState(editorDiv);
+
+//                         questionCounter++;
+//                     });
+//                 }
+//             });
+//         }
+//     }
+    
+function displayGeneratedPaper(paperData) {
+        document.getElementById("form-container").classList.add("hidden");
+        const paperContainer = document.getElementById("paper-container");
+        paperContainer.classList.remove("hidden");
+        document.getElementById("paper-header").textContent =
+            paperData.title || "Generated Question Paper";
+        
+        // Use fullPaperPayload for paper details (unchanged)
+        document.getElementById("paper-jobTitle").textContent =
+            fullPaperPayload.job_title || "N/A";
+        document.getElementById("paper-department").textContent =
+            fullPaperPayload.department || "N/A";
+        document.getElementById("paper-duration").textContent =
+            fullPaperPayload.durationText || "N/A";
+        document.getElementById(
+            "paper-experience"
+        ).textContent = `${fullPaperPayload.min_exp} - ${fullPaperPayload.max_exp} years`;
+        document.getElementById("paper-cutoffScore").textContent = `${fullPaperPayload.cutoff_score}%`;
+        const skillsContainer = document.getElementById("paper-skills");
+        skillsContainer.innerHTML = "";
+        if (fullPaperPayload.skills) {
+            fullPaperPayload.skills.split(",").forEach((skill) => {
+                if (skill.trim()) {
+                    const skillTag = document.createElement("span");
+                    skillTag.className =
+                        "bg-slate-200 text-slate-700 text-sm font-medium px-3 py-1 rounded-full";
+                    skillTag.textContent = skill.trim();
+                    skillsContainer.appendChild(skillTag);
+                }
+            });
+        }
+
+        const questionsContainer = document.getElementById("paper-questions");
+        questionsContainer.innerHTML = "";
+        let questionCounter = 1;
+        
+        if (Array.isArray(paperData.sections)) {
+            paperData.sections.forEach((section, sectionIndex) => {
+                if (!section) return;
+                const sectionTitle = document.createElement("h3");
+                sectionTitle.className =
+                    "text-xl font-bold text-slate-700 mb-4 pb-2 border-b-2 border-[#736b8e]";
+                sectionTitle.textContent = section.title || "Unnamed Section";
+                questionsContainer.appendChild(sectionTitle);
+                
+                if (Array.isArray(section.questions)) {
+                    section.questions.forEach((q, questionIndex) => {
+                        if (!q) return;
+                        
+                        let answerContentHTML = "";
+                        const isRequired = q.required || false;
+                        
+                        // --- 1. Generate Answer/Options/Code Content ---
+                        if (q.type === "MCQ" && Array.isArray(q.options)) {
+                            let optionsHTML = '<div class="mt-4 space-y-3">';
+                            q.options.forEach((option, optionIndex) => {
+                                const isCorrect = (option && option.trim()) === (q.answer && q.answer.trim());
+                                
+                                optionsHTML += `
+                                    <div class="flex items-center group">
+                                        <input type="radio" name="correct_answer_${sectionIndex}_${questionIndex}"
+                                                             id="radio_${sectionIndex}_${questionIndex}_${optionIndex}"
+                                                             class="form-radio h-4 w-4 text-[#736b8e] focus:ring-[#9a92b0] flex-shrink-0"
+                                                             onchange="setCorrectAnswer(${sectionIndex}, ${questionIndex}, ${optionIndex})"
+                                                             ${isCorrect ? "checked" : ""}>
+                                        <div class="ml-3 flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md"
+                                                             contenteditable="true"
+                                                             oninput="updateMcqOption(event, ${sectionIndex}, ${questionIndex}, ${optionIndex})">${option}</div>
+                                        <button onclick="deleteMcqOption(${sectionIndex}, ${questionIndex}, ${optionIndex})"
+                                                             class="ml-2 p-1 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                             title="Delete Option">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                `;
+                            });
+                            answerContentHTML = optionsHTML + `</div>
+                                <div class="mt-4">
+                                    <button onclick="addMcqOption(${sectionIndex}, ${questionIndex})" class="text-sm font-medium text-[#736b8e] hover:text-[#5f5778]">
+                                        + Add Option
+                                    </button>
+                                </div>`;
+
+                        } else if (q.type === "Short Answer") {
+                            answerContentHTML = `
+                                <div class="mt-4 pt-3 border-t border-slate-100">
+                                    <p class="text-sm flex items-start">
+                                        <strong class="font-medium text-slate-500 mr-2 mt-1 flex-shrink-0">Answer:</strong>
+                                        <div class="flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md bg-green-50 text-green-800 font-mono"
+                                                             contenteditable="true"
+                                                             oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || ""
+                                                             }</div>
+                                    </p>
+                                </div>
+                            `;
+                        } else if (q.type === "CODE") {
+                            answerContentHTML = `
+                                <div class="mt-4 pt-3 border-t border-slate-100">
+                                    <p class="text-sm font-medium text-slate-500 mb-2">Expected Solution / Code Editor (Reference):</p>
+                                    <div class="flex-grow p-3 outline-none border border-slate-300 focus-within:border-[#736b8e] rounded-md bg-slate-800 text-green-300 font-mono text-sm whitespace-pre-wrap"
+                                                             contenteditable="true"
+                                                             style="min-height: 100px; tab-size: 4;"
+                                                             oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || "// Write sample code solution here..."
+                                                             }</div>
+                                    <p class="text-xs text-slate-500 mt-2">Note: This box simulates the code editor/reference answer.</p>
+                                </div>
+                                `;
+                        } else { // Default/Fallback
+                            answerContentHTML = `<div class="mt-4 pt-3 border-t border-slate-100"><p class="text-sm"><strong class="font-medium text-slate-500">Answer:</strong> <span class="text-green-700 font-mono bg-green-50 p-1 rounded">${q.answer || "N/A"
+                                }</span></p></div>`;
+                        }
+
+                        // --- 2. Build the Question Block HTML ---
+
+                        const questionBlock = document.createElement("div");
+                        questionBlock.className =
+                            "question-block relative p-4 border border-slate-200 rounded-lg bg-white transition-all duration-200";
+
+                        const contextualAddToolbar = `
+                            <div class="contextual-add-toolbar absolute top-2 right-2 z-10 flex-col items-center gap-1 p-1.5 bg-white border border-slate-200 rounded-lg shadow-lg lg:top-1/2 lg:-translate-y-1/2 lg:left-full lg:right-auto lg:ml-4">
+                                <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'MCQ')" title="Add Multiple Choice" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </button>
+                                <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'Short Answer')" title="Add Short Answer" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16" /></svg>
+                                </button>
+                                <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'CODE')" title="Add Code Question" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                                </button>
+                            </div>
+                        `;
+                        
+                        questionBlock.innerHTML = `
+                            ${contextualAddToolbar}
+                            <div class="flex items-start">
+                                <span class="font-semibold text-slate-800 pt-1">${questionCounter}.</span>
+                                <div class="ml-2 w-full">
+                                    <div class="question-text-editor outline-none p-1 border border-transparent focus:border-slate-300 rounded-md"
+                                         id="editor-${sectionIndex}-${questionIndex}"
+                                         contenteditable="true">${q.text || "Question text not available."}</div>
+                                    
+                                    <div class="custom-toolbar hidden mt-2 py-1 flex flex-wrap items-center gap-1 border rounded-lg p-1 bg-slate-50 shadow-sm">
+                                        <button onclick="formatDoc('bold')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Bold"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg></button>
+                                        <button onclick="formatDoc('italic')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Italic"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" y2="20"></line></svg></button>
+                                        <button onclick="formatDoc('underline')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Underline"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path><line x1="4" y1="21" x2="20" y2="21"></line></svg></button>
+                                        <div class="border-l h-6 border-slate-200 mx-1"></div>
+                                        
+                                        <label class="p-2 rounded-md hover:bg-slate-200 transition-colors cursor-pointer" title="Insert Image">
+                                            <input type="file" accept="image/*" class="hidden" onchange="insertImage(event, ${sectionIndex}, ${questionIndex})">
+                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                        </label>
+                                        
+                                        <button 
+                                            class="p-2 rounded-md hover:bg-slate-200 transition-colors code-block-button" 
+                                            onclick="insertCodeBlock(this, ${sectionIndex}, ${questionIndex})" 
+                                            title="Insert Code Block (Max ${MAX_CODE_BLOCKS})"
+                                            id="code-btn-${sectionIndex}-${questionIndex}">
+                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                                        </button>
+                                    </div>
+                                    ${answerContentHTML} <div class="question-toolbar mt-4 pt-3 border-t border-slate-100 flex flex-wrap justify-center sm:justify-end items-center gap-x-4 gap-y-2 text-sm">
+                                        <button onclick="copyQuestion(${sectionIndex}, ${questionIndex})" title="Copy Question" class="p-2 text-slate-500 hover:text-[#736b8e] hover:bg-slate-100 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
+                                        <button onclick="deleteQuestion(${sectionIndex}, ${questionIndex})" title="Delete Question" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                        <div class="border-l h-6 border-slate-200 hidden mx-2 hidden sm:block"></div>
+                                        <div class="flex items-center gap-2 hidden">
+                                            <span class="font-medium text-slate-600">Required</span>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" onchange="toggleRequired(this, ${sectionIndex}, ${questionIndex})" class="sr-only peer" ${isRequired ? "checked" : ""
+                                                }>
+                                                <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-[#9a92b0] peer-checked:after:translate-x-full peer-checked:after:border-white after:content[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#736b8e]"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
+                        
+                        questionsContainer.appendChild(questionBlock);
+                        
+                        // Event Listeners for the Question Block
+                        const editorDiv = questionBlock.querySelector(".question-text-editor");
+                        const customToolbar = questionBlock.querySelector(".custom-toolbar");
+
+                        editorDiv.addEventListener("focus", () => {
+                            document.querySelectorAll(".question-block").forEach((el) => {
+                                el.classList.remove(
+                                    "question-active",
+                                    "ring-2",
+                                    "ring-[#736b8e]"
+                                );
+                            });
+                            questionBlock.classList.add(
+                                "question-active",
+                                "ring-2",
+                                "ring-[#736b8e]"
+                            );
+                            customToolbar.classList.remove("hidden");
+                        });
+                        
+                        editorDiv.addEventListener("blur", (e) => {
+                             // If focus moves within the same block (e.g. to a toolbar button or code content), don't hide
+                            setTimeout(() => { // Small delay to check if focus moved to a child element
+                                if (!questionBlock.contains(document.activeElement)) {
+                                    customToolbar.classList.add("hidden");
+                                    questionBlock.classList.remove("ring-2", "ring-[#736b8e]");
+                                }
+                            }, 50);
+                        });
+
+                        editorDiv.addEventListener("input", (e) => {
+                            if (
+                                fullPaperPayload.sections[sectionIndex]?.questions[
+                                questionIndex
+                                ]
+                            ) {
+                                fullPaperPayload.sections[sectionIndex].questions[
+                                    questionIndex
+                                ].text = editorDiv.innerHTML;
+                            }
+                            updateCodeBlockButtonState(editorDiv);
+                            // NOTE: We are NOT saving the updated payload to session storage.
+                        });
+                        
+                        // Initial state check for code block button
+                        updateCodeBlockButtonState(editorDiv);
+
+                        questionCounter++;
+                    });
+                }
+            });
+        }
+    }
+    // Global Event Delegation for dynamic 'code-content' inputs
+    document.addEventListener('input', (e) => {
+        if (e.target.tagName === 'CODE-CONTENT') {
+            const editor = e.target.closest('.question-block')?.querySelector('.question-text-editor');
+            if (editor) {
+                const idParts = editor.id.split('-');
+                if (idParts.length === 3) {
+                    const sectionIndex = idParts[1];
+                    const questionIndex = idParts[2];
+                    if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
+                        // Update the main question text payload with the new HTML content
+                        fullPaperPayload.sections[sectionIndex].questions[questionIndex].text = editor.innerHTML;
+                    }
+                }
+            }
+        }
+    });
+
+    async function generatePaper() {
+        const generateButton = document.querySelector(
+            '#step-3 button[onclick="generatePaper()"]'
+        );
+        generateButton.disabled = true;
+        generateButton.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Generating...
+        `;
+        
+        // 🎯 AI POST DATA STRUCTURE: Send sections as objects containing count and weightage
+        const aiPostData = {
+            job_title: formData.jobTitle,
+            min_exp: formData.minExp,
+            max_exp: formData.maxExp,
+            skills: formData.skills,
+            sections: formData.sections, // This is already the correct format: {title: {count: N, weightage: W}}
+        };
+        
+        try {
+            const response = await fetch("{% url 'generate_questions' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken"),
+                },
+                body: JSON.stringify(aiPostData),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(
+                    `Server error: ${response.status} ${response.statusText}. Response: ${errorText}`
+                );
+            }
+            const paperData = await response.json();
+            if (paperData.error) {
+                throw new Error(paperData.error);
+            }
+            
+            // Populate fullPaperPayload (Local memory only)
+            // Combine AI-generated questions with saved form data (including weightage)
+            fullPaperPayload = {
+                job_title: formData.jobTitle,
+                department: formData.departmentName,
+                skills: formData.skills,
+                min_exp: formData.minExp,
+                max_exp: formData.maxExp,
+                duration: formData.duration,
+                durationText: formData.durationText,
+                cutoff_score: formData.cutoffScore,
+                title: paperData.title,
+                
+                // 🎯 CRITICAL: Merge AI's generated questions with the section weightage/data from formData
+                sections: paperData.sections.map(aiSection => {
+           // Find the corresponding section data (weightage) from the original formData
+           const originalData = formData.sections[aiSection.title] || {};
+           
+           // Return a LIST item, merging AI data (questions) and form data (weightage/count)
+           return {
+               title: aiSection.title,
+               questions: aiSection.questions,
+               count: originalData.count || 0,
+               weightage: originalData.weightage || 0 // Include weightage
+           };
+        }).filter(s => s.questions && s.questions.length > 0)
+        };
+            
+            // 1. Clear the preliminary draft (it's no longer a draft)
+            sessionStorage.removeItem("assessmentDraft");
+
+            // 2. Display the generated paper
+            displayGeneratedPaper(fullPaperPayload);
+            currentStep = 4; // Set to a new step to indicate 'Paper View'
+            showStep(currentStep);
+            
+            showToast("Paper generated successfully! Click 'Save' to finalize.", "success");
+
+        } catch (error) {
+            console.error("Failed to generate paper:", error);
+            showToast(`An error occurred: ${error.message}`, "error");
+        } finally {
+            generateButton.disabled = false;
+            generateButton.innerHTML = "Generate";
+        }
+    }
+    
+    // ... (rest of your existing functions like savePaper, loadFromSessionStorage, etc.) ...
+    
     // --- NEW: SESSION STORAGE FUNCTIONS ---
     function saveToSessionStorage() {
         try {
@@ -2371,9 +3234,6 @@ initSkillsAutoSuggest();
 
     function loadFromSessionStorage() {
         try {
-            // NOTE: 'generatedPaper' load logic is REMOVED as per request.
-
-            // 1. Check for a step-by-step draft
             const draft = sessionStorage.getItem("assessmentDraft");
             if (draft) {
                 const savedData = JSON.parse(draft);
@@ -2413,7 +3273,6 @@ initSkillsAutoSuggest();
         } catch (e) {
             console.error("Error loading draft from Session Storage:", e);
             sessionStorage.removeItem("assessmentDraft");
-            // sessionStorage.removeItem("generatedPaper"); // Not needed as it's not stored
         }
     }
 
@@ -2421,7 +3280,7 @@ initSkillsAutoSuggest();
     document.addEventListener("DOMContentLoaded", function () {
         fetchSkills();
         loadFromSessionStorage(); // <-- Session Storage से डेटा लोड करें
- initSkillsAutoSuggest();
+        initSkillsAutoSuggest();
         const departmentDropdown = document.getElementById("department");
         if (departmentDropdown) {
             departmentDropdown.addEventListener("change", (event) => {
@@ -2443,7 +3302,6 @@ initSkillsAutoSuggest();
              collectStepData(1);
              saveToSessionStorage();
         });
-        // Note: Skill changes are handled in selectSkill/deselectSkill
 
         // Add input/change event listeners for Step 2 fields
         document.getElementById("duration")?.addEventListener("change", () => {
@@ -2454,7 +3312,6 @@ initSkillsAutoSuggest();
             collectStepData(2);
             saveToSessionStorage();
         });
-
 
         const skillsContainer = document.getElementById("skills-container");
         const skillsWrapper = document.getElementById("skills-wrapper");
@@ -2633,8 +3490,8 @@ function initSkillsAutoSuggest() {
 
                 // ✅ CHANGE HERE: Agar koi result nahi hai, toh "No match" mat dikhao, bas hide kar do.
                 if (availableDbSkills.length === 0 && !hasAiSuggestions) {
-                     skillsDropdown.classList.add("hidden");
-                     return;
+                    skillsDropdown.classList.add("hidden");
+                    return;
                 }
 
                 // Agar results hain, toh unhe render karein
@@ -2674,7 +3531,7 @@ function initSkillsAutoSuggest() {
 
             } catch (error) {
                 console.error("Search error:", error);
-                // Error aane par bhi chupchap hide kar dein (ya error dikhana chahein to uncomment karein)
+                // Error aane par bhi chupchap hide kar dein (या error दिखाना चाहें तो uncomment करें)
                 skillsDropdown.classList.add("hidden");
                 // skillsDropdown.innerHTML = '<div class="p-3 text-sm text-red-500 text-center">Error loading results.</div>';
             }
@@ -2753,6 +3610,7 @@ initSkillsAutoSuggest();
         }
     }
 
+    // 🎯 UPDATED: collectStepData to handle sections as objects {count, weightage}
     function collectStepData(step) {
         if (step === 1) {
             formData.jobTitle = document.getElementById("jobTitle").value;
@@ -2768,14 +3626,8 @@ initSkillsAutoSuggest();
             formData.minExp = document.getElementById("minExp").value;
             formData.maxExp = document.getElementById("maxExp").value;
         } else if (step === 2) {
-            formData.sections = {};
-            document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
-                const sectionName = div.dataset.section;
-                const count = div.querySelector("input").value;
-                if (parseInt(count, 10) > 0) {
-                    formData.sections[sectionName] = parseInt(count, 10);
-                }
-            });
+            // formData.sections should already be updated by updateSectionData.
+            // Only capture Duration and Cutoff Score here.
             const durationSelect = document.getElementById("duration");
             formData.duration = parseInt(durationSelect.value, 10) || 0;
             formData.durationText =
@@ -2787,6 +3639,55 @@ initSkillsAutoSuggest();
         // Save the collected data to session storage immediately
         saveToSessionStorage();
     }
+
+    // --- NEW HELPER FUNCTION: To update individual section data on input/change ---
+    function updateSectionData(inputElement) {
+        const sectionDiv = inputElement.closest("[data-section]");
+        if (!sectionDiv) return;
+
+        const sectionName = sectionDiv.dataset.section;
+        const countInput = sectionDiv.querySelector("input[data-field='count']");
+        const weightageInput = sectionDiv.querySelector("input[data-field='weightage']");
+
+        let count = parseInt(countInput.value, 10) || 0;
+        let weightage = parseInt(weightageInput.value, 10) || 0;
+
+        // Save as an object in formData.sections
+        formData.sections[sectionName] = {
+            count: count,
+            weightage: weightage
+        };
+
+        // Re-validate total weightage for immediate feedback
+        validateWeightageSum();
+
+        saveToSessionStorage();
+    }
+
+    // --- NEW HELPER FUNCTION: To validate total weightage ---
+    function validateWeightageSum() {
+        let totalWeightage = 0;
+        const sectionInputs = document.querySelectorAll("#step-2 [data-section]");
+        let isError = false;
+
+        if (sectionInputs.length === 0) return true; // No sections, no error
+
+        sectionInputs.forEach(div => {
+            const weightageInput = div.querySelector("input[data-field='weightage']");
+            const weightage = parseInt(weightageInput.value, 10) || 0;
+            totalWeightage += weightage;
+        });
+
+        const sectionsErrorDiv = document.getElementById("sectionsError");
+        if (totalWeightage !== 100) {
+            isError = true;
+            sectionsErrorDiv.textContent = `Total weightage is ${totalWeightage}%. It must equal 100% to proceed.`;
+        } else {
+            sectionsErrorDiv.textContent = "";
+        }
+        return !isError;
+    }
+
 
     async function renderSections(departmentId) {
         const container = document.getElementById("sections-container");
@@ -2815,6 +3716,8 @@ initSkillsAutoSuggest();
             container.innerHTML = `<p class="text-red-500 col-span-2">Could not load sections.</p>`;
         }
     }
+
+    // 🎯 UPDATED: buildSectionsHTML to include Weightage input
     function buildSectionsHTML(sections) {
         const container = document.getElementById("sections-container");
         container.innerHTML = "";
@@ -2823,22 +3726,76 @@ initSkillsAutoSuggest();
                 '<p class="text-slate-500 col-span-2">No sections found for this department.</p>';
             return;
         }
-        sections.forEach((sectionName) => {
-            // Use existing value from formData or default to 1
-            const count = formData.sections?.[sectionName] !== undefined ? formData.sections[sectionName] : 1;
+        
+        const numSections = sections.length;
+        // Calculate a default weightage for fair distribution
+        const defaultWeightage = numSections > 0 ? Math.floor(100 / numSections) : 0;
+        
+        sections.forEach((sectionName, index) => {
+            // Get existing count and weightage from formData or use defaults
+            const existingData = formData.sections[sectionName] || {};
+            const count = existingData.count !== undefined ? existingData.count : 1;
+            
+            let weightage;
+            if (existingData.weightage !== undefined) {
+                 weightage = existingData.weightage;
+            } else {
+                 // For the last section, adjust weightage to ensure sum is 100
+                 weightage = index === numSections - 1 
+                                 ? 100 - (defaultWeightage * (numSections - 1)) 
+                                 : defaultWeightage;
+            }
+
+            // Initialize/Update formData with default values if necessary
+            formData.sections[sectionName] = { count: count, weightage: weightage };
+
             const sectionHTML = `
-                <div data-section="${sectionName}" class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                    <label class="font-medium text-slate-700">${sectionName} <span class="text-red-500">*</span></label>
-                    <div class="flex items-center border border-slate-300 rounded-lg bg-white w-fit mt-2 sm:mt-0">
-                        <button onclick="updateCount(this, -1)" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-l-lg transition-colors">-</button>
-                        <input type="number" value="${count}" readonly class="w-16 text-center font-semibold text-lg text-[#736b8e] border-l border-r py-1.5 focus:outline-none bg-transparent cursor-default" />
-                        <button onclick="updateCount(this, 1)" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-r-lg transition-colors">+</button>
+                <div data-section="${sectionName}" class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <label class="font-medium text-slate-700 block mb-3">${sectionName}</label>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Question Count <span class="text-red-500">*</span></label>
+                            <div class="flex items-center border border-slate-300 rounded-lg bg-white w-full">
+                                <button onclick="updateCount(this, -1, 'count')" class="px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-l-lg transition-colors">-</button>
+                                <input type="number" data-field="count" value="${count}" min="0" max="20" readonly 
+                                    class="w-full text-center font-semibold text-base text-[#736b8e] border-l border-r py-1.5 focus:outline-none bg-transparent cursor-default" />
+                                <button onclick="updateCount(this, 1, 'count')" class="px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-r-lg transition-colors">+</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Weightage (%) <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                 <input type="number" data-field="weightage" value="${weightage}" min="0" max="100" 
+                                     class="w-full px-3 py-3 bg-white border border-slate-300 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#736b8e] focus:border-transparent transition" 
+                                     oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateSectionData(this);"
+                                     onchange="updateSectionData(this);" />
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500">
+                                    %
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>`;
             container.insertAdjacentHTML("beforeend", sectionHTML);
         });
+        // Initial validation check for weightage sum on load
+        validateWeightageSum();
     }
-
+// ✅ इस फंक्शन को अपने script में कहीं भी जोड़ दें
+function triggerImageUpload(sectionIndex, questionIndex) {
+    const inputId = `file-input-${sectionIndex}-${questionIndex}`;
+    const fileInput = document.getElementById(inputId);
+    
+    if (fileInput) {
+        fileInput.value = ''; // 🛠️ यह लाइन पुरानी वैल्यू को साफ करती है ताकि वही फाइल दोबारा सेलेक्ट हो सके
+        fileInput.click();    // अब इनपुट पर क्लिक करें
+    } else {
+        console.error("File input not found for ID:", inputId);
+    }
+}
     function validateExperience() {
         const minExpInput = document.getElementById("minExp");
         const maxExpInput = document.getElementById("maxExp");
@@ -2910,19 +3867,57 @@ initSkillsAutoSuggest();
         validateExperience();
         return isValid;
     }
+    
+    // 🎯 UPDATED: validateStep2 to include weightage check
     function validateStep2() {
         let isValid = true;
         let totalQuestions = 0;
         const sectionsErrorDiv = document.getElementById("sectionsError");
+        
+        // 1. Check Total Questions and individual section validation
         document.querySelectorAll("#step-2 [data-section]").forEach((div) => {
-            totalQuestions += parseInt(div.querySelector("input").value, 10) || 0;
+            const count = parseInt(div.querySelector("input[data-field='count']").value, 10) || 0;
+            const weightageInput = div.querySelector("input[data-field='weightage']");
+            const weightage = parseInt(weightageInput.value, 10) || 0;
+
+            totalQuestions += count;
+            
+            // Basic individual input validation
+            if (count < 0 || count > 20) {
+                 isValid = false;
+                 sectionsErrorDiv.textContent = "Question count must be between 0 and 20 per section.";
+                 return;
+            }
+            if (weightage < 0 || weightage > 100) {
+                isValid = false;
+                sectionsErrorDiv.textContent = "Weightage must be between 0% and 100% per section.";
+                return;
+            }
+
+            // Highlight sections with count=0 but weightage>0
+            if (count === 0 && weightage > 0) {
+                div.classList.add("border-red-500"); // Visually alert the user
+                isValid = false;
+                sectionsErrorDiv.textContent = "A section with 0 questions cannot have weightage.";
+            } else {
+                div.classList.remove("border-red-500");
+            }
         });
-        if (sectionsErrorDiv) sectionsErrorDiv.textContent = "";
+
+        if (!isValid) return false;
+
+        // 2. Check Total Question Count
         if (totalQuestions <= 0) {
             isValid = false;
-            if (sectionsErrorDiv)
-                sectionsErrorDiv.textContent = "Please add at least one question.";
+            sectionsErrorDiv.textContent = "Please add at least one question.";
         }
+        
+        // 3. Check Total Weightage Sum
+        if (!validateWeightageSum()) {
+            isValid = false;
+        }
+        
+        // 4. Duration Validation
         const durationSelect = document.getElementById("duration");
         const durationError = document.getElementById("durationError");
         durationSelect.classList.remove("border-red-500");
@@ -2933,12 +3928,11 @@ initSkillsAutoSuggest();
             if (durationError)
                 durationError.textContent = "Please select a duration.";
         }
-        // --- YAHAN NAYA VALIDATION CODE ADD KAREIN ---
+        
+        // 5. Cutoff Score Validation
         const cutoffInput = document.getElementById("cutoffScore");
         const cutoffError = document.getElementById("cutoffScoreError");
         const cutoffValue = cutoffInput.value.trim();
-
-        // Pehle error message saaf karein
         cutoffError.textContent = "";
         cutoffInput.classList.remove("border-red-500");
 
@@ -2954,9 +3948,10 @@ initSkillsAutoSuggest();
                 cutoffInput.classList.add("border-red-500");
             }
         }
-        // --- NAYA VALIDATION CODE YAHAN KHATM ---
+
         return isValid;
     }
+
 
     function nextStep() {
         if (currentStep === 1 && !validateStep1()) return;
@@ -3004,24 +3999,39 @@ initSkillsAutoSuggest();
         }
     }
 
-    function updateCount(button, change) {
+    // 🎯 UPDATED: updateCount to use updateSectionData for Step 2 counters
+    function updateCount(button, change, field) {
         const input = button.parentElement.querySelector("input");
         let currentValue = parseInt(input.value, 10) || 0;
         let newValue = currentValue + change;
         const isSectionCounter = button.closest("[data-section]");
+        
         if (isSectionCounter) {
-            newValue = Math.max(0, Math.min(newValue, 20));
+            // Section Question Count (Max 20, Min 0)
+            const countInput = isSectionCounter.querySelector("input[data-field='count']");
+            if (input === countInput) {
+               newValue = Math.max(0, Math.min(newValue, 20));
+            } else {
+               // Must be minExp/maxExp, handle below
+               newValue = Math.max(0, newValue);
+            }
         } else {
+            // Min/Max Experience
             newValue = Math.max(0, newValue);
         }
+        
         input.value = newValue;
+        
         if (input.id === "minExp" || input.id === "maxExp") {
             validateExperience();
             collectStepData(1); // Save Step 1 data
         } else if (isSectionCounter) {
-            collectStepData(2); // Save Step 2 data
+            // Section Counter changed - use new dedicated function
+            updateSectionData(input);
         }
     }
+
+
     // --- NEW FUNCTIONS FOR SKILL COLLAPSE IN STEP 3 ---
     function toggleReviewSkills() {
         isReviewSkillsExpanded = !isReviewSkillsExpanded;
@@ -3070,7 +4080,8 @@ initSkillsAutoSuggest();
             skillsContainer.appendChild(button);
         }
     }
-    // ----------------------------------------------------------------
+
+    // 🎯 UPDATED: populateReview to correctly display Section Count AND Weightage
     function populateReview() {
         document.getElementById("review-jobTitle").textContent =
             formData.jobTitle || "N/A";
@@ -3093,17 +4104,23 @@ initSkillsAutoSuggest();
         const sectionsContainer = document.getElementById("review-sections");
         sectionsContainer.innerHTML = "";
         let totalQuestions = 0;
+        
+        // 🎯 NEW: Iterate over section objects in formData.sections
         for (const section in formData.sections) {
-            const count = formData.sections[section];
+            const sectionData = formData.sections[section];
+            const count = sectionData.count || 0;
+            const weightage = sectionData.weightage || 0;
+            
             totalQuestions += count;
             sectionsContainer.innerHTML += `
-                        <div class="flex justify-between items-center text-slate-700">
-                            <span>${section}</span>
-                            <span class="font-medium bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full">${count} Questions</span>
-                        </div>`;
+                <div class="flex justify-between items-center text-slate-700">
+                    <span>${section}</span>
+                    <span class="font-medium bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full">${count} Qs (${weightage}%)</span>
+                </div>`;
         }
         document.getElementById("review-total").textContent = totalQuestions;
     }
+
 
     function getCookie(name) {
         let cookieValue = null;
@@ -3168,7 +4185,7 @@ initSkillsAutoSuggest();
         }
     }
 
-    // --- EDIT MODAL SCRIPT ---
+    // --- EDIT MODAL SCRIPT (UNCHANGED logic related to skills/job title/duration/cutoff) ---
     let editSelectedSkills = [];
     let allEditSkills = [];
 
@@ -3378,12 +4395,11 @@ initSkillsAutoSuggest();
                 .getElementById("edit-skills-dropdown")
                 .classList.add("hidden");
         }
-    });</script>
+    });
 
-    <script>
     // --- PAPER GENERATION AND EDITING SCRIPT ---
 
-    // **NEW: Toast Notification Function**
+    // **Toast Notification Function**
     function showToast(message, type = "success") {
         const container = document.getElementById("toast-container");
         const toast = document.createElement("div");
@@ -3408,42 +4424,40 @@ initSkillsAutoSuggest();
         }
     }
 
-function updateMcqOption(event, sectionIndex, questionIndex, optionIndex) {
-    const question = fullPaperPayload.sections[sectionIndex]?.questions[questionIndex];
-    if (question) {
-        const newText = event.target.textContent.trim();
-        const oldText = question.options[optionIndex]; // पुराना टेक्स्ट सहेजें
+    function updateMcqOption(event, sectionIndex, questionIndex, optionIndex) {
+        const question = fullPaperPayload.sections[sectionIndex]?.questions[questionIndex];
+        if (question) {
+            const newText = event.target.textContent.trim();
+            const oldText = question.options[optionIndex]; // पुराना टेक्स्ट सहेजें
 
-        // विकल्प अपडेट करें
-        question.options[optionIndex] = newText;
+            // विकल्प अपडेट करें
+            question.options[optionIndex] = newText;
 
-        // CRITICAL FIX: अगर यही विकल्प पहले से 'सही उत्तर' चुना हुआ था, 
-        // तो 'answer' को भी नए टेक्स्ट से अपडेट करें।
-        // हम trim() का उपयोग करते हैं ताकि स्पेस की वजह से गलती न हो।
-        if (question.answer && oldText.trim() === question.answer.trim()) {
-            question.answer = newText;
-        }
-        // अगर अभी तक कोई उत्तर सेट नहीं है, और यह पहला विकल्प है, तो इसे डिफॉल्ट बना दें
-        else if (!question.answer && optionIndex === 0) {
-             question.answer = newText;
+            // CRITICAL FIX: अगर यही विकल्प पहले से 'सही उत्तर' चुना हुआ था, 
+            // तो 'answer' को भी नए टेक्स्ट से अपडेट करें।
+            if (question.answer && oldText.trim() === question.answer.trim()) {
+                question.answer = newText;
+            }
+            // अगर अभी तक कोई उत्तर सेट नहीं है, और यह पहला विकल्प है, तो इसे डिफॉल्ट बना दें
+            else if (!question.answer && optionIndex === 0) {
+                 question.answer = newText;
+            }
         }
     }
-}
 
-function setCorrectAnswer(sectionIndex, questionIndex, optionIndex) {
-    const question = fullPaperPayload.sections[sectionIndex].questions[questionIndex];
-    if (question) {
-        // चुने गए विकल्प का टेक्स्ट प्राप्त करें
-        const selectedOptionText = question.options[optionIndex] ? question.options[optionIndex].trim() : "";
-        
-        // उसे सही उत्तर के रूप में सेट करें
-        question.answer = selectedOptionText;
-        
-        // UI अपडेट करें ताकि रेडियो बटन सही दिखे
-        displayGeneratedPaper(fullPaperPayload);
+    function setCorrectAnswer(sectionIndex, questionIndex, optionIndex) {
+        const question = fullPaperPayload.sections[sectionIndex].questions[questionIndex];
+        if (question) {
+            // चुने गए विकल्प का टेक्स्ट प्राप्त करें
+            const selectedOptionText = question.options[optionIndex] ? question.options[optionIndex].trim() : "";
+            
+            // उसे सही उत्तर के रूप में सेट करें
+            question.answer = selectedOptionText;
+            
+            // UI अपडेट करें ताकि रेडियो बटन सही दिखे
+            displayGeneratedPaper(fullPaperPayload);
+        }
     }
-}
-
 
 
     function deleteMcqOption(sectionIndex, questionIndex, optionIndex) {
@@ -3463,74 +4477,73 @@ function setCorrectAnswer(sectionIndex, questionIndex, optionIndex) {
         }
     }
 
-function addMcqOption(sectionIndex, questionIndex) {
-    event.stopPropagation();
-    const question = fullPaperPayload.sections[sectionIndex].questions[questionIndex];
-    if (question) {
-        question.options.push(""); // "New Option" की जगह खाली स्ट्रिंग ""
-        displayGeneratedPaper(fullPaperPayload);
+    function addMcqOption(sectionIndex, questionIndex) {
+        event.stopPropagation();
+        const question = fullPaperPayload.sections[sectionIndex].questions[questionIndex];
+        if (question) {
+            question.options.push(""); // "New Option" की जगह खाली स्ट्रिंग ""
+            displayGeneratedPaper(fullPaperPayload);
+        }
     }
-}
-
 
 
     function updateShortAnswer(event, sectionIndex, questionIndex) {
-    if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
-        fullPaperPayload.sections[sectionIndex].questions[
-            questionIndex
-        ].answer = event.target.textContent.trim(); // ✅ CORRECT
+        if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
+            fullPaperPayload.sections[sectionIndex].questions[
+                questionIndex
+            ].answer = event.target.textContent.trim(); // ✅ CORRECT
+        }
     }
-}
-  
+    
 
-function addQuestionAfter(sectionIndex, questionIndex, type) {
-    event.stopPropagation();
-    let newQuestionTemplate;
-    if (type === "MCQ") {
-        newQuestionTemplate = {
-            text: "<em>Write your new multiple choice question here...</em>",
-            type: "MCQ",
-            options: ["", ""], // पहले से खाली विकल्प
-            answer: "",        // उत्तर भी शुरू में खाली
-            required: false,
-        };
-    } else if (type === "Short Answer") {
-        newQuestionTemplate = {
-            text: "<em>Write your new short answer question here...</em>",
-            type: "Short Answer",
-            options: [],
-            answer: "Sample correct answer text.",
-            required: false,
-        };
-    } else if (type === "CODE") {
-        newQuestionTemplate = {
-            text: "<em>Write your new coding challenge prompt here...</em>",
-            type: "CODE",
-            options: [],
-            answer: "def solution(): \n    pass",
-            required: true,
-        };
-    } else {
-        console.error("Unknown question type:", type);
-        return;
+    function addQuestionAfter(sectionIndex, questionIndex, type) {
+        event.stopPropagation();
+        let newQuestionTemplate;
+        if (type === "MCQ") {
+            newQuestionTemplate = {
+                text: "<em>Write your new multiple choice question here...</em>",
+                type: "MCQ",
+                options: ["", ""], // पहले से खाली विकल्प
+                answer: "",          // उत्तर भी शुरू में खाली
+                required: false,
+            };
+        } else if (type === "Short Answer") {
+            newQuestionTemplate = {
+                text: "<em>Write your new short answer question here...</em>",
+                type: "Short Answer",
+                options: [],
+                answer: "Sample correct answer text.",
+                required: false,
+            };
+        } else if (type === "CODE") {
+            newQuestionTemplate = {
+                text: "<em>Write your new coding challenge prompt here...</em>",
+                type: "CODE",
+                options: [],
+                answer: "def solution(): \n    pass",
+                required: true,
+            };
+        } else {
+            console.error("Unknown question type:", type);
+            return;
+        }
+        fullPaperPayload.sections[sectionIndex].questions.splice(
+            questionIndex + 1,
+            0,
+            newQuestionTemplate
+        );
+        const targetEditorId = `editor-${sectionIndex}-${questionIndex + 1}`;
+        displayGeneratedPaper(fullPaperPayload);
+        // स्क्रॉल और फोकस के लिए पुराना कोड यहाँ रहेगा...
+        setTimeout(() => {
+           const newEditor = document.getElementById(targetEditorId);
+           if (newEditor) {
+               newEditor.closest(".question-block").scrollIntoView({ behavior: "smooth", block: "center" });
+               newEditor.focus();
+           }
+        }, 100);
     }
-    fullPaperPayload.sections[sectionIndex].questions.splice(
-        questionIndex + 1,
-        0,
-        newQuestionTemplate
-    );
-    const targetEditorId = `editor-${sectionIndex}-${questionIndex + 1}`;
-    displayGeneratedPaper(fullPaperPayload);
-    // स्क्रॉल और फोकस के लिए पुराना कोड यहाँ रहेगा...
-    setTimeout(() => {
-       const newEditor = document.getElementById(targetEditorId);
-       if (newEditor) {
-           newEditor.closest(".question-block").scrollIntoView({ behavior: "smooth", block: "center" });
-           newEditor.focus();
-       }
-    }, 100);
-}
-function copyQuestion(sectionIndex, questionIndex) {
+    function copyQuestion(sectionIndex, questionIndex) {
         event.stopPropagation();
         const questionToCopy =
             fullPaperPayload.sections[sectionIndex].questions[questionIndex];
@@ -3569,420 +4582,363 @@ function copyQuestion(sectionIndex, questionIndex) {
         }
         // NOTE: We are NOT saving the updated payload to session storage.
     }
-// 2. updateMcqOption (Ensures clean text is saved to the options array)
-function updateMcqOption(event, sectionIndex, questionIndex, optionIndex) {
-    if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
-        // contenteditable से आने वाले टेक्स्ट को TRIM करके options array में सेव करें
-        fullPaperPayload.sections[sectionIndex].questions[
-            questionIndex
-        ].options[optionIndex] = event.target.textContent.trim();
+    // 2. updateMcqOption (Ensures clean text is saved to the options array)
+    function updateMcqOption(event, sectionIndex, questionIndex, optionIndex) {
+        if (fullPaperPayload.sections[sectionIndex]?.questions[questionIndex]) {
+            // contenteditable से आने वाले टेक्स्ट को TRIM करके options array में सेव करें
+            fullPaperPayload.sections[sectionIndex].questions[
+                questionIndex
+            ].options[optionIndex] = event.target.textContent.trim();
+        }
     }
-}
 
-function displayGeneratedPaper(paperData) {
-    document.getElementById("form-container").classList.add("hidden");
-    const paperContainer = document.getElementById("paper-container");
-    paperContainer.classList.remove("hidden");
-    document.getElementById("paper-header").textContent =
-        paperData.title || "Generated Question Paper";
-    
-    // Use fullPaperPayload for paper details
-    document.getElementById("paper-jobTitle").textContent =
-        fullPaperPayload.job_title || "N/A";
-    document.getElementById("paper-department").textContent =
-        fullPaperPayload.department || "N/A";
-    document.getElementById("paper-duration").textContent =
-        fullPaperPayload.durationText || "N/A";
-    document.getElementById(
-        "paper-experience"
-    ).textContent = `${fullPaperPayload.min_exp} - ${fullPaperPayload.max_exp} years`;
-    document.getElementById("paper-cutoffScore").textContent = `${fullPaperPayload.cutoff_score}%`;
-    const skillsContainer = document.getElementById("paper-skills");
-    skillsContainer.innerHTML = "";
-    if (fullPaperPayload.skills) {
-        fullPaperPayload.skills.split(",").forEach((skill) => {
-            if (skill.trim()) {
-                const skillTag = document.createElement("span");
-                skillTag.className =
-                    "bg-slate-200 text-slate-700 text-sm font-medium px-3 py-1 rounded-full";
-                skillTag.textContent = skill.trim();
-                skillsContainer.appendChild(skillTag);
-            }
-        });
-    }
-    const questionsContainer = document.getElementById("paper-questions");
-    questionsContainer.innerHTML = "";
-    let questionCounter = 1;
-    if (Array.isArray(paperData.sections)) {
-        paperData.sections.forEach((section, sectionIndex) => {
-            if (!section) return;
-            const sectionTitle = document.createElement("h3");
-            sectionTitle.className =
-                "text-xl font-bold text-slate-700 mb-4 pb-2 border-b-2 border-[#736b8e]";
-            sectionTitle.textContent = section.title || "Unnamed Section";
-            questionsContainer.appendChild(sectionTitle);
-            if (Array.isArray(section.questions)) {
-                section.questions.forEach((q, questionIndex) => {
-                    if (!q) return;
-                    const questionBlock = document.createElement("div");
-                    questionBlock.className =
-                        "question-block relative p-4 border border-slate-200 rounded-lg bg-white transition-all duration-200";
-                    let contentHTML = "";
-                  // ... existing code ...
-
-if (q.type === "MCQ" && Array.isArray(q.options)) {
-    let optionsHTML = '<div class="mt-4 space-y-3">';
-    q.options.forEach((option, optionIndex) => {
+    // --- Main Rendering Logic (Replaced) ---
+    function displayGeneratedPaper(paperData) {
+        document.getElementById("form-container").classList.add("hidden");
+        const paperContainer = document.getElementById("paper-container");
+        paperContainer.classList.remove("hidden");
+        document.getElementById("paper-header").textContent =
+            paperData.title || "Generated Question Paper";
         
-        // 🚨 FIX APPLIED HERE: Ensure both sides are trimmed for reliable comparison
-        const isCorrect = (option && option.trim()) === (q.answer && q.answer.trim());
-        
-        optionsHTML += `
-          <div class="flex items-center group">
-            <input type="radio" name="correct_answer_${sectionIndex}_${questionIndex}"
-                       id="radio_${sectionIndex}_${questionIndex}_${optionIndex}"
-                       class="form-radio h-4 w-4 text-[#736b8e] focus:ring-[#9a92b0] flex-shrink-0"
-                       onchange="setCorrectAnswer(${sectionIndex}, ${questionIndex}, ${optionIndex})"
-                       ${isCorrect ? "checked" : ""}>
-            <div class="ml-3 flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md"
-                       contenteditable="true"
-                       oninput="updateMcqOption(event, ${sectionIndex}, ${questionIndex}, ${optionIndex})">${option}</div>
-            <button onclick="deleteMcqOption(${sectionIndex}, ${questionIndex}, ${optionIndex})"
-                       class="ml-2 p-1 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                       title="Delete Option">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-        `;
-    });
-    optionsHTML += `</div>
-      <div class="mt-4">
-        <button onclick="addMcqOption(${sectionIndex}, ${questionIndex})" class="text-sm font-medium text-[#736b8e] hover:text-[#5f5778]">
-          + Add Option
-        </button>
-      </div>`;
-    contentHTML = optionsHTML;
-}
-
-// ... rest of the code ...
-                    else if (q.type === "Short Answer") {
-                        contentHTML = `
-        <div class="mt-4 pt-3 border-t border-slate-100">
-          <p class="text-sm flex items-start">
-            <strong class="font-medium text-slate-500 mr-2 mt-1 flex-shrink-0">Answer:</strong>
-            <div class="flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md bg-green-50 text-green-800 font-mono"
-                       contenteditable="true"
-                       oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || ""
-                            }</div>
-          </p>
-        </div>
-      `;
-                    } else if (q.type === "CODE") { // ✅ NEW CODE QUESTION RENDERING
-                        contentHTML = `
-                        <div class="mt-4 pt-3 border-t border-slate-100">
-                            <p class="text-sm font-medium text-slate-500 mb-2">Expected Solution / Code Editor (Reference):</p>
-                            <div class="flex-grow p-3 outline-none border border-slate-300 focus-within:border-[#736b8e] rounded-md bg-slate-800 text-green-300 font-mono text-sm whitespace-pre-wrap"
-                                contenteditable="true"
-                                style="min-height: 100px; tab-size: 4;"
-                                oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || "// Write sample code solution here..."
-                            }</div>
-                            <p class="text-xs text-slate-500 mt-2">Note: This box simulates the code editor/reference answer.</p>
-                        </div>
-                        `;
-                    } else { // Default/Fallback
-                        contentHTML = `<div class="mt-4 pt-3 border-t border-slate-100"><p class="text-sm"><strong class="font-medium text-slate-500">Answer:</strong> <span class="text-green-700 font-mono bg-green-50 p-1 rounded">${q.answer || "N/A"
-                            }</span></p></div>`;
-                    }
-                    const isRequired = q.required || false;
-                    const contextualAddToolbar = `
-        <div class="contextual-add-toolbar absolute top-2 right-2 z-10 flex-col items-center gap-1 p-1.5 bg-white border border-slate-200 rounded-lg shadow-lg lg:top-1/2 lg:-translate-y-1/2 lg:left-full lg:right-auto lg:ml-4">
-          <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'MCQ')" title="Add Multiple Choice" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </button>
-          <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'Short Answer')" title="Add Short Answer" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16" /></svg>
-          </button>
-          <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'CODE')" title="Add Code Question" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-          </button>
-        </div>
-      `;
+        // Use fullPaperPayload for paper details
+        document.getElementById("paper-jobTitle").textContent =
+            fullPaperPayload.job_title || "N/A";
+        document.getElementById("paper-department").textContent =
+            fullPaperPayload.department || "N/A";
+        document.getElementById("paper-duration").textContent =
+            fullPaperPayload.durationText || "N/A";
+        document.getElementById(
+            "paper-experience"
+        ).textContent = `${fullPaperPayload.min_exp} - ${fullPaperPayload.max_exp} years`;
+        document.getElementById("paper-cutoffScore").textContent = `${fullPaperPayload.cutoff_score}%`;
+        const skillsContainer = document.getElementById("paper-skills");
+        skillsContainer.innerHTML = "";
+        if (fullPaperPayload.skills) {
+            fullPaperPayload.skills.split(",").forEach((skill) => {
+                if (skill.trim()) {
+                    const skillTag = document.createElement("span");
+                    skillTag.className =
+                        "bg-slate-200 text-slate-700 text-sm font-medium px-3 py-1 rounded-full";
+                    skillTag.textContent = skill.trim();
+                    skillsContainer.appendChild(skillTag);
+                }
+            });
+        }
+        const questionsContainer = document.getElementById("paper-questions");
+        questionsContainer.innerHTML = "";
+        let questionCounter = 1;
+        if (Array.isArray(paperData.sections)) {
+            paperData.sections.forEach((section, sectionIndex) => {
+                if (!section) return;
+                const sectionTitle = document.createElement("h3");
+                sectionTitle.className =
+                    "text-xl font-bold text-slate-700 mb-4 pb-2 border-b-2 border-[#736b8e]";
+                sectionTitle.textContent = section.title || "Unnamed Section";
+                questionsContainer.appendChild(sectionTitle);
+                if (Array.isArray(section.questions)) {
+                    section.questions.forEach((q, questionIndex) => {
+                        if (!q) return;
+                        const questionBlock = document.createElement("div");
+                        questionBlock.className =
+                            "question-block relative p-4 border border-slate-200 rounded-lg bg-white transition-all duration-200";
+                        let contentHTML = "";
                     
-                    questionBlock.innerHTML = `
-        ${contextualAddToolbar}
-        <div class="flex items-start">
-          <span class="font-semibold text-slate-800 pt-1">${questionCounter}.</span>
-          <div class="ml-2 w-full">
-            <div class="question-text-editor outline-none p-1 border border-transparent focus:border-slate-300 rounded-md"
-                       id="editor-${sectionIndex}-${questionIndex}"
-                       contenteditable="true">${q.text || "Question text not available."
-                        }</div>
-            <div class="custom-toolbar hidden mt-2 py-1 flex items-center gap-1 border rounded-lg p-1 bg-slate-50 shadow-sm">
-              <button onclick="formatDoc('bold')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Bold"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg></button>
-              <button onclick="formatDoc('italic')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Italic"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" y2="20"></line></svg></button>
-              <button onclick="formatDoc('underline')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Underline"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path><line x1="4" y1="21" x2="20" y2="21"></line></svg></button>
-            </div>
-            ${contentHTML}
-            <div class="question-toolbar mt-4 pt-3 border-t border-slate-100 flex flex-wrap justify-center sm:justify-end items-center gap-x-4 gap-y-2 text-sm">
-              <button onclick="copyQuestion(${sectionIndex}, ${questionIndex})" title="Copy Question" class="p-2 text-slate-500 hover:text-[#736b8e] hover:bg-slate-100 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
-              <button onclick="deleteQuestion(${sectionIndex}, ${questionIndex})" title="Delete Question" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-              <div class="border-l h-6 border-slate-200 hidden mx-2 hidden sm:block"></div>
-              <div class="flex items-center gap-2 hidden">
-                <span class="font-medium text-slate-600">Required</span>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" onchange="toggleRequired(this, ${sectionIndex}, ${questionIndex})" class="sr-only peer" ${isRequired ? "checked" : ""
-                        }>
-                  <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-[#9a92b0] peer-checked:after:translate-x-full peer-checked:after:border-white after:content[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#736b8e]"></div>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>`;
-                    questionsContainer.appendChild(questionBlock);
-                    const editorDiv = questionBlock.querySelector(
-                        ".question-text-editor"
-                    );
-                   
-                    const customToolbar =
-                        questionBlock.querySelector(".custom-toolbar");
-                    editorDiv.addEventListener("focus", () => {
-                        document.querySelectorAll(".question-block").forEach((el) => {
-                            el.classList.remove(
+                        if (q.type === "MCQ" && Array.isArray(q.options)) {
+                            let optionsHTML = '<div class="mt-4 space-y-3">';
+                            q.options.forEach((option, optionIndex) => {
+                                
+                                // 🚨 FIX APPLIED HERE: Ensure both sides are trimmed for reliable comparison
+                                const isCorrect = (option && option.trim()) === (q.answer && q.answer.trim());
+                                
+                                optionsHTML += `
+                                    <div class="flex items-center group">
+                                        <input type="radio" name="correct_answer_${sectionIndex}_${questionIndex}"
+                                                             id="radio_${sectionIndex}_${questionIndex}_${optionIndex}"
+                                                             class="form-radio h-4 w-4 text-[#736b8e] focus:ring-[#9a92b0] flex-shrink-0"
+                                                             onchange="setCorrectAnswer(${sectionIndex}, ${questionIndex}, ${optionIndex})"
+                                                             ${isCorrect ? "checked" : ""}>
+                                        <div class="ml-3 flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md"
+                                                             contenteditable="true"
+                                                             oninput="updateMcqOption(event, ${sectionIndex}, ${questionIndex}, ${optionIndex})">${option}</div>
+                                        <button onclick="deleteMcqOption(${sectionIndex}, ${questionIndex}, ${optionIndex})"
+                                                             class="ml-2 p-1 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                             title="Delete Option">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                `;
+                            });
+                            optionsHTML += `</div>
+                                <div class="mt-4">
+                                    <button onclick="addMcqOption(${sectionIndex}, ${questionIndex})" class="text-sm font-medium text-[#736b8e] hover:text-[#5f5778]">
+                                        + Add Option
+                                    </button>
+                                </div>`;
+                            contentHTML = optionsHTML;
+                        }
+
+                        else if (q.type === "Short Answer") {
+                            contentHTML = `
+                                <div class="mt-4 pt-3 border-t border-slate-100">
+                                    <p class="text-sm flex items-start">
+                                        <strong class="font-medium text-slate-500 mr-2 mt-1 flex-shrink-0">Answer:</strong>
+                                        <div class="flex-grow p-1 outline-none border border-transparent focus-within:border-slate-300 rounded-md bg-green-50 text-green-800 font-mono"
+                                                             contenteditable="true"
+                                                             oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || ""
+                                                             }</div>
+                                    </p>
+                                </div>
+                            `;
+                        } else if (q.type === "CODE") { // ✅ CODE QUESTION RENDERING
+                            contentHTML = `
+                                <div class="mt-4 pt-3 border-t border-slate-100">
+                                    <p class="text-sm font-medium text-slate-500 mb-2">Expected Solution / Code Editor (Reference):</p>
+                                    <div class="flex-grow p-3 outline-none border border-slate-300 focus-within:border-[#736b8e] rounded-md bg-slate-800 text-green-300 font-mono text-sm whitespace-pre-wrap"
+                                                             contenteditable="true"
+                                                             style="min-height: 100px; tab-size: 4;"
+                                                             oninput="updateShortAnswer(event, ${sectionIndex}, ${questionIndex})">${q.answer || "// Write sample code solution here..."
+                                                             }</div>
+                                    <p class="text-xs text-slate-500 mt-2">Note: This box simulates the code editor/reference answer.</p>
+                                </div>
+                                `;
+                        } else { // Default/Fallback
+                            contentHTML = `<div class="mt-4 pt-3 border-t border-slate-100"><p class="text-sm"><strong class="font-medium text-slate-500">Answer:</strong> <span class="text-green-700 font-mono bg-green-50 p-1 rounded">${q.answer || "N/A"
+                                }</span></p></div>`;
+                        }
+                        const isRequired = q.required || false;
+                        const contextualAddToolbar = `
+                            <div class="contextual-add-toolbar absolute top-2 right-2 z-10 flex-col items-center gap-1 p-1.5 bg-white border border-slate-200 rounded-lg shadow-lg lg:top-1/2 lg:-translate-y-1/2 lg:left-full lg:right-auto lg:ml-4">
+                                <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'MCQ')" title="Add Multiple Choice" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </button>
+                                <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'Short Answer')" title="Add Short Answer" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16" /></svg>
+                                </button>
+                                <button onclick="addQuestionAfter(${sectionIndex}, ${questionIndex}, 'CODE')" title="Add Code Question" class="p-2 text-slate-500 hover:bg-[#736b8e] hover:text-white rounded-md transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                                </button>
+                            </div>
+                        `;
+                        
+                        questionBlock.innerHTML = `
+                            ${contextualAddToolbar}
+                            <div class="flex items-start">
+                                <span class="font-semibold text-slate-800 pt-1">${questionCounter}.</span>
+                                <div class="ml-2 w-full">
+                                    <div class="question-text-editor outline-none p-1 border border-transparent focus:border-slate-300 rounded-md"
+                                                             id="editor-${sectionIndex}-${questionIndex}"
+                                                             contenteditable="true">${q.text || "Question text not available."
+                                                             }</div>
+                                    <div class="custom-toolbar hidden mt-2 py-1 flex flex-wrap items-center gap-1 border rounded-lg p-1 bg-slate-50 shadow-sm">
+                                        <button onclick="formatDoc('bold')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Bold"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg></button>
+                                        <button onclick="formatDoc('italic')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Italic"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" y2="20"></line></svg></button>
+                                        <button onclick="formatDoc('underline')" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Underline"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path><line x1="4" y1="21" x2="20" y2="21"></line></svg></button>
+                                        <div class="border-l h-6 border-slate-200 mx-1"></div>
+                                        
+                                        // ✅ New Code: Button और Hidden Input अलग-अलग रखें
+
+// 1. पहले Hidden Input बनाएं (Unique ID के साथ)
+<input type="file" id="file-input-${sectionIndex}-${questionIndex}" accept="image/*" class="hidden" onchange="insertImage(event, ${sectionIndex}, ${questionIndex})">
+
+// 2. फिर Button बनाएं जो उस इनपुट को ट्रिगर करेगा
+<button onclick="triggerImageUpload(${sectionIndex}, ${questionIndex})" class="p-2 rounded-md hover:bg-slate-200 transition-colors" title="Insert Image">
+    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+        <polyline points="21 15 16 10 5 21"></polyline>
+    </svg>
+</button>
+                                        
+                                        <button 
+                                            class="p-2 rounded-md hover:bg-slate-200 transition-colors code-block-button" 
+                                            onclick="insertCodeBlock(this, ${sectionIndex}, ${questionIndex})" 
+                                            title="Insert Code Block (Max ${MAX_CODE_BLOCKS})"
+                                            id="code-btn-${sectionIndex}-${questionIndex}">
+                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                                        </button>
+                                    </div>
+                                    ${contentHTML}
+                                    <div class="question-toolbar mt-4 pt-3 border-t border-slate-100 flex flex-wrap justify-center sm:justify-end items-center gap-x-4 gap-y-2 text-sm">
+                                        <button onclick="copyQuestion(${sectionIndex}, ${questionIndex})" title="Copy Question" class="p-2 text-slate-500 hover:text-[#736b8e] hover:bg-slate-100 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
+                                        <button onclick="deleteQuestion(${sectionIndex}, ${questionIndex})" title="Delete Question" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                        <div class="border-l h-6 border-slate-200 hidden mx-2 hidden sm:block"></div>
+                                        <div class="flex items-center gap-2 hidden">
+                                            <span class="font-medium text-slate-600">Required</span>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" onchange="toggleRequired(this, ${sectionIndex}, ${questionIndex})" class="sr-only peer" ${isRequired ? "checked" : ""
+                                                }>
+                                                <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-[#9a92b0] peer-checked:after:translate-x-full peer-checked:after:border-white after:content[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#736b8e]"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
+                        questionsContainer.appendChild(questionBlock);
+                        
+                        // Event Listeners for the Question Block
+                        const editorDiv = questionBlock.querySelector(".question-text-editor");
+                        const customToolbar = questionBlock.querySelector(".custom-toolbar");
+
+                        editorDiv.addEventListener("focus", () => {
+                            document.querySelectorAll(".question-block").forEach((el) => {
+                                el.classList.remove(
+                                    "question-active",
+                                    "ring-2",
+                                    "ring-[#736b8e]"
+                                );
+                            });
+                            questionBlock.classList.add(
                                 "question-active",
                                 "ring-2",
                                 "ring-[#736b8e]"
                             );
+                            customToolbar.classList.remove("hidden");
                         });
-                        questionBlock.classList.add(
-                            "question-active",
-                            "ring-2",
-                            "ring-[#736b8e]"
-                        );
-                        customToolbar.classList.remove("hidden");
-                    });
-                    editorDiv.addEventListener("input", () => {
-                        if (
-                            fullPaperPayload.sections[sectionIndex]?.questions[
-                            questionIndex
-                            ]
-                        ) {
-                            fullPaperPayload.sections[sectionIndex].questions[
+                        
+                        editorDiv.addEventListener("blur", (e) => {
+                             // If focus moves within the same block (e.g. to a toolbar button or code content), don't hide
+                            setTimeout(() => { // Small delay to check if focus moved to a child element
+                                if (!questionBlock.contains(document.activeElement)) {
+                                    customToolbar.classList.add("hidden");
+                                    questionBlock.classList.remove("ring-2", "ring-[#736b8e]");
+                                }
+                            }, 50);
+                        });
+
+                        editorDiv.addEventListener("input", (e) => {
+                            if (
+                                fullPaperPayload.sections[sectionIndex]?.questions[
                                 questionIndex
-                            ].text = editorDiv.innerHTML;
-                        }
-                        // NOTE: We are NOT saving the updated payload to session storage.
+                                ]
+                            ) {
+                                fullPaperPayload.sections[sectionIndex].questions[
+                                    questionIndex
+                                ].text = editorDiv.innerHTML;
+                            }
+                            updateCodeBlockButtonState(editorDiv);
+                            // NOTE: We are NOT saving the updated payload to session storage.
+                        });
+                        
+                        // Initial state check for code block button
+                        updateCodeBlockButtonState(editorDiv);
+
+                        questionCounter++;
                     });
-                    questionCounter++;
-                });
-            }
-        });
-    }
-}
-    async function generatePaper() {
-        const generateButton = document.querySelector(
-            '#step-3 button[onclick="generatePaper()"]'
-        );
-        generateButton.disabled = true;
-        generateButton.innerHTML = `
-      <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      Generating...
-      `;
-        const aiPostData = {
-            job_title: formData.jobTitle,
-            min_exp: formData.minExp,
-            max_exp: formData.maxExp,
-            skills: formData.skills,
-            sections: formData.sections,
-        };
-        try {
-            const response = await fetch("{% url 'generate_questions' %}", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": getCookie("csrftoken"),
-                },
-                body: JSON.stringify(aiPostData),
+                }
             });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(
-                    `Server error: ${response.status} ${response.statusText}. Response: ${errorText}`
-                );
-            }
-            const paperData = await response.json();
-            if (paperData.error) {
-                throw new Error(paperData.error);
-            }
-            // Populate fullPaperPayload (Local memory only)
-            fullPaperPayload = {
-                job_title: formData.jobTitle,
-                department: formData.departmentName,
-                skills: formData.skills,
-                min_exp: formData.minExp,
-                max_exp: formData.maxExp,
-                duration: formData.duration,
-                durationText: formData.durationText,
-                cutoff_score: formData.cutoffScore,
-                title: paperData.title,
-                sections: paperData.sections,
-            };
-            
-            // --- NEW LOGIC START ---
-            // 1. Clear the preliminary draft (it's no longer a draft)
-            sessionStorage.removeItem("assessmentDraft");
-
-            // 2. We explicitly do NOT save fullPaperPayload to session storage.
-
-            // 3. Display the generated paper
-            displayGeneratedPaper(fullPaperPayload);
-            currentStep = 4; // Set to a new step to indicate 'Paper View'
-            showStep(currentStep);
-            
-            showToast("Paper generated successfully!", "success");
-            // --- NEW LOGIC END ---
-
-        } catch (error) {
-            console.error("Failed to generate paper:", error);
-            // **UPDATED: Using toast instead of alert**
-            showToast(`An error occurred: ${error.message}`, "error");
-        } finally {
-            generateButton.disabled = false;
-            generateButton.innerHTML = "Generate";
         }
     }
+    
     document.addEventListener("DOMContentLoaded", function () {
-        // Sidebar toggle
-        const sidebar = document.getElementById("sidebar");
-        const toggleButton = document.getElementById("sidebar-toggle");
-        const sidebarLogo = document.getElementById("sidebar-logo");
-        const sidebarTexts = document.querySelectorAll(".sidebar-text");
-        const sidebarHeader = document.getElementById("sidebar-header");
-        if (toggleButton) {
-            toggleButton.addEventListener("click", () => {
-                sidebar.classList.toggle("w-64");
-                sidebar.classList.toggle("w-20");
-                sidebarLogo.classList.toggle("hidden");
-                sidebarHeader.classList.toggle("justify-between");
-                sidebarHeader.classList.toggle("justify-center");
-                sidebarTexts.forEach((text) => {
-                    text.classList.toggle("hidden");
-                });
+        // ... (rest of DOMContentLoaded remains the same)
+        const userMenuButton = document.getElementById("user-menu-button");
+        const userMenu = document.getElementById("user-menu");
+
+        if (userMenuButton && userMenu) {
+            userMenuButton.addEventListener("click", (event) => {
+                userMenu.classList.toggle("hidden");
+                event.stopPropagation();
+            });
+
+            document.addEventListener("click", (event) => {
+                if (
+                    !userMenu.classList.contains("hidden") &&
+                    !userMenuButton.contains(event.target)
+                ) {
+                    userMenu.classList.add("hidden");
+                }
             });
         }
-        // Profile dropdown
-       
-          // Profile dropdown
-      const userMenuButton = document.getElementById("user-menu-button");
-      const userMenu = document.getElementById("user-menu");
-
-      if (userMenuButton && userMenu) {
-        userMenuButton.addEventListener("click", (event) => {
-          userMenu.classList.toggle("hidden");
-          event.stopPropagation();
-        });
-
-        document.addEventListener("click", (event) => {
-          if (
-            !userMenu.classList.contains("hidden") &&
-            !userMenuButton.contains(event.target)
-          ) {
-            userMenu.classList.add("hidden");
-          }
-        });
-      }
-let skillSearchTimeout;
-    
-    const skillsInput = document.getElementById("skills-input");
-    const skillsDropdown = document.getElementById("skills-dropdown");
-    
-    if (skillsInput) {
-        skillsInput.addEventListener("input", async (e) => {
-            clearTimeout(skillSearchTimeout);
-            const query = e.target.value.trim();
-            
-            if (query.length >= 1) {
-                skillSearchTimeout = setTimeout(async () => {
-                    try {
-                        const response = await fetch(
-                            "{% url 'search_skills_suggestions' %}?q=" + encodeURIComponent(query)
-                        );
-                        const data = await response.json();
-                        
-                        const availableDbSkills = data.skills.filter(
-                            s => !selectedSkills.includes(s)
-                        );
-                        
-                        skillsDropdown.innerHTML = "";
-                        
-                        // Database skills (green)
-                        if (availableDbSkills && availableDbSkills.length > 0) {
-                            availableDbSkills.forEach(skill => {
-                                const option = document.createElement("div");
-                                option.className = "px-4 py-2 cursor-pointer hover:bg-slate-100 flex items-center transition-colors";
-                                option.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> ${skill}`;
-                                option.addEventListener("click", () => selectSkill(skill));
-                                skillsDropdown.appendChild(option);
-                            });
-                        }
-                        
-                        // AI suggestions (blue)
-                        if (data.suggestions && data.suggestions.length > 0) {
-                            if (availableDbSkills.length > 0) {
-                                const separator = document.createElement("div");
-                                separator.className = "border-t border-slate-200 my-2";
-                                skillsDropdown.appendChild(separator);
+        let skillSearchTimeout;
+        
+        const skillsInput = document.getElementById("skills-input");
+        const skillsDropdown = document.getElementById("skills-dropdown");
+        
+        if (skillsInput) {
+            skillsInput.addEventListener("input", async (e) => {
+                clearTimeout(skillSearchTimeout);
+                const query = e.target.value.trim();
+                
+                if (query.length >= 1) {
+                    skillSearchTimeout = setTimeout(async () => {
+                        try {
+                            const response = await fetch(
+                                "{% url 'search_skills_suggestions' %}?q=" + encodeURIComponent(query)
+                            );
+                            const data = await response.json();
+                            
+                            const availableDbSkills = data.skills.filter(
+                                s => !selectedSkills.includes(s)
+                            );
+                            
+                            skillsDropdown.innerHTML = "";
+                            
+                            // Database skills (green)
+                            if (availableDbSkills && availableDbSkills.length > 0) {
+                                availableDbSkills.forEach(skill => {
+                                    const option = document.createElement("div");
+                                    option.className = "px-4 py-2 cursor-pointer hover:bg-slate-100 flex items-center transition-colors";
+                                    option.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> ${skill}`;
+                                    option.addEventListener("click", () => selectSkill(skill));
+                                    skillsDropdown.appendChild(option);
+                                });
                             }
                             
-                            const aiHeader = document.createElement("div");
-                            aiHeader.className = "px-4 py-2 font-semibold text-blue-600 text-sm bg-blue-50";
-                            aiHeader.textContent = "🤖 AI Suggestions:";
-                            skillsDropdown.appendChild(aiHeader);
+                            // AI suggestions (blue)
+                            if (data.suggestions && data.suggestions.length > 0) {
+                                if (availableDbSkills.length > 0) {
+                                    const separator = document.createElement("div");
+                                    separator.className = "border-t border-slate-200 my-2";
+                                    skillsDropdown.appendChild(separator);
+                                }
+                                
+                                const aiHeader = document.createElement("div");
+                                aiHeader.className = "px-4 py-2 font-semibold text-blue-600 text-sm bg-blue-50";
+                                aiHeader.textContent = "🤖 AI Suggestions:";
+                                skillsDropdown.appendChild(aiHeader);
+                                
+                                data.suggestions.forEach(skill => {
+                                    const option = document.createElement("div");
+                                    option.className = "px-4 py-2 cursor-pointer hover:bg-blue-50 flex items-center transition-colors";
+                                    option.innerHTML = `<span class="text-blue-500 mr-2">✨</span> ${skill}`;
+                                    option.addEventListener("click", () => selectSkill(skill));
+                                    skillsDropdown.appendChild(option);
+                                });
+                            }
                             
-                            data.suggestions.forEach(skill => {
-                                const option = document.createElement("div");
-                                option.className = "px-4 py-2 cursor-pointer hover:bg-blue-50 flex items-center transition-colors";
-                                option.innerHTML = `<span class="text-blue-500 mr-2">✨</span> ${skill}`;
-                                option.addEventListener("click", () => selectSkill(skill));
-                                skillsDropdown.appendChild(option);
-                            });
+                            // No results
+                            if (availableDbSkills.length === 0 && (!data.suggestions || data.suggestions.length === 0)) {
+                                const noResult = document.createElement("div");
+                                noResult.className = "px-4 py-2 text-center text-slate-500 text-sm";
+                                noResult.textContent = "No skills found";
+                                skillsDropdown.appendChild(noResult);
+                            }
+                            
+                            if (skillsDropdown) skillsDropdown.classList.remove("hidden");
+                            
+                        } catch (error) {
+                            console.error("AI suggestion error:", error);
+                            showToast("Error loading suggestions", "error");
                         }
-                        
-                        // No results
-                        if (availableDbSkills.length === 0 && (!data.suggestions || data.suggestions.length === 0)) {
-                            const noResult = document.createElement("div");
-                            noResult.className = "px-4 py-2 text-center text-slate-500 text-sm";
-                            noResult.textContent = "No skills found";
-                            skillsDropdown.appendChild(noResult);
-                        }
-                        
-                        if (skillsDropdown) skillsDropdown.classList.remove("hidden");
-                        
-                    } catch (error) {
-                        console.error("AI suggestion error:", error);
-                        showToast("Error loading suggestions", "error");
-                    }
-                }, 300);
-            } else if (query.length === 0) {
-                renderDropdown();
-                if (skillsDropdown) skillsDropdown.classList.remove("hidden");
-            } else {
-                if (skillsDropdown) skillsDropdown.classList.add("hidden");
-            }
-        });
-        
-        // Close dropdown on outside click
-        document.addEventListener("click", (e) => {
-            if (skillsInput && !skillsInput.contains(e.target) && 
-                skillsDropdown && !skillsDropdown.contains(e.target)) {
-                skillsDropdown.classList.add("hidden");
-            }
-        });
-    }
+                    }, 300);
+                } else if (query.length === 0) {
+                    renderDropdown();
+                    if (skillsDropdown) skillsDropdown.classList.remove("hidden");
+                } else {
+                    if (skillsDropdown) skillsDropdown.classList.add("hidden");
+                }
+            });
+            
+            // Close dropdown on outside click
+            document.addEventListener("click", (e) => {
+                if (skillsInput && !skillsInput.contains(e.target) && 
+                    skillsDropdown && !skillsDropdown.contains(e.target)) {
+                    skillsDropdown.classList.add("hidden");
+                }
+            });
+        }
     });
-</script> -->
+</script>
 
 
 </body>

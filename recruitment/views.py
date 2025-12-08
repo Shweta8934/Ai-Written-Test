@@ -11,15 +11,15 @@ from django.db import IntegrityError
 from django.contrib import messages
 from django.utils.text import slugify 
 from .models import JobPost, Candidate, RoundFeedback
-from .forms import JobPostForm, RoundFeedbackForm, CandidateApplicationForm # <-- यह line critical है
+from .forms import JobPostForm, RoundFeedbackForm, CandidateApplicationForm 
 from user_tests.forms import TestRegistrationForm 
-from user_tests.models import TestRegistration 
-
 from django.shortcuts import render, redirect, get_object_or_404
-from django.db import IntegrityError
-from django.contrib import messages
-from django.urls import reverse
-from user_tests.models import TestRegistration, QuestionPaper # QuestionPaper added
+from user_tests.models import TestRegistration, QuestionPaper 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+from django.views.generic import DetailView
+
 class JobPostListView(LoginRequiredMixin, ListView):
     model = JobPost
     template_name = 'partials/recruiter/job_list.html'
@@ -297,3 +297,101 @@ def job_application_view(request, slug):
 
     # Use the correct template path you provided earlier:
     return render(request, 'partials/recruiter/job_application.html', {'job': job_post, 'form': form})
+
+
+
+
+
+
+class CandidateDetailView(LoginRequiredMixin, DetailView):
+    model = Candidate
+    template_name = 'partials/recruiter/candidate_detail.html'
+    context_object_name = 'candidate'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['job'] = self.object.job_post
+        
+        try:
+            context['feedbacks'] = self.object.feedbacks.all().order_by('-created_at')
+        except AttributeError:
+            context['feedbacks'] = []
+            
+        return context
+
+
+class CandidateKanbanView(LoginRequiredMixin, DetailView):
+    model = JobPost
+    template_name = 'partials/recruiter/candidate_kanban.html'
+    context_object_name = 'job'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        job = self.object
+        candidates = job.candidates.all()
+
+        kanban_data = []
+        for cand in candidates:
+            # Color logic
+            color = "#5dc3f0" 
+            if cand.current_round == 'Rejected': color = "#ef4444"
+            elif cand.current_round == 'Final Offer': color = "#22c55e"
+            
+            kanban_data.append({
+                'id': str(cand.id),
+                'state': cand.current_round,
+                'label': cand.name,
+                'tags': f"Score: {cand.test_registration.score or 'N/A'}",
+                'hex': color,
+                'resourceId': cand.id,
+                'detail_url': reverse('candidate_detail', kwargs={'pk': cand.pk}) 
+            })
+
+        context['kanban_data'] = json.dumps(kanban_data)
+        
+        columns = [
+            {'text': 'Applied', 'dataField': 'Applied'},
+            {'text': 'Written Test', 'dataField': 'Written Test Passed'}, 
+            {'text': 'GD Round', 'dataField': 'GD Round'},
+            {'text': 'Technical Interview', 'dataField': 'Interview Round'},
+            {'text': 'HR Interview', 'dataField': 'HR Round'},
+            {'text': 'Final Offer', 'dataField': 'Final Offer'},
+            {'text': 'Rejected', 'dataField': 'Rejected'}
+        ]
+        context['kanban_columns'] = json.dumps(columns)
+        return context
+
+
+@csrf_exempt 
+@login_required
+def update_candidate_kanban_status(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            candidate_id = data.get('candidate_id')
+            new_status = data.get('new_status')
+
+            if not candidate_id:
+                return JsonResponse({'success': False, 'message': "ID Missing from request"})
+
+            # Filter by ID
+            candidate = Candidate.objects.get(pk=candidate_id)
+            
+            # Update Round
+            candidate.current_round = new_status
+            
+            # Handle Hired/Rejected flags
+            if new_status == 'Final Offer':
+                candidate.is_hired = True
+            elif new_status == 'Rejected':
+                candidate.is_hired = False
+            
+            candidate.save()
+            return JsonResponse({'success': True, 'message': f"Moved to {new_status}"})
+
+        except Candidate.DoesNotExist:
+             return JsonResponse({'success': False, 'message': "Candidate not found in DB"})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+            
+    return JsonResponse({'success': False})

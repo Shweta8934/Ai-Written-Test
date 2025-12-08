@@ -3,6 +3,7 @@
 import json
 from openai import OpenAI  # Import OpenAI instead of google.generativeai
 import re
+from django.conf import settings
 import google.generativeai as genai
 from django.contrib.auth import login, logout
 from django.views.decorators.http import require_POST
@@ -2462,3 +2463,95 @@ def get_chatgpt_suggestions(query, db_list):
     except Exception as e:
         print(f"OpenAI Error: {e}")
         return []
+
+
+
+# app/views.py (File ke ant mein ya kisi bhi suitable jagah)
+
+# Ensure 'from django.views.decorators.csrf import csrf_exempt' is already imported (it is)
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+import os
+import base64
+import uuid
+
+# ... (other imports)
+import base64
+import uuid
+from django.core.files.base import ContentFile
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.conf import settings
+import os
+# app/views.py
+
+import json
+# ... (अन्य imports)
+import logging # <-- यह सुनिश्चित करें कि यह आयात हो
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+# ... (अन्य imports)
+
+logger = logging.getLogger(__name__) # <-- यह सुनिश्चित करें कि यह फ़ाइल के टॉप पर मौजूद हो
+
+# ... (अन्य views)
+
+@login_required
+@require_POST
+def upload_image_ajax(request):
+    """
+    Handles image upload from the question editor via AJAX.
+    Saves the image and returns its public URL.
+    """
+    try:
+        data = json.loads(request.body)
+        image_data = data.get('image_data')
+
+        if not image_data:
+            logger.warning("Image upload failed: No image data provided.") # <-- LOG ADDED
+            return JsonResponse({"status": "error", "message": "No image data provided."}, status=400)
+
+        # Base64 string से image content निकालना
+        if ';base64,' in image_data:
+            header, base64_data = image_data.split(';base64,')
+        else:
+             # Agar data:image/png;base64, header nahi hai to
+            header, base64_data = '', image_data
+            
+        
+        # Determine file extension based on header or default to png
+        try:
+            ext = header.split('/')[-1] if header else 'png'
+            if ext not in ['png', 'jpeg', 'jpg', 'gif']:
+                ext = 'png'
+        except:
+            ext = 'png'
+            
+        file_content = ContentFile(base64.b64decode(base64_data))
+        
+        # Unique filename create karein
+        file_name = f'questions/{request.user.id}/{uuid.uuid4()}.{ext}'
+        
+        # Default storage mein save karein (MEDIA_ROOT/media files)
+        path = default_storage.save(file_name, file_content)
+        
+        # Image ka public URL return karein
+        # image_url = request.build_absolute_uri(settings.MEDIA_URL + path)
+        image_url = request.build_absolute_uri(settings.MEDIA_URL + path) 
+        # ✅ SUCCESS LOGGING
+        logger.info(f"Image uploaded successfully. Filename: {path}, URL: {image_url}")
+        
+        
+    
+        return JsonResponse({"status": "success", "url": image_url})
+
+    except json.JSONDecodeError:
+        logger.error("Image upload failed: Invalid JSON payload received.", exc_info=True) # <-- LOG ADDED
+        return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
+    except Exception as e:
+        logger.error(f"Image Upload Server Error: {e}", exc_info=True) # <-- LOG ADDED
+        return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"}, status=500)
+
+  

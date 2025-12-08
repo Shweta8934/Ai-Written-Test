@@ -1,6 +1,20 @@
 # recruitment/urls.py
 from django.urls import path
 from . import views
+from django.urls import path
+from .views import (
+    JobPostListView, 
+    JobPostCreateView, 
+    JobPostDetailView, 
+    CandidateListView, 
+    move_candidate_round, 
+    FeedbackCreateView, 
+    job_application_view,
+    CandidateKanbanView, 
+    update_candidate_kanban_status,
+    CandidateDetailView
+)
+
 
 urlpatterns = [
  
@@ -12,5 +26,8 @@ urlpatterns = [
     path('candidate/<int:pk>/feedback/submit/', views.FeedbackCreateView.as_view(), name='submit_feedback'),
     path('apply/<slug:slug>/', views.job_application_view, name='job_application'),    
     path('candidate/<int:pk>/feedback/submit/', views.FeedbackCreateView.as_view(), name='submit_feedback'),
+path('job/<int:pk>/kanban/', CandidateKanbanView.as_view(), name='candidate_kanban'),
+    path('api/update-kanban-status/', update_candidate_kanban_status, name='update_candidate_kanban_status'),
+    path('candidate/<int:pk>/details/', CandidateDetailView.as_view(), name='candidate_detail'),
 
 ]

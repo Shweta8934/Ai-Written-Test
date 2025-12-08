@@ -1,7 +1,6 @@
 
 
 {% load static %}
-
 <aside
   id="desktop-sidebar"
   class="bg-white text-slate-800 w-64 flex-col transition-all duration-300 ease-in-out shadow-md hidden lg:flex"
@@ -195,6 +194,83 @@
       <span
         class="desktop-sidebar-text whitespace-nowrap transition-opacity duration-200"
         >Job List</span
+      >
+    </a>
+
+     <a
+      href="{% url 'job_list' %}"
+      class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-100 group relative"
+    >
+      <svg
+        class="w-5 h-5 mr-3 flex-shrink-0"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="1.5"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M3 13.5h.008v.008H3v-.008z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM18.75 8.25a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 14.25h.008v.008H12v-.008zM12.375 16.5h-.008v-.008h.008v.008z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 18.75h.008v.008H12v-.008zM18.75 13.5h.008v.008h-.008v-.008zM18.75 15.75h.008v.008h-.008v-.008zM18.75 18h.008v.008h-.008v-.008zM3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v12a2.25 2.25 0 002.25 2.25z"
+        />
+      </svg>
+      <span
+        class="desktop-sidebar-text whitespace-nowrap transition-opacity duration-200"
+        >Round Master</span
+      >
+    </a>
+     <a
+      href="{% url 'job_list' %}"
+      class="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-100 group relative"
+    >
+      <svg
+        class="w-5 h-5 mr-3 flex-shrink-0"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="1.5"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M3 13.5h.008v.008H3v-.008z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM18.75 8.25a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 14.25h.008v.008H12v-.008zM12.375 16.5h-.008v-.008h.008v.008z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 18.75h.008v.008H12v-.008zM18.75 13.5h.008v.008h-.008v-.008zM18.75 15.75h.008v.008h-.008v-.008zM18.75 18h.008v.008h-.008v-.008zM3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v12a2.25 2.25 0 002.25 2.25z"
+        />
+      </svg>
+      <span
+        class="desktop-sidebar-text whitespace-nowrap transition-opacity duration-200"
+        >Evaluation Master</span
       >
     </a>
   </nav>
