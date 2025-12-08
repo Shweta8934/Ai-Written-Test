@@ -42,8 +42,14 @@
       <main class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 p-6">
         
         <div class="container mx-auto max-w-3xl">
-            <h2 class="text-2xl font-bold mb-6 text-theme-dark">Create Evaluation Template</h2>
-            
+<div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-theme-dark">Create Evaluation Template</h2>
+                
+                <a href="{% url 'evaluation_template_list' %}" 
+                   class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-theme-primary font-medium py-2 px-4 rounded shadow-sm transition duration-200 flex items-center text-sm">
+                    <i class="fas fa-list-ul mr-2 text-theme-primary"></i> View All Templates
+                </a>
+            </div>            
             <form method="post" class="bg-white shadow-lg rounded-lg px-8 pt-6 pb-8 mb-4">
                 {% csrf_token %}
                 

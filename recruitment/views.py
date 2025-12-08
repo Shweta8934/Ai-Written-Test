@@ -24,7 +24,8 @@ class JobPostListView(LoginRequiredMixin, ListView):
     model = JobPost
     template_name = 'partials/recruiter/job_list.html'
     context_object_name = 'jobs'
-    # recruitment/views.py mein JobPostCreateView ko replace/update karein
+    ordering = ['-created_at']  
+    paginate_by = 5
 
 from .forms import JobPostForm, JobRoundFormSet # Import FormSet
 
@@ -37,8 +38,6 @@ class JobPostCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['question_papers'] = QuestionPaper.objects.all().order_by('id')
-        
-        # FormSet ko context mein pass karein
         if self.request.POST:
             context['rounds_formset'] = JobRoundFormSet(self.request.POST)
         else:
@@ -49,64 +48,51 @@ class JobPostCreateView(LoginRequiredMixin, CreateView):
         context = self.get_context_data()
         rounds_formset = context['rounds_formset']
 
-        # Dono form valid hone chahiye
         if form.is_valid() and rounds_formset.is_valid():
-            form.instance.created_by = self.request.user
-            
-            # Slug Generation Logic (Existing)
-            base_slug = slugify(form.instance.title)
-            unique_slug = base_slug
-            num = 1
-            while JobPost.objects.filter(public_link_slug=unique_slug).exists():
-                unique_slug = f'{base_slug}-{num}'
-                num += 1
-            form.instance.public_link_slug = unique_slug 
-            
-            # 1. Job Post Save karein
-            self.object = form.save()
-            
-            # 2. Rounds Save karein (Link them to this Job Post)
-            rounds_formset.instance = self.object
-            rounds_formset.save()
-            
-            # Optional: Total rounds count update kar sakte hain model mein agar field rakha hai
-            self.object.total_rounds = self.object.rounds.count()
-            self.object.save()
+            try:
+                form.instance.created_by = self.request.user
+                
+                # Slug Generation Logic
+                base_slug = slugify(form.instance.title)
+                unique_slug = base_slug
+                num = 1
+                while JobPost.objects.filter(public_link_slug=unique_slug).exists():
+                    unique_slug = f'{base_slug}-{num}'
+                    num += 1
+                form.instance.public_link_slug = unique_slug 
+                
+                # 1. Job Post Save करें
+                self.object = form.save()
+                
+                # 2. Rounds Formset Save Logic (AUTO ORDERING)
+                # commit=False से ऑब्जेक्ट्स मेमोरी में बनेंगे, DB में नहीं
+                rounds = rounds_formset.save(commit=False)
+                
+                # Loop चलाकर अपने आप order सेट करें (1, 2, 3...)
+                for index, round_obj in enumerate(rounds):
+                    round_obj.job_post = self.object
+                    round_obj.order = index + 1  # यहाँ आटोमेटिक आर्डर सेट हो रहा है
+                    round_obj.save()
 
-            messages.success(self.request, f"Job '{form.instance.title}' created successfully!")
-            return redirect(self.success_url)
+                # अगर कोई राउंड डिलीट किया गया है तो उसे हटाएं
+                for deleted_obj in rounds_formset.deleted_objects:
+                    deleted_obj.delete()
+                
+                # Update total rounds count
+                self.object.total_rounds = self.object.rounds.count()
+                self.object.save()
+
+                messages.success(self.request, f"Job '{form.instance.title}' created successfully!")
+                return redirect(self.success_url)
+                
+            except Exception as e:
+                print(f"❌ Database Error: {e}")
+                return self.render_to_response(self.get_context_data(form=form))
         else:
-            # Agar error hai to wapis form dikhayein
+            print("❌ FORM INVALID")
+            print("Formset Errors:", rounds_formset.errors) # अब error नहीं आएगा
             return self.render_to_response(self.get_context_data(form=form))
-# class JobPostCreateView(LoginRequiredMixin, CreateView):
-#     model = JobPost
-#     form_class = JobPostForm
-#     template_name = 'partials/recruiter/job_Create.html'    
-#     success_url = reverse_lazy('job_list')
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         # सभी उपलब्ध प्रश्न पत्रों को फ़ेच करें
-#         context['question_papers'] = QuestionPaper.objects.all().order_by('id')
-#         return context
-#     def form_valid(self, form):
-#         form.instance.created_by = self.request.user
-        
-#         # SLUG GENERATION LOGIC:
-#         base_slug = slugify(form.instance.title)
-#         unique_slug = base_slug
-#         num = 1
-        
-#         # Ensure the slug is unique before saving
-#         while JobPost.objects.filter(public_link_slug=unique_slug).exists():
-#             unique_slug = f'{base_slug}-{num}'
-#             num += 1
-            
-#         form.instance.public_link_slug = unique_slug 
-        
-#         # Save the form instance with the generated slug
-#         response = super().form_valid(form)
-#         messages.success(self.request, f"Job '{form.instance.title}' created successfully!")
-#         return response
+
 
 class JobPostDetailView(LoginRequiredMixin, DetailView):
     model = JobPost
@@ -536,4 +522,90 @@ class RoundMasterCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, f"Round '{form.instance.name}' created successfully!")
         return super().form_valid(form)
 
+# recruitment/views.py
 
+# ... existing imports ...
+from django.views.generic import UpdateView
+
+class JobPostUpdateView(LoginRequiredMixin, UpdateView):
+    model = JobPost
+    form_class = JobPostForm
+    template_name = 'partials/recruiter/job_edit.html'  # अलग टेम्पलेट
+    success_url = reverse_lazy('job_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # अगर POST रिक्वेस्ट है (Form Submit हुआ है)
+        if self.request.POST:
+            context['rounds_formset'] = JobRoundFormSet(self.request.POST, instance=self.object)
+        else:
+            # अगर GET रिक्वेस्ट है (Page Load हुआ है) - मौजूदा Rounds को लोड करें
+            context['rounds_formset'] = JobRoundFormSet(instance=self.object)
+        return context
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        rounds_formset = context['rounds_formset']
+
+        if form.is_valid() and rounds_formset.is_valid():
+            try:
+                self.object = form.save()
+                
+                # Rounds को सेव करें
+                rounds = rounds_formset.save(commit=False)
+                
+                # डिलीट किए गए राउंड्स को हैंडल करें
+                for deleted_obj in rounds_formset.deleted_objects:
+                    deleted_obj.delete()
+
+                # नए या अपडेट किए गए राउंड्स को सेव करें और आर्डर सेट करें
+                for index, round_obj in enumerate(rounds):
+                    round_obj.job_post = self.object
+                    round_obj.order = index + 1
+                    round_obj.save()
+                
+                # Total rounds count अपडेट करें
+                self.object.total_rounds = self.object.rounds.count()
+                self.object.save()
+
+                messages.success(self.request, f"Job '{form.instance.title}' updated successfully!")
+                return redirect(self.success_url)
+                
+            except Exception as e:
+                print(f"❌ Database Error: {e}")
+                return self.render_to_response(self.get_context_data(form=form))
+        else:
+            return self.render_to_response(self.get_context_data(form=form))
+
+
+
+
+
+from django.views.generic import DeleteView
+
+
+class JobPostDeleteView(LoginRequiredMixin, DeleteView):
+    model = JobPost
+    success_url = reverse_lazy('job_list')
+    
+    template_name = 'partials/recruiter/job_confirm_delete.html'
+
+    # recruitment/views.py
+
+from django.views.decorators.http import require_POST
+
+@login_required
+@require_POST
+def update_job_status_ajax(request):
+    try:
+        data = json.loads(request.body)
+        job_id = data.get('job_id')
+        new_status = data.get('status')
+
+        job = get_object_or_404(JobPost, pk=job_id, created_by=request.user)
+        job.status = new_status
+        job.save()
+
+        return JsonResponse({'success': True, 'message': f"Status updated to {new_status}"})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=400)

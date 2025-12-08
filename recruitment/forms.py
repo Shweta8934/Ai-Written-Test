@@ -45,7 +45,8 @@ class JobPostForm(forms.ModelForm):
             'experience_min', 'experience_max', 'skills_required', 'positions_available',
             
            
-            # 'total_rounds', 'pay_scale', 'end_date',
+            # 'total_rounds',
+            'pay_scale', 'end_date',
             
             'description', 'question_paper', 'status', 
            
@@ -238,9 +239,6 @@ EvaluationParameterFormSet = inlineformset_factory(
     extra=1,
     can_delete=True
 )
-
-
-# recruitment/forms.py में import और class जोड़ें
 from .models import RoundMaster # Ensure RoundMaster is imported
 
 class RoundMasterForm(forms.ModelForm):
@@ -257,7 +255,7 @@ class RoundMasterForm(forms.ModelForm):
 class JobRoundForm(forms.ModelForm):
     class Meta:
         model = JobRound
-        fields = ['round_master', 'order']
+        fields = ['round_master']
         widgets = {
             'round_master': forms.Select(attrs={
                 'class': 'block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500'

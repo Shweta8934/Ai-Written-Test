@@ -181,15 +181,8 @@ class RoundMaster(models.Model):
         return f"{self.name} ({self.get_round_type_display()})"
 
 
-# recruitment/models.py ke end mein ye add karein
+from .models import RoundMaster 
 
-from .models import RoundMaster # Ensure RoundMaster is imported
-
-# ... existing JobPost class ...
-
-# recruitment/models.py
-
-# ... existing code ...
 
 class JobRound(models.Model):
     job_post = models.ForeignKey(
