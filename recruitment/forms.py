@@ -3,6 +3,7 @@ from django import forms
 from .models import JobPost, RoundFeedback
 from django.core.exceptions import ValidationError
 from .models import JobPost, JobRound, RoundMaster  
+from django.core.validators import RegexValidator
 INPUT_CLASSES = (
     "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm "
     "placeholder-gray-400 focus:outline-none focus:ring-blue-primary "
@@ -109,7 +110,16 @@ class CandidateApplicationForm(forms.Form):
         ('fresher', 'Fresher'),
         ('experienced', 'Experienced'),
     ]
-
+    # 2. Dropdown ke liye choices define karein
+    SOURCE_CHOICES = [
+        ('', 'Select an option'), # Default empty
+        ('linkedin', 'LinkedIn'),
+        ('naukri', 'Naukri.com'),
+        ('website', 'Company Website'),
+        ('referral', 'Friend/Referral'),
+        ('social', 'Social Media'),
+        ('other', 'Other'),
+    ]
     # 📌 Experience Status
     is_experienced = forms.ChoiceField(
         choices=EXPERIENCE_CHOICES,
@@ -125,8 +135,24 @@ class CandidateApplicationForm(forms.Form):
         widget=forms.EmailInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Email *'})
     )
     mobile = forms.CharField(
-        max_length=15, 
-        widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Mobile *'})
+        max_length=11, # Database me 15 hai, par form me hum 11 allow karenge
+        min_length=11,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{11}$', 
+                message='Mobile number must be exactly 11 digits.', 
+                code='invalid_mobile'
+            )
+        ],
+        widget=forms.TextInput(attrs={
+            'class': INPUT_CLASSES, 
+            'placeholder': 'Mobile (11 Digits) *',
+            'type': 'tel',  # Mobile keypad numeric open hoga
+            'pattern': '[0-9]{11}', # HTML5 validation
+            'maxlength': '11', # User 11 se zyada type hi nahi kar payega
+            # Ye Javascript user ko sirf number type karne dega:
+            'oninput': "this.value = this.value.replace(/[^0-9]/g, '')" 
+        })
     )
     
     # 📌 Skills & Experience (Conditional Fields)
@@ -142,8 +168,12 @@ class CandidateApplicationForm(forms.Form):
     notice_period = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Notice Period'}))
     
     # 📌 Source
-    heard_about_us = forms.CharField(max_length=255, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'From where did you hear about us?'}))
-
+    # 4. Heard About Us - Ab Dropdown ban gaya hai
+    heard_about_us = forms.ChoiceField(
+        choices=SOURCE_CHOICES,
+        required=False, 
+        widget=forms.Select(attrs={'class': INPUT_CLASSES})
+    )
     # 📌 File Uploads (Confirmed Optional: required=False)
     cv_or_resume = forms.FileField(
         required=False, 
@@ -162,6 +192,109 @@ class CandidateApplicationForm(forms.Form):
     
     job_post_pk = forms.IntegerField(widget=forms.HiddenInput())
 
+
+class CandidateApplicationForm(forms.Form):
+    """
+    Public form for a candidate to apply directly to a job post.
+    Fields match the provided image with Fresher/Experienced selection.
+    """
+    EXPERIENCE_CHOICES = [
+        ('fresher', 'Fresher'),
+        ('experienced', 'Experienced'),
+    ]
+    # 2. Dropdown ke liye choices define karein
+    SOURCE_CHOICES = [
+        ('', 'Select an option'), # Default empty
+        ('linkedin', 'LinkedIn'),
+        ('naukri', 'Naukri.com'),
+        ('website', 'Company Website'),
+        ('referral', 'Friend/Referral'),
+        ('social', 'Social Media'),
+        ('other', 'Other'),
+    ]
+    # 📌 Experience Status
+    is_experienced = forms.ChoiceField(
+        choices=EXPERIENCE_CHOICES,
+        widget=forms.Select(attrs={'class': INPUT_CLASSES})
+    )
+    
+    # 📌 Personal Information Fields
+    full_name = forms.CharField(
+        max_length=255, 
+        widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Full Name *'})
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Email *'})
+    )
+    mobile = forms.CharField(
+        max_length=11, # Database me 15 hai, par form me hum 11 allow karenge
+        min_length=11,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{11}$', 
+                message='Mobile number must be exactly 11 digits.', 
+                code='invalid_mobile'
+            )
+        ],
+        widget=forms.TextInput(attrs={
+            'class': INPUT_CLASSES, 
+            'placeholder': 'Mobile (11 Digits) *',
+            'type': 'tel',  # Mobile keypad numeric open hoga
+            'pattern': '[0-9]{11}', # HTML5 validation
+            'maxlength': '11', # User 11 se zyada type hi nahi kar payega
+            # Ye Javascript user ko sirf number type karne dega:
+            'oninput': "this.value = this.value.replace(/[^0-9]/g, '')" 
+        })
+    )
+    
+    # 📌 Skills & Experience (Conditional Fields)
+    your_skills = forms.CharField(max_length=500, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Your Skills'}))
+    total_experience = forms.IntegerField(min_value=0, required=False, widget=forms.NumberInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Total Experience'}))
+    current_location = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Current Location'}))
+    
+    # 📌 Compensation & Notice (Conditional Fields)
+    current_ctc = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Current CTC ₹'}))
+    current_ctc_rate = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Current CTC Rate'}))
+    expected_ctc = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Expected CTC ₹'}))
+    expected_ctc_rate = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Expected CTC Rate'}))
+    notice_period = forms.CharField(max_length=50, required=False, widget=forms.TextInput(attrs={'class': INPUT_CLASSES, 'placeholder': 'Notice Period'}))
+    
+    # 📌 Source
+    # 4. Heard About Us - Ab Dropdown ban gaya hai
+    heard_about_us = forms.ChoiceField(
+        choices=SOURCE_CHOICES,
+        required=False, 
+        widget=forms.Select(attrs={'class': INPUT_CLASSES})
+    )
+    # 📌 File Uploads (Confirmed Optional: required=False)
+    cv_or_resume = forms.FileField(
+        required=False, 
+        widget=forms.ClearableFileInput(attrs={'class': 'hidden', 'id': 'cv_upload'})
+    )
+    photo = forms.FileField(
+        required=False, 
+        widget=forms.ClearableFileInput(attrs={'class': 'hidden', 'id': 'photo_upload'})
+    )
+    
+    # 📌 Cover Letter
+    cover_letter = forms.CharField(
+        widget=forms.Textarea(attrs={'class': TEXTAREA_CLASSES, 'rows': 5, 'placeholder': 'Write a brief cover letter...'}), 
+        required=False
+    )
+    
+    job_post_pk = forms.IntegerField(widget=forms.HiddenInput())
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        
+        if email:
+            # Email ko lowercase karein taaki Case Sensitive issue na ho (User@Gmail.com bhi chalega)
+            email_check = email.lower()
+            
+            # Check karein agar @gmail.com ya .in se end ho raha hai
+            if not (email_check.endswith('@gmail.com') or email_check.endswith('.in')):
+                raise ValidationError("Only Gmail (@gmail.com) or .in domains are allowed.")
+        
+        return email
 
 
 # recruitment/forms.py

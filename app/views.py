@@ -2001,7 +2001,6 @@ def upload_image_ajax(request):
         logger.error(f"Image Upload Server Error: {e}", exc_info=True)
         return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"}, status=500)
 
- 
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages

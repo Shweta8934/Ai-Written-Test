@@ -145,8 +145,41 @@
                         
                         <div class="flex justify-between items-start mb-2">
                             <h2 class="text-2xl font-bold text-gray-900 break-words max-w-[70%]">{{ current_job.title }}</h2>
-                            
                             <div class="flex space-x-2 mt-1">
+    {% if not current_job.is_expired and current_job.status != 'Closed' %}
+        <button id="copy-link-btn" 
+                data-application-link="{% if application_link %}{{ application_link }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% url 'job_application' slug=current_job.public_link_slug %}{% endif %}"
+                class="p-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition duration-150 relative group"
+                title="Copy Application Link">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+            </svg>
+            <span class="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-700 text-white text-xs rounded-lg whitespace-nowrap">
+                Copy Link
+            </span>
+        </button>
+    {% endif %}
+
+    {% if current_job.is_expired or current_job.status == 'Closed' %}
+        <button disabled class="px-3 py-2 text-sm bg-gray-300 text-gray-500 rounded-md cursor-not-allowed flex items-center space-x-1">
+            <span>Applications Closed</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+        </button>
+    {% else %}
+        <a href="{% if application_link %}{{ application_link }}{% else %}{% url 'job_application' slug=current_job.public_link_slug %}{% endif %}" 
+           target="_blank"
+           class="px-3 py-2 text-sm bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-150 flex items-center space-x-1"
+           title="View Public Application Form">
+            <span>Apply</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+            </svg>
+        </a>
+    {% endif %}
+</div>
+                            <!-- <div class="flex space-x-2 mt-1">
                                 <button id="copy-link-btn" 
                                         data-application-link="{% if application_link %}{{ application_link }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% url 'job_application' slug=current_job.public_link_slug %}{% endif %}"
                                         class="p-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition duration-150 relative group"
@@ -168,7 +201,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                     </svg>
                                 </a>
-                            </div>
+                            </div> -->
                         </div>
                         <p class="text-sm text-gray-500 mb-2">{{ current_job.department }} - {{ current_job.location|default:"N/A" }}</p>
                         
@@ -178,16 +211,13 @@
                                 <p class="text-xs text-gray-500">Total Openings</p>
                             </div>
                             <div class="p-3 bg-gray-100 rounded-lg">
-                                <p class="text-xl font-semibold text-indigo-600">{{ candidate_count|default:0 }}</p>
-                                <p class="text-xs text-gray-500">Total Candidates</p>
+<p class="text-xl font-semibold text-indigo-600">{{ current_job.total_candidates_count }}</p>                                <p class="text-xs text-gray-500">Total Candidates</p>
                             </div>
                             <div class="p-3 bg-gray-100 rounded-lg">
-                                <p class="text-xl font-semibold text-yellow-600">0</p>
-                                <p class="text-xs text-gray-500">In Progress</p>
+<p class="text-xl font-semibold text-yellow-600">{{ current_job.in_progress_count }}</p>                                <p class="text-xs text-gray-500">In Progress</p>
                             </div>
                             <div class="p-3 bg-gray-100 rounded-lg">
-                                <p class="text-xl font-semibold text-green-600">0</p>
-                                <p class="text-xs text-gray-500">Hired</p>
+<p class="text-xl font-semibold text-green-600">{{ current_job.hired_count }}</p>                                <p class="text-xs text-gray-500">Hired</p>
                             </div>
                         </div>
                         
@@ -213,10 +243,12 @@
                                     <p class="text-gray-500">End Date</p>
                                     <p class="font-medium text-gray-900">{{ current_job.end_date|date:"D d M Y"|default:"N/A" }}</p>
                                 </div>
-                                <div>
-                                    <p class="text-gray-500">Status</p>
-                                    <p class="font-medium text-gray-900">{{ current_job.get_status_display }}</p>
-                                </div>
+                               <div>
+    <p class="text-gray-500">Status</p>
+    <p id="detail-status-text" data-job-id="{{ current_job.pk }}" class="font-medium text-gray-900">
+        {{ current_job.get_status_display }}
+    </p>
+</div>
                             </div>
 
                             <div class="space-y-4">

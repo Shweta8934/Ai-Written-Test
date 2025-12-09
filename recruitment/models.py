@@ -3,6 +3,73 @@ from django.db import models
 from django.conf import settings
 from app.models import QuestionPaper 
 from user_tests.models import TestRegistration 
+# class JobPost(models.Model):
+#     STATUS_CHOICES = [
+#         ('Open', 'Open'),
+#         ('Closed', 'Closed'),
+#         ('Archived', 'Archived'),
+#     ]
+#     JOB_TYPE_CHOICES = [
+#         ('Full-Time', 'Full-Time'),
+#         ('Part-Time', 'Part-Time'),
+#         ('Contract', 'Contract'),
+#         ('Internship', 'Internship'),
+#     ]
+    
+#     # 📌 Job Details (Image Fields)
+#     title = models.CharField(max_length=255, verbose_name="Job Title") # Job Title
+#     department = models.CharField(max_length=100, blank=True, verbose_name="Department") # Department
+#     location = models.CharField(max_length=100, blank=True, verbose_name="Job Location") # Job Location
+#     job_type = models.CharField(max_length=50, choices=JOB_TYPE_CHOICES, default='Full-Time', verbose_name="Job Type") # Job Type
+
+#     # 📌 Requirements (Image Fields)
+#     experience_min = models.IntegerField(default=0, verbose_name="Experience Min (Years)") # Experience Min
+#     experience_max = models.IntegerField(default=5, verbose_name="Experience Max (Years)") # Experience Max
+#     skills_required = models.TextField(blank=True, verbose_name="Skills Required (Comma separated)") # Skills
+#     positions_available = models.IntegerField(default=1, verbose_name="Positions Available") # Positions (renamed for clarity)
+
+#     # 📌 Logistics (Image Fields)
+#     # Note: 'Rounds' will be better handled in a separate related model/structure for complexity, 
+#     # but we will store the total number of rounds here for simplicity in the form.
+#     total_rounds = models.IntegerField(default=3, verbose_name="Total Interview Rounds") # Rounds (Simplified)
+#     pay_scale = models.CharField(max_length=100, blank=True, verbose_name="Pay Scale / Salary Range") # Pay Scale
+#     end_date = models.DateField(null=True, blank=True, verbose_name="Application End Date") # End Date
+
+#     # 📌 Existing Fields
+#     description = models.TextField()
+#     question_paper = models.ForeignKey(
+#         QuestionPaper, 
+#         on_delete=models.SET_NULL, 
+#         null=True, blank=True,
+#         related_name='job_posts',
+#         verbose_name="Written Test Question Paper"
+#     )
+#     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Open')
+#     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+#     public_link_slug = models.SlugField(unique=True, max_length=100, help_text="Unique URL identifier")
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#   @property
+#     def total_candidates_count(self):
+#         return self.candidates.count()
+
+#     @property
+#     def hired_count(self):
+#         return self.candidates.filter(is_hired=True).count()
+
+#     @property
+#     def in_progress_count(self):
+#         # In Progress = Not Hired AND Not Rejected
+#         return self.candidates.filter(is_hired=False).exclude(current_round='Rejected').count()
+#     def __str__(self):
+#         return self.title
+
+from django.db import models
+from django.conf import settings
+from app.models import QuestionPaper 
+from user_tests.models import TestRegistration 
+import datetime  # <--- 1. यह लाइन जोड़ना न भूलें
+
 class JobPost(models.Model):
     STATUS_CHOICES = [
         ('Open', 'Open'),
@@ -16,24 +83,22 @@ class JobPost(models.Model):
         ('Internship', 'Internship'),
     ]
     
-    # 📌 Job Details (Image Fields)
-    title = models.CharField(max_length=255, verbose_name="Job Title") # Job Title
-    department = models.CharField(max_length=100, blank=True, verbose_name="Department") # Department
-    location = models.CharField(max_length=100, blank=True, verbose_name="Job Location") # Job Location
-    job_type = models.CharField(max_length=50, choices=JOB_TYPE_CHOICES, default='Full-Time', verbose_name="Job Type") # Job Type
+    # 📌 Job Details
+    title = models.CharField(max_length=255, verbose_name="Job Title")
+    department = models.CharField(max_length=100, blank=True, verbose_name="Department")
+    location = models.CharField(max_length=100, blank=True, verbose_name="Job Location")
+    job_type = models.CharField(max_length=50, choices=JOB_TYPE_CHOICES, default='Full-Time', verbose_name="Job Type")
 
-    # 📌 Requirements (Image Fields)
-    experience_min = models.IntegerField(default=0, verbose_name="Experience Min (Years)") # Experience Min
-    experience_max = models.IntegerField(default=5, verbose_name="Experience Max (Years)") # Experience Max
-    skills_required = models.TextField(blank=True, verbose_name="Skills Required (Comma separated)") # Skills
-    positions_available = models.IntegerField(default=1, verbose_name="Positions Available") # Positions (renamed for clarity)
+    # 📌 Requirements
+    experience_min = models.IntegerField(default=0, verbose_name="Experience Min (Years)")
+    experience_max = models.IntegerField(default=5, verbose_name="Experience Max (Years)")
+    skills_required = models.TextField(blank=True, verbose_name="Skills Required (Comma separated)")
+    positions_available = models.IntegerField(default=1, verbose_name="Positions Available")
 
-    # 📌 Logistics (Image Fields)
-    # Note: 'Rounds' will be better handled in a separate related model/structure for complexity, 
-    # but we will store the total number of rounds here for simplicity in the form.
-    total_rounds = models.IntegerField(default=3, verbose_name="Total Interview Rounds") # Rounds (Simplified)
-    pay_scale = models.CharField(max_length=100, blank=True, verbose_name="Pay Scale / Salary Range") # Pay Scale
-    end_date = models.DateField(null=True, blank=True, verbose_name="Application End Date") # End Date
+    # 📌 Logistics
+    total_rounds = models.IntegerField(default=3, verbose_name="Total Interview Rounds")
+    pay_scale = models.CharField(max_length=100, blank=True, verbose_name="Pay Scale / Salary Range")
+    end_date = models.DateField(null=True, blank=True, verbose_name="Application End Date")
 
     # 📌 Existing Fields
     description = models.TextField()
@@ -48,11 +113,33 @@ class JobPost(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     public_link_slug = models.SlugField(unique=True, max_length=100, help_text="Unique URL identifier")
     created_at = models.DateTimeField(auto_now_add=True)
-  
+    
+    # ---------------------------------------------------------
+    # PROPERTIES
+    # ---------------------------------------------------------
+
+    @property
+    def total_candidates_count(self):
+        return self.candidates.count()
+
+    @property
+    def hired_count(self):
+        return self.candidates.filter(is_hired=True).count()
+
+    @property
+    def in_progress_count(self):
+        # In Progress = Not Hired AND Not Rejected
+        return self.candidates.filter(is_hired=False).exclude(current_round='Rejected').count()
+
+    @property
+    def is_expired(self):
+        """Checks if the job end date has passed."""
+        if self.end_date and self.end_date < datetime.date.today():
+            return True
+        return False
+
     def __str__(self):
         return self.title
-
-
 class Candidate(models.Model):
     # This links the candidate to the initial Test Registration details
     test_registration = models.OneToOneField(

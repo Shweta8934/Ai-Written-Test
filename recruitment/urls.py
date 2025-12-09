@@ -34,10 +34,11 @@ urlpatterns = [
     path('job/<int:pk>/kanban/', CandidateKanbanView.as_view(), name='candidate_kanban'),
     path('api/update-kanban-status/', update_candidate_kanban_status, name='update_candidate_kanban_status'),
     path('candidate/<int:pk>/details/', CandidateDetailView.as_view(), name='candidate_detail'),
-path('evaluations/', EvaluationTemplateListView.as_view(), name='evaluation_template_list'),
+    path('evaluations/', EvaluationTemplateListView.as_view(), name='evaluation_template_list'),
+
     path('evaluations/create/', EvaluationTemplateCreateView.as_view(), name='evaluation_template_create'),
-path('rounds/', RoundMasterListView.as_view(), name='round_master_list'),
+    path('rounds/', RoundMasterListView.as_view(), name='round_master_list'),
     path('rounds/create/', RoundMasterCreateView.as_view(), name='round_master_create'),
-path('jobs/<int:pk>/delete/', views.JobPostDeleteView.as_view(), name='job_delete'),
-path('api/update-job-status/', views.update_job_status_ajax, name='update_job_status_ajax'),
+    path('jobs/<int:pk>/delete/', views.JobPostDeleteView.as_view(), name='job_delete'),
+    path('api/update-job-status/', views.update_job_status_ajax, name='update_job_status_ajax'),
 ]

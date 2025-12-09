@@ -19,14 +19,27 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.views.generic import DetailView
-
+import datetime 
 class JobPostListView(LoginRequiredMixin, ListView):
     model = JobPost
     template_name = 'partials/recruiter/job_list.html'
     context_object_name = 'jobs'
     ordering = ['-created_at']  
     paginate_by = 5
-
+def get_queryset(self):
+        
+        queryset = super().get_queryset()
+        
+       
+        today = datetime.date.today()
+        
+        JobPost.objects.filter(
+            status='Open', 
+            end_date__lt=today
+        ).update(status='Closed')
+        
+        
+        return queryset.order_by('-created_at')
 from .forms import JobPostForm, JobRoundFormSet # Import FormSet
 
 class JobPostCreateView(LoginRequiredMixin, CreateView):
@@ -93,28 +106,32 @@ class JobPostCreateView(LoginRequiredMixin, CreateView):
             print("Formset Errors:", rounds_formset.errors) # अब error नहीं आएगा
             return self.render_to_response(self.get_context_data(form=form))
 
-
 class JobPostDetailView(LoginRequiredMixin, DetailView):
     model = JobPost
     template_name = 'partials/recruiter/job_list.html'
     context_object_name = 'job'
     
+    # get_object को override करें ताकि जॉब लोड होते ही चेक हो जाए
+    def get_object(self, queryset=None):
+        job = super().get_object(queryset)
+        
+        # अगर जॉब Open है और डेट निकल चुकी है, तो उसे बंद करें और सेव करें
+        if job.status == 'Open' and job.end_date and job.end_date < datetime.date.today():
+            job.status = 'Closed'
+            job.save()
+            
+        return job
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        job = context['job']
-        
-        # Pass all jobs for sidebar
-        context['jobs'] = JobPost.objects.all()
-        
-        context['candidate_count'] = job.candidates.count()
-        
-        # Generate the FULL application link using the slug
-        # Ensure 'job_application' URL pattern exists and uses 'slug' parameter
+        # बाकी का कोड वही रहेगा जो आपके पास है
+        context['jobs'] = JobPost.objects.all().order_by('-created_at') # Sidebar list update
+        context['candidate_count'] = context['job'].candidates.count()
         context['application_link'] = self.request.build_absolute_uri(
-            reverse('job_application', kwargs={'slug': job.public_link_slug})
+            reverse('job_application', kwargs={'slug': context['job'].public_link_slug})
         )
-        
         return context
+
 
 class CandidateListView(LoginRequiredMixin, ListView):
     model = Candidate
@@ -246,14 +263,22 @@ class FeedbackCreateView(LoginRequiredMixin, CreateView):
              # This happens if the same user tries to give feedback for the same candidate in the same round again
              messages.error(self.request, f"Feedback already exists for {candidate.name} in the **{candidate.current_round}** round by you.")
              return self.form_invalid(form)
-
 def job_application_view(request, slug):
-    """Public view for candidate to apply for a job using the detailed form."""
+    """Public view for candidate to apply for a job."""
     
-    job_post = get_object_or_404(JobPost, public_link_slug=slug, status='Open')
+ 
+    job_post = get_object_or_404(JobPost, public_link_slug=slug)
     
+ 
+    today = datetime.date.today()
+
+    if job_post.status == 'Open' and job_post.end_date and job_post.end_date < today:
+        job_post.status = 'Closed'
+        job_post.save()
+    if job_post.status == 'Closed':
+        return render(request, 'partials/recruiter/job_closed.html', {'job': job_post})
+
     if request.method == 'POST':
-        # request.FILES is crucial for handling file uploads (CV/Photo)
         form = CandidateApplicationForm(request.POST, request.FILES)
         
         # Manually set job_post_pk
@@ -266,8 +291,7 @@ def job_application_view(request, slug):
             email = cleaned_data['email']
             
             try:
-                # 1. Check for duplicate application
-                # Assuming TestRegistration has an 'email' field.
+                
                 if Candidate.objects.filter(job_post=job_post, test_registration__email=email).exists():
                     messages.warning(request, "You have already applied for this job.")
                     return redirect('job_application', slug=slug)
