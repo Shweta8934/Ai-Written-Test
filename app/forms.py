@@ -8,27 +8,11 @@ from .models import Department, Skill
 from .models import Section
 from .models import QuestionPaper
 import re
-from django import forms
-from django import forms
-from .models import Skill
-from django import forms
-from .models import Department, Section
 from django.core.exceptions import ValidationError
 
 User = get_user_model()
 from django.contrib.auth.forms import AuthenticationForm
-from django.core.exceptions import ValidationError
-from django import forms
-from django.contrib.auth.forms import UserCreationForm as BaseUserCreationForm
-from django.contrib.auth import get_user_model
-from .models import User, UserProfile
-from .models import Department, Skill
-from .models import Section
-from .models import QuestionPaper
 
-User = get_user_model()
-from django.contrib.auth.forms import AuthenticationForm
-from django.core.exceptions import ValidationError
 
 class LoginForm(AuthenticationForm):
     """
@@ -421,3 +405,24 @@ class SectionForm(forms.ModelForm):
         if Section.objects.filter(name__iexact=name).exists():
             raise forms.ValidationError("This section already exists.")
         return name
+
+# app/forms.py
+
+class UserUpdateForm(forms.ModelForm):
+    """
+    Form to update User model fields only.
+    """
+    email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={'readonly': 'readonly'}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            field.widget.attrs.update({"class": INPUT_CLASSES})
+            
+            # Email ko greyed out dikhane ke liye (read-only)
+            if field_name == 'email':
+                field.widget.attrs.update({'class': INPUT_CLASSES + " bg-gray-100 cursor-not-allowed"})
+
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "email"]

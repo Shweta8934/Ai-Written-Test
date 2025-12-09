@@ -96,4 +96,6 @@ urlpatterns = [
 ),
 path('api/skills/search/', views.search_skills_with_suggestions, name='search_skills_suggestions'),
     path('ajax/upload_image/', views.upload_image_ajax, name='upload_image_ajax'),
+    path('profile/<int:pk>/edit/', views.edit_user_profile, name='edit_user_profile'),
+    path('profile/change-password/', views.change_password, name='change_password'),
 ]

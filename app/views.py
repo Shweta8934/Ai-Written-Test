@@ -24,6 +24,7 @@ from .forms import (
     UserProfileRegistrationForm,
     DepartmentForm,
     SkillForm,
+    UserUpdateForm
 )
 import csv  
 from .models import QuestionPaper, PaperSection, Question, Department, Skill
@@ -1296,58 +1297,6 @@ Respond with ONLY a valid JSON object (no markdown, no extra text):
     "reason": "brief explanation in one line"
 }}"""
 
-
-# def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> str:
-#     """
-#     Generate prompt for coding evaluation with cross-language flexibility criteria.
-#     (MODIFIED FOR LANGUAGE FLEXIBILITY - FOR DIRECT PASTE)
-#     """
-#     return f"""You are an expert programming instructor. Evaluate if the user's code correctly solves the problem.
-
-# **Question:**
-# {question_text}
-
-# **Reference Solution (Use for context, but do not require exact matching):**
-# ```
-# {model_code}
-# ```
-
-# **User's Code:**
-# ```
-# {user_code}
-# ```
-
-# **Evaluation Criteria:**
-# 1. **CRITICAL: The user's code MUST solve the specific problem described in the Question.**
-
-# 2. **⭐ Cross-Language Tolerance (FLEXIBLE LOGIC) ⭐:**
-#     * **If the QUESTION text DOES NOT explicitly name a programming language** (e.g., "Write a function...", "Solve this problem..."), **then ACCEPT the solution, even if the language of the User's Code differs from the Reference Solution, provided the core logic is sound.** The goal is to check technical skill, not language specific adherence, unless requested.
-#     * If the **QUESTION text EXPLICITLY specifies a language** (e.g., "Write a JavaScript function...", "Implement this in Python"), then **code in a different language should result in is_correct: false**, regardless of the logic.
-
-# 3. The core logic must be sound, even if the implementation style differs.
-# 4. Accept different approaches: loops vs. comprehensions, recursion vs. iteration.
-# 5. Accept different but correct algorithms.
-# 6. Ignore minor syntax variations: spacing, indentation, bracket styles.
-# 7. Accept more efficient or optimized solutions.
-
-# **What to REJECT (This must result in is_correct: false):**
-# - **Code that solves a COMPLETELY DIFFERENT PROBLEM than the one asked.**
-# - Logic errors that produce incorrect output.
-# - Missing critical functionality.
-# - **Code in a different language when the question explicitly mandated a specific one.**
-
-# **Scoring Guide:**
-# - is_correct: true if code would work and solve the problem (50%+ functionality)
-# - is_correct: false if code has fundamental logic errors or solves the wrong problem
-# - confidence: 90-100% for perfect or near-perfect solutions
-# - confidence: 70-89% for working solutions with minor issues
-
-# Respond with ONLY valid JSON (no markdown, no extra text):
-# {{
-#     "is_correct": true/false,
-#     "confidence": 0-100,
-#     "reason": "brief explanation"
-# }}"""
 def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> str:
     """
     Generate a highly flexible prompt that forces AI to ignore language differences
@@ -2052,4 +2001,88 @@ def upload_image_ajax(request):
         logger.error(f"Image Upload Server Error: {e}", exc_info=True)
         return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"}, status=500)
 
-  
+ 
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from .models import User, UserProfile
+from .forms import UserUpdateForm, UserProfileRegistrationForm
+
+@login_required
+def edit_user_profile(request, pk):
+    """
+    Handles updating User details AND Profile details (Phone, Address).
+    """
+    user_to_edit = get_object_or_404(User, pk=pk)
+    
+    # Security Check
+    if request.user != user_to_edit and not request.user.is_superuser:
+        messages.error(request, "You are not authorized to edit this profile.")
+        return redirect("dashboard")
+
+    # ✅ STEP 1: Safe Profile Retrieval
+    # Agar profile nahi hai (jaise Admin user ke liye), toh code crash nahi hoga, balki nayi profile bana dega.
+    profile, created = UserProfile.objects.get_or_create(user=user_to_edit)
+
+    if request.method == "POST":
+        # ✅ STEP 2: Dono Forms Load Karein
+        u_form = UserUpdateForm(request.POST, instance=user_to_edit)
+        p_form = UserProfileRegistrationForm(request.POST, instance=profile)
+
+        # ✅ STEP 3: Validate & Save Both
+        if u_form.is_valid() and p_form.is_valid():
+            u_form.save()
+            p_form.save()
+            messages.success(request, "Profile details updated successfully!")
+            return redirect("user_profile", pk=pk) 
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        # GET request mein forms ko existing data se pre-fill karein
+        u_form = UserUpdateForm(instance=user_to_edit)
+        p_form = UserProfileRegistrationForm(instance=profile)
+
+    context = {
+        "u_form": u_form,
+        "p_form": p_form,  # Template mein Phone/Address dikhane ke liye zaroori hai
+        "profile_user": user_to_edit,
+        "title": "Edit Profile Details"
+    }
+    
+    return render(request, "partials/users/profile_edit.html", context)
+
+# app/views.py
+
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
+
+@login_required
+def change_password(request):
+    """
+    Allows a logged-in user to change their own password.
+    """
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            # YEH IMPORTANT HAI: Session ko update karein taaki user logout na ho
+            update_session_auth_hash(request, user)  
+            messages.success(request, 'Your password was successfully updated! 🎉')
+            return redirect('user_profile', pk=user.pk)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = PasswordChangeForm(request.user)
+
+    # Tailwind CSS classes add karna fields par
+    for field in form.fields.values():
+        field.widget.attrs.update({
+            'class': "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        })
+
+    context = {
+        'form': form,
+        'title': 'Change Password'
+    }
+    return render(request, 'partials/users/change_password.html', context)
