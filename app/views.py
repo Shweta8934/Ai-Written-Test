@@ -4,7 +4,7 @@ import json
 from openai import OpenAI  
 import re
 from django.conf import settings
-import google.generativeai as genai
+# import google.generativeai as genai
 from django.contrib.auth import login, logout
 from django.views.decorators.http import require_POST
 from django.db import transaction
@@ -964,8 +964,8 @@ def regenerate_question(request):
         question_type = data.get("question_type")
         question_text = data.get("question_text")
 
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-pro")
+        # OpenAI setup
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
         prompt = f"""
         As an expert technical recruiter, generate ONE new and different interview question based on the following context.
@@ -991,11 +991,18 @@ def regenerate_question(request):
         }}
         """
 
-        response = model.generate_content(prompt)
-        cleaned_response = (
-            response.text.strip().replace("```json", "").replace("```", "")
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates technical assessments in strictly valid JSON format."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
         )
-        new_question = json.loads(cleaned_response)
+
+        json_text = response.choices[0].message.content.strip()
+        new_question = json.loads(json_text)
 
         return JsonResponse(new_question)
 
@@ -1164,7 +1171,7 @@ def toggle_shortlist(request, registration_id):
 import json
 import re
 from typing import Tuple, Dict, Any
-import google.generativeai as genai
+# Removed Gemini imports
 from django.conf import settings
 
 

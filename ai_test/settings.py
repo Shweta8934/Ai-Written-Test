@@ -137,25 +137,6 @@
 #     },
 #     {
 #         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-#     },
-#     {
-#         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-#     },
-# ]
-
-# # ----------------------------------------------------------------------
-# #                         GEMINI API KEY CONFIGURATION (Hardcoded for testing)
-# # ----------------------------------------------------------------------
-# # WARNING: Yeh key production code mein nahi honi chahiye.
-# # TESTING ke liye, aap apni key ko single quotes mein yahan daal sakte hain.
-
-# GEMINI_API_KEY = "AIzaSyDB23HkzpmpWCy-9pv4zmowqg-gKd1DShw"  # <-- YAHAN APNI KEY DAALEN
-
-
-# # Old environ configuration remove kar di gayi hai.
-# # env = environ.Env(...)
-# # environ.Env.read_env(...)
-# # ----------------------------------------------------------------------
 
 
 # # Internationalization
@@ -286,12 +267,8 @@ EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "Recruitment",
-        "USER": "postgres",
-        "PASSWORD": "12345",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.1.10", "10.0.0.42"]
@@ -314,14 +291,11 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 env = environ.Env(
-    # Set casting default for API key (e.g., read as a string)
-    GEMINI_API_KEY=(str, ""),
     OPENAI_API_KEY=(str, "")
 )
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # settings.py
-GEMINI_API_KEY = env("GEMINI_API_KEY")
 OPENAI_API_KEY = env("OPENAI_API_KEY")
 print(f"DEBUG: OpenAI Key Loaded: {'Yes' if OPENAI_API_KEY else 'No'}") # DO NOT PRINT THE ACTUAL KEY FOR SECURITY
 # Internationalization
