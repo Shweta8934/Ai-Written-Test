@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -23,45 +24,47 @@
     {% include 'partials/sidebar.html' %}
 
     <div class="flex-1 flex flex-col overflow-hidden">
-      {% include 'partials/header.html' with page_title="Round Master" %}
+      {% include 'partials/header.html' with page_title=" " %}
 
-      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 p-6">
-        <div class="container mx-auto max-w-2xl">
-            <h2 class="text-2xl font-bold mb-6 text-theme-dark">Create New Round</h2>
-            
-            <form method="post" class="bg-white shadow-lg rounded-lg px-8 pt-6 pb-8 mb-4">
-                {% csrf_token %}
-                
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">Round Name</label>
-                    {{ form.name }}
-                    <p class="text-xs text-gray-500 mt-1">Example: "Technical Round 1 (Java)" or "HR Final"</p>
-                </div>
+      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-8">
+        <h2 class="text-3xl font-bold tracking-tight mb-8 text-gray-900">Create New Round</h2>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Round Type</label>
-                        {{ form.round_type }}
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Evaluation Template</label>
-                        {{ form.evaluation_template }}
-                        <p class="text-xs text-blue-500 mt-1">
-                            <a href="{% url 'evaluation_template_create' %}" class="hover:underline">+ Create new template</a>
-                        </p>
-                    </div>
-                </div>
+        <form method="post" class="bg-white shadow-lg rounded-lg p-8 md:p-10 mb-4">
+          {% csrf_token %}
 
-                <div class="flex items-center justify-end mt-8 gap-4">
-                    <a href="{% url 'round_master_list' %}" class="text-slate-500 hover:text-slate-700 font-medium text-sm">Cancel</a>
-                    <button class="bg-theme-primary hover:bg-theme-dark text-white font-bold py-2.5 px-6 rounded shadow-md transition duration-200" type="submit">
-                        Save Round
-                    </button>
-                </div>
-            </form>
-        </div>
+          <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2">Round Name</label>
+            {{ form.name }}
+            <p class="text-xs text-gray-500 mt-1">Example: "Technical Round 1 (Java)" or "HR Final"</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label class="block text-gray-700 text-sm font-bold mb-2">Round Type</label>
+              {{ form.round_type }}
+            </div>
+            <div>
+              <label class="block text-gray-700 text-sm font-bold mb-2">Evaluation Template</label>
+              {{ form.evaluation_template }}
+              <p class="text-xs text-blue-500 mt-1">
+                <a href="{% url 'evaluation_template_create' %}" class="hover:underline">+ Create new template</a>
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end mt-8 gap-4">
+            <a href="{% url 'round_master_list' %}"
+              class="text-slate-500 hover:text-slate-700 font-medium text-sm">Cancel</a>
+            <button
+              class="bg-theme-primary hover:bg-theme-dark text-white font-bold py-2.5 px-6 rounded shadow-md transition duration-200"
+              type="submit">
+              Save Round
+            </button>
+          </div>
+        </form>
       </main>
     </div>
   </div>
 </body>
+
 </html>

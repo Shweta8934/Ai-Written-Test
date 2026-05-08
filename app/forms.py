@@ -81,7 +81,7 @@ class LoginForm(AuthenticationForm):
             raise ValidationError(
                 "Password must be at least 8 characters long.", code="min_length"
             )
-        # ✨ YAHAN BADLAV KIYA GAYA HAI ✨
+        # Limit password length to 64 characters
         if len(password) > 64:
             raise ValidationError(
                 "Password is too long. Please use a password with 64 characters or less.",
@@ -175,6 +175,9 @@ class UserProfileRegistrationForm(forms.ModelForm):
     class Meta:
         model = UserProfile
         fields = ("phone_number", "address", "profile_image")
+        widgets = {
+            'profile_image': forms.FileInput(attrs={'class': INPUT_CLASSES}),
+        }
 
 
 class DepartmentForm(forms.ModelForm):
@@ -197,15 +200,14 @@ class DepartmentForm(forms.ModelForm):
         """
         name = self.cleaned_data.get("name", "").strip()
 
-        # ✨ YEH NAYA AUR BEHTAR LOGIC HAI ✨
-        # __iexact ka matlab hai: case-insensitive (chote/bade letters se farak nahi padta) EXACT match.
+        # Use case-insensitive exact match for department name.
         query = Department.objects.filter(name__iexact=name)
 
-        # Agar form edit ho raha hai, toh khud ko check na karein
+        # Exclude self if editing
         if self.instance.pk:
             query = query.exclude(pk=self.instance.pk)
 
-        # Agar is naam ka koi department pehle se hai, toh error dein
+        # Raise error if duplicate exists
         if query.exists():
             raise forms.ValidationError(
                 "A department with this exact name already exists. Please use a different name."

@@ -146,13 +146,13 @@ def generate_questions(request):
             min_exp = data.get("min_exp")
             max_exp = data.get("max_exp")
             skills_raw = data.get("skills")
-            # ✨ CHANGE: sections_data को सही तरीके से पढ़ना
+            # Parse sections data
             sections_data = data.get("sections", {})
             
-            # total_questions sum of counts hai
+            # total_questions is sum of counts
             total_questions = sum(item.get("count", 0) for item in sections_data.values())
             
-            # AI Prompt ke liye sirf Section Titles aur Counts use karein
+            # Use only Section Titles and Counts for the AI Prompt
             ai_sections_data = {
                 title: item.get("count", 0) 
                 for title, item in sections_data.items()
@@ -274,33 +274,25 @@ def save_paper(request):
         # Sections data is expected to be a DICT: {section_title: {count: N, weightage: W, questions: [...]}}
         sections_data = data.get("sections", {})
         
-        # 🟢 LOGGING FOR DEBUGGING 🟢
+        # LOGGING FOR DEBUGGING
         logger.info(f"--- START SAVING PAPER DEBUG ---")
-        logger.info(f"Received sections_data TYPE: {type(sections_data)}") # List or Dict?
+        logger.info(f"Received sections_data TYPE: {type(sections_data)}")
         
-        # यदि sections_data एक लिस्ट है (जो ट्रेसबैक के अनुसार है), तो उसे ऐसे ही इस्तेमाल करें
         if isinstance(sections_data, list):
-            # यदि यह एक लिस्ट है, तो हमें उसे प्रोसेस करने के लिए keys (title) की आवश्यकता होगी।
-            # लेकिन AI से आया sections का लिस्ट फॉर्मेट अक्सर Dicts की List होती है।
+            # If it's a list, we proceed as expected from the AI output
             section_items_list = sections_data
-            
-            # **हम इसे लिस्ट मानकर आगे बढ़ते हैं**
             total_questions_count = sum(len(item.get("questions", [])) for item in section_items_list)
-            
-            # अगर यह लिस्ट है, तो हम items() का उपयोग नहीं कर सकते, हमें सीधे लिस्ट को iterate करना होगा।
             section_data_iterator = enumerate(section_items_list)
             
-        else: # Dictionary होने पर
-            # यह वह ब्लॉक है जो पहले अपेक्षित था
+        else: # Handle dictionary format if sent
             section_items_list = list(sections_data.values())
             total_questions_count = sum(len(item.get("questions", [])) for item in sections_data.values())
-            section_data_iterator = sections_data.items() # (title, content_dict)
+            section_data_iterator = sections_data.items()
             
-        # ⚠️ यह लॉग हमें दिखाएगा कि sections_data में क्या आया है:
         logger.info(f"Sections Data (First 2 items): {section_items_list[:2]}")
         logger.info(f"Total Questions Count: {total_questions_count}")
         
-        # 2. QuestionPaper ऑब्जेक्ट बनाएं (UNCHANGED)
+        # 2. Create QuestionPaper object (UNCHANGED)
         paper = QuestionPaper.objects.create(
             created_by=request.user,
             title=data.get("title", "Generated Assessment"),
@@ -316,16 +308,12 @@ def save_paper(request):
             total_questions=total_questions_count,
         )
         
-        # 3. PaperSection और Question ऑब्जेक्ट बनाएं 
+        # 3. Create PaperSection and Question objects
         
-        # हम मानते हैं कि आपका JavaScript अब LIST OF DICTS भेज रहा है (जैसा कि AI output से सीधे आया था)
-        
-        # 🛑 पुराने कोड को हटाएँ जो `sections_data.items()` पर निर्भर था
-        
-        # ✨ FIX: अब हम सीधे sections_data (LIST) को iterate करते हैं
+        # Iterate over sections list directly
         for section_index, section_content in enumerate(sections_data):
             
-            # List of Dicts के लिए, हम title को key के बजाय content dict से निकालते हैं
+            # For List of Dicts, we extract the title from the content dict instead of the key
             section_title = section_content.get("title")
             
             # Extract weightage (यह मान अब section_content dict में होना चाहिए)
@@ -427,7 +415,7 @@ def paper_detail_view(request, paper_id):
         TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
     )
 
-    # 🚀 OPTIMIZATION: Read from DB, do NOT re-evaluate with AI
+    # OPTIMIZATION: Read from DB, do NOT re-evaluate with AI
     cutoff = paper.cutoff_score or 0
     for p in all_participants:
         if p.is_completed:
@@ -485,7 +473,7 @@ def paper_edit_view(request, paper_id):
             # 1. Iterate over existing sections to update weightage and questions
             for section in updated_paper.paper_sections.all():
                 
-                # ✅ WEIGHTAGE UPDATE LOGIC: POST data से weightage प्राप्त करें
+                # WEIGHTAGE UPDATE LOGIC: Get weightage from POST data
                 weightage_name = f"section-weightage-{section.id}"
                 
                 if weightage_name in request.POST:
@@ -493,7 +481,7 @@ def paper_edit_view(request, paper_id):
                         new_weightage = int(request.POST[weightage_name])
                         if 0 <= new_weightage <= 100:
                             section.weightage = new_weightage
-                            section.save(update_fields=["weightage"]) # Weightage save करें
+                            section.save(update_fields=["weightage"]) # Save weightage
                     except ValueError:
                         messages.warning(request, f"Invalid weightage provided for section {section.title}. Not saved.")
                         pass # Ignore invalid inputs, but continue processing
@@ -545,7 +533,7 @@ def paper_edit_view(request, paper_id):
 
             messages.success(
                 request,
-                f"✅ Paper '{updated_paper.title}' successfully updated with {total_questions_count} questions!",
+                f"Paper '{updated_paper.title}' successfully updated with {total_questions_count} questions!",
             )
             return redirect("paper_detail", paper_id=paper.id)
 
@@ -559,13 +547,13 @@ def paper_edit_view(request, paper_id):
     else:
         form = QuestionPaperEditForm(instance=paper)
     
-    # ✅ FIX: Fetch sections to pass to the edit template
+    # FIX: Fetch sections to pass to the edit template
     paper_sections = paper.paper_sections.all().prefetch_related('questions')
 
     context = {
         "form": form, 
         "paper": paper, 
-        "paper_sections": paper_sections, # Sections को template में पास किया गया
+        "paper_sections": paper_sections, # Pass sections to template
         "title": f"Edit {paper.title}"
     }
 
@@ -583,12 +571,12 @@ def department_create_view(request):
         form = DepartmentForm(request.POST)
         if form.is_valid():
             try:
-                # ✨ CHANGE 1: Pehle Department instance banayein par abhi database main pura commit na karein
+                # First create the Department instance but don't commit to DB yet
                 department = form.save(commit=False)
-                # Department ko save karein taaki usse ek ID mil jaye
+                # Save department to get an ID
                 department.save()
 
-                # ✨ CHANGE 2: Ab explicitly Many-to-Many relations (sections) ko save karein
+                # Now explicitly save Many-to-Many relations (sections)
                 form.save_m2m()
 
                 messages.success(request, "Department created successfully!")
@@ -614,7 +602,7 @@ def get_skills_json(request):
 
 @login_required
 def skill_list_view(request):
-    """Page load karne aur saare active skills dikhane ke liye."""
+    """Page load and show all active skills."""
     skills = Skill.objects.filter(is_active=True)
     context = {
         "skills": skills,
@@ -625,7 +613,7 @@ def skill_list_view(request):
 @login_required
 @require_POST
 def skill_create_view(request):
-    """AJAX request se naya skill banane ke liye."""
+    """Create new skill via AJAX request."""
     try:
         data = json.loads(request.body)
         form = SkillForm(data)
@@ -651,7 +639,7 @@ def skill_create_view(request):
 @login_required
 @require_POST
 def skill_update_view(request, pk):
-    """(Naya View) AJAX request se skill ko edit/update karne ke liye."""
+    """Update skill via AJAX request."""
     try:
         skill = get_object_or_404(Skill, pk=pk)
         data = json.loads(request.body)
@@ -673,7 +661,7 @@ def skill_update_view(request, pk):
 @login_required
 @require_POST
 def skill_delete_view(request, pk):
-    """AJAX request se skill delete karne ke liye."""
+    """Delete skill via AJAX request."""
     skill = get_object_or_404(Skill, pk=pk)
     skill.delete()
     return JsonResponse({"status": "success", "message": "Skill deleted successfully."})
@@ -783,20 +771,20 @@ def test_result(request, registration_id):
 
     score = 0
     results_data = []
-    unattempted_count = 0  # ✅ NEW: Track unattempted questions
+    unattempted_count = 0  # NEW: Track unattempted questions
 
     for response in user_responses:
         question = response.question
         user_answer = response.user_answer.strip()
         is_correct = False
-        attempt_status = "incorrect"  # ✅ NEW: Default status
+        attempt_status = "incorrect"  # Default status
 
-        # ✅ Check if question was attempted
+        # Check if question was attempted
         if not user_answer:
             attempt_status = "unattempted"
             unattempted_count += 1
         else:
-            # Question attempt kiya gaya hai, ab evaluate karo
+            # Question has been attempted, now evaluate it
             if question.question_type == "MCQ":
                 model_answer = question.answer.strip()
                 is_correct = user_answer.lower() == model_answer.lower()
@@ -855,7 +843,7 @@ def test_result(request, registration_id):
         "score": score,
         "total_questions": total_questions,
         "incorrect_answers": incorrect_answers,
-        "unattempted_count": unattempted_count,  # ✅ NEW
+        "unattempted_count": unattempted_count,  # NEW
         "percentage": percentage,
         "title": f"Test Report for {registration.email}",
         "status": status,
@@ -997,7 +985,7 @@ def deactivate_paper(request, paper_id):
         
         duration_minutes = paper.duration
         
-        active_takers_exist = False  # Pehle se False maan lein
+        active_takers_exist = False
 
         if duration_minutes and duration_minutes > 0:
             cutoff_time = timezone.now() - datetime.timedelta(minutes=duration_minutes)
@@ -1006,7 +994,7 @@ def deactivate_paper(request, paper_id):
             active_takers_exist = TestRegistration.objects.filter(
                 question_paper=paper,
                 is_completed=False,
-                start_time__gt=cutoff_time  # Check: start_time cutoff ke BAAD ka hai
+                start_time__gt=cutoff_time  # Check if start_time is after cutoff
             ).exists()
 
         else:
@@ -1017,10 +1005,10 @@ def deactivate_paper(request, paper_id):
                 start_time__isnull=False
             ).exists()
 
-        # --- CHECK KHATAM ---
+        # Check finished
 
         if active_takers_exist:
-            # Agar active takers hain, toh error message ke saath 400 status return karein
+            # If active takers exist, return error message with 400 status
             return JsonResponse(
                 {
                     "status": "error",

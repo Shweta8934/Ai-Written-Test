@@ -44,11 +44,11 @@
       <div class="flex-1 flex flex-col overflow-hidden">
         {% include 'partials/header.html' with page_title="" %}
 
-        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 md:p-10">
-          <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-xl border border-gray-200 p-8 md:p-10">
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-8">
             <h2 class="text-3xl font-bold tracking-tight mb-8 text-gray-900">
               Department Details
             </h2>
+            <div class="bg-white rounded-xl shadow-xl border border-gray-200 p-8 md:p-10">
 
             <form method="post" novalidate>
               {% csrf_token %}
