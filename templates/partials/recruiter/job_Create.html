@@ -8,7 +8,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create New Job Post</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "theme-primary": "#736b8e",
+              "theme-dark": "#5f5778",
+              "theme-light": "#e5e3e9",
+              "gray-text": "#6B7280",
+            },
+          },
+        },
+      };
+    </script>
     <style>
+        body { font-family: "Inter", sans-serif; }
         /* Custom scrollbar style for modern browsers */
         .form-container::-webkit-scrollbar { width: 8px; }
         .form-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -19,8 +36,8 @@
         }
         /* Custom focus style for inputs */
         .custom-focus:focus {
-            border-color: #4f46e5; /* indigo-600 */
-            box-shadow: 0 0 0 1px #4f46e5;
+            border-color: #736b8e; /* theme-primary */
+            box-shadow: 0 0 0 1px #736b8e;
         }
     </style>
 </head>
@@ -35,12 +52,12 @@
                 
                 <div class="max-w-5xl mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
                     
-                    <header class="bg-indigo-700 p-6 border-b-4 border-indigo-500">
+                    <header class="bg-theme-primary p-6 border-b-4 border-theme-dark">
                         <h1 class="text-3xl font-extrabold text-white flex items-center">
                             <svg class="w-8 h-8 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             New Job Post Configuration
                         </h1>
-                        <p class="text-indigo-200 mt-2 text-lg">Define all mandatory and optional fields for the job opening and its flow.</p>
+                        <p class="text-white opacity-80 mt-2 text-lg">Define all mandatory and optional fields for the job opening and its flow.</p>
                     </header>
             
                     <form id="job-post-form" class="p-8 md:p-10 form-container" method="post" onsubmit="return validateForm(event)">
@@ -94,7 +111,7 @@
                             </div>
                             
                             <h3 class="text-xl font-semibold text-gray-800 mb-6 flex items-center border-b border-gray-100 pb-3">
-                                <span class="mr-2 text-indigo-600">⚙️</span> Application & Flow Settings
+                                <span class="mr-2 text-theme-primary">⚙️</span> Application & Flow Settings
                             </h3>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
@@ -138,7 +155,7 @@
                                         </select>
                                         
                                         <a href="{% url 'generate_questions' %}" target="_blank"
-                                           class="flex-shrink-0 px-4 py-3 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                                           class="flex-shrink-0 px-4 py-3 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-theme-primary hover:bg-theme-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-theme-primary transition duration-150">
                                             <span class="hidden sm:inline">➕ Create Written Test</span>
                                             <span class="sm:hidden">➕ Create</span>
                                         </a>
@@ -154,7 +171,7 @@
                                     </div>
                                     
                                     <a href="{% url 'round_master_create' %}" target="_blank" 
-                                       class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center">
+                                       class="text-sm text-theme-primary hover:text-theme-dark font-semibold flex items-center">
                                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                                         Create New Round Type
                                     </a>
@@ -191,7 +208,7 @@
                                     {% endfor %}
                                 </div>
 
-                                <button type="button" id="add-round-btn" class="mt-4 flex items-center text-sm font-bold text-indigo-600 hover:text-indigo-800 focus:outline-none">
+                                <button type="button" id="add-round-btn" class="mt-4 flex items-center text-sm font-bold text-theme-primary hover:text-theme-dark focus:outline-none">
                                     <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                     Add Another Round
                                 </button>
@@ -200,7 +217,7 @@
             
                         <section class="mb-10 pb-4">
                             <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                                <span class="mr-3 text-indigo-600">✨</span> Candidate Requirements
+                                <span class="mr-3 text-theme-primary">✨</span> Candidate Requirements
                             </h2>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 <div>
@@ -243,7 +260,7 @@
             
                         <div class="flex justify-end">
                             <button type="submit"
-                                    class="px-8 py-4 text-lg font-bold rounded-lg shadow-xl text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition duration-300 transform hover:scale-[1.02]">
+                                    class="px-8 py-4 text-lg font-bold rounded-lg shadow-xl text-white bg-theme-primary hover:bg-theme-dark focus:outline-none focus:ring-4 focus:ring-theme-primary transition duration-300 transform hover:scale-[1.02]">
                                 💾 Save & Publish Job Post
                             </button>
                         </div>

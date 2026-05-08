@@ -8,10 +8,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jobs Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "theme-primary": "#736b8e",
+              "theme-dark": "#5f5778",
+              "theme-light": "#e5e3e9",
+              "gray-text": "#6B7280",
+            },
+          },
+        },
+      };
+    </script>
     <style>
+        body { font-family: "Inter", sans-serif; }
         .job-card.active-card {
-            border-color: #4f46e5;
-            background-color: #f5f3ff;
+            border-color: #736b8e;
+            background-color: #e5e3e9;
         }
         .overflow-y-auto {
             scrollbar-width: thin;
@@ -53,9 +70,9 @@
                         <h2 class="text-lg font-bold text-gray-800 mb-2">All Jobs</h2>
                         <p class="text-sm text-gray-500">Click a job to view details on the right.</p>
                         <div class="mt-3 flex space-x-2">
-                            <button class="px-3 py-1 text-xs sm:text-sm rounded-full bg-indigo-600 text-white hover:bg-indigo-700">All</button>
-                            <button class="px-3 py-1 text-xs sm:text-sm rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300">Active</button>
-                            <button class="px-3 py-1 text-xs sm:text-sm rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300">Closed</button>
+                            <a href="?status=all" class="px-3 py-1 text-xs sm:text-sm rounded-full {% if request.GET.status == 'all' or not request.GET.status %}bg-theme-primary text-white hover:bg-theme-dark{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">All</a>
+                            <a href="?status=active" class="px-3 py-1 text-xs sm:text-sm rounded-full {% if request.GET.status == 'active' %}bg-theme-primary text-white hover:bg-theme-dark{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">Active</a>
+                            <a href="?status=closed" class="px-3 py-1 text-xs sm:text-sm rounded-full {% if request.GET.status == 'closed' %}bg-theme-primary text-white hover:bg-theme-dark{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">Closed</a>
                         </div>
                     </div>
 
@@ -170,7 +187,7 @@
     {% else %}
         <a href="{% if application_link %}{{ application_link }}{% else %}{% url 'job_application' slug=current_job.public_link_slug %}{% endif %}" 
            target="_blank"
-           class="px-3 py-2 text-sm bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-150 flex items-center space-x-1"
+           class="px-3 py-2 text-sm bg-theme-primary text-white rounded-md hover:bg-theme-dark transition duration-150 flex items-center space-x-1"
            title="View Public Application Form">
             <span>Apply</span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -211,7 +228,7 @@
                                 <p class="text-xs text-gray-500">Total Openings</p>
                             </div>
                             <div class="p-3 bg-gray-100 rounded-lg">
-<p class="text-xl font-semibold text-indigo-600">{{ current_job.total_candidates_count }}</p>                                <p class="text-xs text-gray-500">Total Candidates</p>
+<p class="text-xl font-semibold text-theme-primary">{{ current_job.total_candidates_count }}</p>                                <p class="text-xs text-gray-500">Total Candidates</p>
                             </div>
                             <div class="p-3 bg-gray-100 rounded-lg">
 <p class="text-xl font-semibold text-yellow-600">{{ current_job.in_progress_count }}</p>                                <p class="text-xs text-gray-500">In Progress</p>
@@ -395,7 +412,7 @@
 
                     // 3. Sidebar me jo active card highlight hai, use hata do
                     jobCards.forEach(c => {
-                        c.classList.remove('active-card', 'bg-indigo-50', 'border-indigo-600');
+                        c.classList.remove('active-card', 'bg-theme-light', 'border-theme-primary');
                         c.classList.add('border-gray-200', 'bg-white');
                     });
 
@@ -412,10 +429,10 @@
                     e.preventDefault(); 
                     const linkToCopy = this.getAttribute('data-application-link');
                     
-                    navigator.clipboard.writeText(linkToCopy).then(() => {
-                        showToast('🔗 Application link copied to clipboard!');
+                    copyToClipboard(linkToCopy).then(() => {
+                        showToast('Link copied!');
                     }).catch(err => {
-                        showToast('❌ Failed to copy link!');
+                        showToast('Failed to copy link');
                         console.error('Failed to copy link: ', err);
                     });
                 });
@@ -429,11 +446,11 @@
                     if(placeholderDiv) placeholderDiv.classList.add('hidden');
 
                     jobCards.forEach(c => {
-                        c.classList.remove('active-card', 'bg-indigo-50', 'border-indigo-600');
+                        c.classList.remove('active-card', 'bg-theme-light', 'border-theme-primary');
                         c.classList.add('border-gray-200', 'bg-white');
                     });
 
-                    card.classList.add('active-card', 'bg-indigo-50');
+                    card.classList.add('active-card', 'bg-theme-light');
                     card.classList.remove('border-gray-200', 'bg-white');
                 });
             });
@@ -441,12 +458,12 @@
             // Set initial active card
             const activeCard = document.querySelector('.job-card.active-card');
             if (activeCard) {
-                activeCard.classList.add('active-card', 'bg-indigo-50');
+                activeCard.classList.add('active-card', 'bg-theme-light');
                 activeCard.classList.remove('border-gray-200', 'bg-white');
             } else if (jobCards.length > 0 && !document.querySelector('.active-card')) {
                 // अगर कोई जॉब selected नहीं है (शायद Close कर दिया हो), तो किसी को active न करें
                 if (!placeholderDiv || placeholderDiv.classList.contains('hidden')) {
-                     jobCards[0].classList.add('active-card', 'bg-indigo-50');
+                     jobCards[0].classList.add('active-card', 'bg-theme-light');
                      jobCards[0].classList.remove('border-gray-200', 'bg-white');
                 }
             }
@@ -466,6 +483,26 @@
                 toast.style.opacity = '0';
                 toast.style.pointerEvents = 'none';
             }, 3000);
+        }
+
+        // Helper for Copy to Clipboard (Handles insecure origins)
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                return new Promise((res, rej) => {
+                    document.execCommand('copy') ? res() : rej();
+                    textArea.remove();
+                });
+            }
         }
     </script>
 

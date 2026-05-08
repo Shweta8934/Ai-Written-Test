@@ -174,7 +174,7 @@ class UserProfileRegistrationForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ("phone_number", "address")
+        fields = ("phone_number", "address", "profile_image")
 
 
 class DepartmentForm(forms.ModelForm):

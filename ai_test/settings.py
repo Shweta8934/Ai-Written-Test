@@ -197,7 +197,6 @@ import environ
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'  
 
-# इमेज सेव होने की जगह (सिस्टम के लिए)
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Quick-start development settings - unsuitable for production
@@ -209,7 +208,8 @@ SECRET_KEY = "django-insecure-rf^i_@h*%*-6bz7n5djy8d2r26z+e!y-s4=h2g83pv=uptw)gk
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev', 'https://*.ngrok.io', 'http://106.222.214.131', 'https://106.222.214.131', 'http://10.0.0.17']
 
 
 # Application definition
@@ -262,16 +262,21 @@ EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "shweta.ladne.averybit@gmail.com"
-EMAIL_HOST_PASSWORD = "qwgh jagp euzh qcwi"
+EMAIL_HOST_PASSWORD = "syas brdx pcrc qkrn"
 
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'Recruitment',
+        'USER': 'postgres',
+        'PASSWORD': '12345',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.1.10", "10.0.0.42"]
+
+# ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.1.10", "10.0.0.42"]
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

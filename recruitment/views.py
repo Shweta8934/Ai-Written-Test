@@ -26,11 +26,9 @@ class JobPostListView(LoginRequiredMixin, ListView):
     context_object_name = 'jobs'
     ordering = ['-created_at']  
     paginate_by = 5
-def get_queryset(self):
-        
+    def get_queryset(self):
         queryset = super().get_queryset()
         
-       
         today = datetime.date.today()
         
         JobPost.objects.filter(
@@ -38,8 +36,14 @@ def get_queryset(self):
             end_date__lt=today
         ).update(status='Closed')
         
+        status_filter = self.request.GET.get('status')
+        if status_filter == 'active':
+            queryset = queryset.filter(status__in=['Open', 'Active'])
+        elif status_filter == 'closed':
+            queryset = queryset.filter(status__in=['Closed', 'Archived'])
         
         return queryset.order_by('-created_at')
+
 from .forms import JobPostForm, JobRoundFormSet # Import FormSet
 
 class JobPostCreateView(LoginRequiredMixin, CreateView):

@@ -379,6 +379,26 @@
         toast.addEventListener("transitionend", () => toast.remove());
       }, 3000);
     }
+    
+    // --- Helper for Copy to Clipboard (Handles insecure origins) ---
+    function copyToClipboard(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        return new Promise((res, rej) => {
+          document.execCommand('copy') ? res() : rej();
+          textArea.remove();
+        });
+      }
+    }
 
     // --- Reusable Confirmation Modal Function ---
     function showConfirmModal(title, message, onConfirm) {
@@ -521,12 +541,15 @@
       .getElementById("copy-link-button")
       .addEventListener("click", (e) => {
         const linkInput = document.getElementById("share-link-input");
-        navigator.clipboard.writeText(linkInput.value).then(() => {
+        copyToClipboard(linkInput.value).then(() => {
           e.target.textContent = "Copied!";
-          showToast("Link copied to clipboard!");
+          showToast("Link copied!");
           setTimeout(() => {
             e.target.textContent = "Copy Link";
           }, 2000);
+        }).catch(err => {
+          console.error("Copy failed:", err);
+          showToast("Failed to copy link", "error");
         });
       });
 
@@ -706,6 +729,9 @@
       sendInviteButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
 
       const inviteUrl = "{% url 'invite_candidate' %}"; 
+      console.log("Starting Invitation Fetch...");
+      console.log("URL:", inviteUrl);
+      console.log("Payload:", { email: email, paper_id: paper_id });
 
       fetch(inviteUrl, {
         method: "POST",
@@ -716,20 +742,26 @@
         body: JSON.stringify({ email: email, paper_id: paper_id }),
       })
       .then((res) => {
-        if (res.status === 400) {
-          // Handle validation errors from the backend
+        console.log("Response Status:", res.status);
+        console.log("Response OK:", res.ok);
+
+        if (res.status === 400 || res.status === 500) {
+          // Handle errors from the backend (including my custom 500 SMTP errors)
           return res.json().then(data => {
+            console.error("Server Error Data:", data);
             if (data.errors && data.errors.email) {
               inviteEmailInput.classList.add("invalid");
               inviteEmailError.textContent = data.errors.email[0];
               inviteEmailError.classList.remove("hidden");
             } else {
-               showToast(data.message || "Invitation failed due to validation error.", "error");
+               showToast(data.message || "Invitation failed.", "error");
             }
-            throw new Error("Validation Failed"); // Break the chain
+            throw new Error(data.message || "Server error occurred.");
           });
         }
+        
         if (!res.ok) {
+           console.error("Unknown Server Error (not 400/500)");
            throw new Error("Server error occurred.");
         }
         return res.json();

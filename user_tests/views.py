@@ -311,7 +311,11 @@ def user_test_view(request, link_id):
 
         with transaction.atomic():
 
-            # 1. User Responses ko save karein (Existing logic retained)
+            # 1. Save user responses AND calculate score simultaneously
+            correct_count = 0
+            total_questions = paper.total_questions or 0
+            saved_responses = []
+
             for key, value in request.POST.items():
                 if key.startswith("question_"):
                     question_id = key.split("_")[1]
@@ -319,25 +323,33 @@ def user_test_view(request, link_id):
 
                     try:
                         question = Question.objects.get(pk=question_id)
-
-                        # UserResponse object create karein
                         UserResponse.objects.create(
                             registration=registration,
                             question=question,
                             user_answer=user_answer,
                         )
+                        # ✅ Calculate score for MCQ answers immediately (no AI needed)
+                        if question.question_type == "MCQ" and user_answer:
+                            if user_answer.lower() == question.answer.strip().lower():
+                                correct_count += 1
                     except Question.DoesNotExist:
                         continue
 
-            # 2. Test Registration ko COMPLETE mark karein (Existing logic retained)
-            registration.is_completed = True
-            registration.save()
+            # 2. Calculate percentage and save score to DB immediately
+            if total_questions > 0:
+                percentage_score = round((correct_count / total_questions) * 100)
+            else:
+                percentage_score = 0
 
-            # 3. Session clean up (important for back prevention)
+            # 3. Mark test complete AND save score in single save
+            registration.is_completed = True
+            registration.score = percentage_score
+            registration.save(update_fields=["is_completed", "score"])
+
+            # 4. Session clean up (important for back prevention)
             if "current_registration_id" in request.session:
                 del request.session["current_registration_id"]
             if get_session_key(link_id) in request.session:
-                # Set final session status
                 request.session[get_session_key(link_id)] = "submitted"
             request.session.modified = True
 

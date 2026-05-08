@@ -27,12 +27,31 @@
                             <h2 class="text-xl font-bold text-slate-800">Edit Profile Details</h2>
                         </div>
 
-                        <form method="POST" class="p-6 space-y-6">
+                        <form method="POST" enctype="multipart/form-data" class="p-6 space-y-6">
                             {% csrf_token %}
 
                             <div>
                                 <h3 class="text-lg font-medium leading-6 text-slate-900 mb-4 border-b pb-2">Personal Information</h3>
                                 <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                    <div class="sm:col-span-6 flex items-center space-x-6 pb-4">
+                                        <div class="flex-shrink-0">
+                                            {% if profile_user.profile.profile_image %}
+                                                <img src="{{ profile_user.profile.profile_image.url }}" alt="Profile Image" class="h-24 w-24 rounded-full object-cover border-2 border-slate-200">
+                                            {% else %}
+                                                <div class="h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border-2 border-slate-200">
+                                                    <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-700 mb-1">Update Profile Photo</label>
+                                            {{ p_form.profile_image }}
+                                            <p class="mt-1 text-xs text-slate-500">JPG, PNG or GIF. Max 5MB.</p>
+                                            {% if p_form.profile_image.errors %}
+                                                <p class="text-red-500 text-xs mt-1">{{ p_form.profile_image.errors.0 }}</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                     <div class="sm:col-span-3">
                                         <label for="{{ u_form.first_name.id_for_label }}" class="block text-sm font-medium text-slate-700">First name</label>
                                         <div class="mt-1">

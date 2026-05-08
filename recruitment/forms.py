@@ -375,6 +375,12 @@ EvaluationParameterFormSet = inlineformset_factory(
 from .models import RoundMaster # Ensure RoundMaster is imported
 
 class RoundMasterForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Update empty labels for dropdowns
+        self.fields['round_type'].choices = [('', 'Select Round Type')] + list(self.fields['round_type'].choices)[1:]
+        self.fields['evaluation_template'].empty_label = "Select Evaluation Template"
+
     class Meta:
         model = RoundMaster
         fields = ['name', 'round_type', 'evaluation_template']

@@ -212,9 +212,16 @@ def generate_questions(request):
 
             # json_text = response.text.strip()
             # --- PASTE THIS NEW BLOCK ---
-            client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=settings.OPENAI_API_KEY.strip(),
+                default_headers={
+                    "HTTP-Referer": "http://localhost:8000",
+                    "X-Title": "AI Written Test Platform",
+                }
+            )
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="google/gemini-2.0-flash-001",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that generates technical assessments in strictly valid JSON format."},
                     {"role": "user", "content": prompt}
@@ -420,70 +427,21 @@ def paper_detail_view(request, paper_id):
         TestRegistration.objects.filter(question_paper=paper).order_by("-start_time")
     )
 
+    # 🚀 OPTIMIZATION: Read from DB, do NOT re-evaluate with AI
+    cutoff = paper.cutoff_score or 0
     for p in all_participants:
         if p.is_completed:
-            user_responses = UserResponse.objects.filter(registration=p)
-            correct_answers_count = 0
-
-            for response in user_responses:
-                question = response.question
-                user_answer = response.user_answer.strip()
-                is_correct = False
-
-                if not user_answer:
-                    is_correct = False
-                elif question and question.answer:
-                    if question.question_type == "MCQ":
-
-                        cleaned_answer = re.sub(r"<[^>]+>", "", question.answer).strip()
-                        is_correct = user_answer.lower() == cleaned_answer.lower()
-                    else:
-                        qtype = question.question_type.upper()
-                        if qtype in ("CODE", "CODING"):
-                            evaluator_type = "coding"
-                        elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
-                            evaluator_type = "short"
-                        elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
-                            evaluator_type = "true_false"
-                        else:
-                            evaluator_type = "short"
-
-                        is_correct, _ = evaluate_answer_with_ai(
-                            question_text=question.text,
-                            user_answer=user_answer,
-                            model_answer=question.answer.strip(),
-                            question_type=evaluator_type,
-                        )
-
-                if is_correct:
-                    correct_answers_count += 1
-
-            total_questions = p.question_paper.total_questions
-            live_percentage = 0
-            if total_questions > 0:
-                live_percentage = round((correct_answers_count / total_questions) * 100)
-
-            p.score = live_percentage
-            cutoff = p.question_paper.cutoff_score
-
-            if cutoff is not None:
-                if live_percentage >= cutoff:
-                    p.status = "pass"
-                else:
-                    p.status = "fail"
-            else:
-                p.status = "pass"
+            # Ensure score is treated as a number
+            score_val = float(p.score) if p.score is not None else 0.0
+            p.test_status_result = "pass" if score_val >= float(cutoff) else "fail"
         else:
-            p.status = "pending"
-    # ▲▲▲ END OF CORRECTED LOGIC ▲▲▲
+            p.test_status_result = "pending"
 
+    # Apply Filters
+    filtered_participants = all_participants
     if status_filter != "all":
-        filtered_participants = [
-            p for p in all_participants if p.status == status_filter
-        ]
-    else:
-        filtered_participants = all_participants
-
+        filtered_participants = [p for p in filtered_participants if p.test_status_result == status_filter]
+    
     if shortlist_filter == "shortlisted":
         final_participants = [p for p in filtered_participants if p.is_shortlisted]
     elif shortlist_filter == "not_shortlisted":
@@ -498,7 +456,7 @@ def paper_detail_view(request, paper_id):
         "title": f"Details for {paper.title}",
         "selected_status": status_filter,
         "selected_shortlist_status": shortlist_filter,
-        "sections": sections_with_weightage, # ✨ Context में sections_with_weightage भेजा गया
+        "sections": sections_with_weightage,
     }
     return render(request, "question_generator/paper_detail.html", context)
 
@@ -881,8 +839,13 @@ def test_result(request, registration_id):
             }
         )
 
-    incorrect_answers = total_questions - score - unattempted_count  # ✅ UPDATED
-    percentage = round((score / total_questions) * 100) if total_questions > 0 else 0
+    incorrect_answers = total_questions - score - unattempted_count
+    
+    # ✅ Always read the authoritative score directly from the database
+    if registration.score is not None:
+        percentage = int(registration.score)
+    else:
+        percentage = round((score / total_questions) * 100) if total_questions > 0 else 0
 
     status = "Pass" if percentage >= cutoff_score else "Fail"
 
@@ -965,7 +928,14 @@ def regenerate_question(request):
         question_text = data.get("question_text")
 
         # OpenAI setup
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.OPENAI_API_KEY.strip(),
+            default_headers={
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "AI Written Test Platform",
+            }
+        )
 
         prompt = f"""
         As an expert technical recruiter, generate ONE new and different interview question based on the following context.
@@ -992,7 +962,7 @@ def regenerate_question(request):
         """
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="google/gemini-2.0-flash-001",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that generates technical assessments in strictly valid JSON format."},
                 {"role": "user", "content": prompt}
@@ -1184,7 +1154,14 @@ import re
 from typing import Tuple, Dict, Any
 from django.conf import settings
 from openai import OpenAI 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=settings.OPENAI_API_KEY.strip(),
+    default_headers={
+        "HTTP-Referer": "http://localhost:8000",
+        "X-Title": "AI Written Test Platform",
+    }
+)
 
 def evaluate_answer_with_ai(
     question_text: str,
@@ -1193,14 +1170,40 @@ def evaluate_answer_with_ai(
     question_type: str = "short",
 ) -> Tuple[bool, Dict[str, Any]]:
     """
-    Uses OpenAI GPT-4o-mini to evaluate if a user's answer is conceptually correct.
+    Uses OpenRouter (google/gemini-2.0-flash-001) to evaluate if a user's answer is conceptually correct.
     """
     
+    # 1. Check for empty answers
     if not user_answer or not user_answer.strip():
         return False, {
             "is_correct": False,
             "confidence": 100,
             "reason": "Answer is empty",
+        }
+
+    # 2. Check for common placeholders (Case-insensitive)
+    placeholders = [
+        "# write your python code here",
+        "// write your code snippet here",
+        "// write your javascript code here",
+        "// write your java code here",
+        "// write your c/c++ code here",
+        "-- write your sql query here",
+        "write your answer here",
+        "type your detailed answer here...",
+        "not attempted",
+        "sample correct answer text",
+        "# write your code here",
+        "write your new short answer question here",
+        "write your new coding challenge prompt here"
+    ]
+    
+    clean_answer = user_answer.strip().lower()
+    if clean_answer in placeholders:
+        return False, {
+            "is_correct": False,
+            "confidence": 100,
+            "reason": "Candidate left the placeholder text; did not attempt the question.",
         }
 
     # Normalize inputs
@@ -1227,7 +1230,7 @@ def evaluate_answer_with_ai(
 
         # OpenAI API Call
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="google/gemini-2.0-flash-001",
             messages=[
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
@@ -1326,17 +1329,14 @@ def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> s
 **Reference Solution (FOR CONTEXT ONLY - IGNORE LANGUAGE USED HERE):**
 
 
-**CRITICAL EVALUATION RULES (MUST FOLLOW):**
-1. **🚫 IGNORE LANGUAGE RESTRICTIONS (UNLESS EXPLICIT):**
-   - If the question does NOT explicitly say "Write in JavaScript" (or another specific language), you **MUST ACCEPT** solutions in **Java, Python, C++, C, SQL, or JavaScript**.
-   - The user's language DOES NOT need to match the Reference Solution's language.
+3. **✅ STRICT LANGUAGE ENFORCEMENT:**
+   - The user **MUST** use the programming language requested in the question or the one shown in the reference solution.
+   - If the user writes code in a different language (e.g., Python code for a JavaScript question), mark it as **INCORRECT** even if the logic is right.
+   - Logic must be correct **AND** the language must match.
 
-2. **🏗️ IGNORE BOILERPLATE & STRUCTURE:**
-   - In Java/C++, users often need full classes (`public class Main { ... }`) to run code. **DO NOT mark this wrong** if the question only asked for a "function".
-   - Focus ONLY on the core logic inside the function/method that solves the problem.
-
-3. **✅ LOGIC IS KING:**
+4. **✅ LOGIC IS KING (BUT REJECT PLACEHOLDERS):**
    - Does the code actually solve the problem?
+   - **CRITICAL**: If the user's code is just a comment like `# Write your code here` or `// Your code`, it is **INCORRECT**.
    - If it runs and produces the correct output (like "madam" -> true), it is **CORRECT**.
    - Ignore minor syntax errors (like missing semicolons) if the logic is sound.
 
@@ -1639,12 +1639,11 @@ def submit_test(request, registration_id):
 
     percentage_score = 0
     if total_questions > 0:
-        percentage_score = round((correct_answers_count / total_questions) * 100, 2)
+        percentage_score = round((correct_answers_count / total_questions) * 100)
 
     registration.is_completed = True
-    registration.end_time = timezone.now()
     registration.score = percentage_score
-    registration.save(update_fields=["is_completed", "end_time", "score"])
+    registration.save(update_fields=["is_completed", "score"])
 
     return redirect("test_result", registration_id=registration.id)
 
@@ -1783,10 +1782,18 @@ def invite_candidate(request):
 
         except Exception as e:
             logger.error(f"Error sending email to {candidate_email}: {e}")
+            
+            # Check if it's a Gmail quota error
+            error_message = str(e)
+            if "Daily user sending limit exceeded" in error_message:
+                frontend_message = "Gmail Daily Sending Limit Exceeded. Please try again tomorrow or update SMTP credentials."
+            else:
+                frontend_message = f"Email sending failed: {error_message}"
+                
             return JsonResponse(
                 {
                     "status": "error",
-                    "message": "Email sending failed. Please check server logs.",
+                    "message": frontend_message,
                 },
                 status=500,
             )
@@ -1905,7 +1912,14 @@ def get_chatgpt_suggestions(query, db_list):
         # Check if key exists
         if not settings.OPENAI_API_KEY: return []
 
-        client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.OPENAI_API_KEY.strip(),
+            default_headers={
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "AI Written Test Platform",
+            }
+        )
         excluded = ', '.join([f'"{s}"' for s in db_list]) if db_list else 'none'
         
         # CHANGE HERE: Prompt mein 15 maange hain
@@ -1913,7 +1927,7 @@ def get_chatgpt_suggestions(query, db_list):
         user_prompt = f'User typed: "{query}". Exclude these DB results: {excluded}. Suggest 15 related technical skills.'
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="google/gemini-2.0-flash-001",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -2034,7 +2048,7 @@ def edit_user_profile(request, pk):
     if request.method == "POST":
         # ✅ STEP 2: Dono Forms Load Karein
         u_form = UserUpdateForm(request.POST, instance=user_to_edit)
-        p_form = UserProfileRegistrationForm(request.POST, instance=profile)
+        p_form = UserProfileRegistrationForm(request.POST, request.FILES, instance=profile)
 
         # ✅ STEP 3: Validate & Save Both
         if u_form.is_valid() and p_form.is_valid():
