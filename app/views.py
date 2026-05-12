@@ -1867,9 +1867,9 @@ def search_skills_with_suggestions(request):
              return JsonResponse({'skills': db_list, 'suggestions': []})
         
         if ai_provider == 'gemini':
-             ai_suggestions = [] # Gemini implement hone par yahan add karein
+            ai_suggestions = get_gemini_suggestions(query, db_list)
         else:
-            # Agar DB results bahut kam hain, tabhi AI call karein
+            # Default to ChatGPT suggestions
             ai_suggestions = get_chatgpt_suggestions(query, db_list)
         
         ai_suggestions = ai_suggestions[:15]
@@ -1877,7 +1877,7 @@ def search_skills_with_suggestions(request):
         return JsonResponse({
             'skills': db_list,
             'suggestions': ai_suggestions,
-            'provider': 'chatgpt'
+            'provider': ai_provider
         })
     
     except Exception as e:
@@ -1885,10 +1885,18 @@ def search_skills_with_suggestions(request):
         return JsonResponse({'skills': [], 'suggestions': [], 'error': str(e)})
 
 def get_chatgpt_suggestions(query, db_list):
-    """Get 15 skill suggestions using OpenAI API"""
+    """Get 15 skill suggestions using OpenAI GPT-4o-mini via OpenRouter"""
+    return get_ai_suggestions(query, db_list, "openai/gpt-4o-mini")
+
+def get_gemini_suggestions(query, db_list):
+    """Get 15 skill suggestions using Google Gemini 2.0 Flash via OpenRouter"""
+    return get_ai_suggestions(query, db_list, "google/gemini-2.0-flash-001")
+
+def get_ai_suggestions(query, db_list, model_name):
+    """Generic helper to fetch skill suggestions from OpenRouter"""
     try:
-        # Check if key exists
-        if not settings.OPENAI_API_KEY: return []
+        if not settings.OPENAI_API_KEY: 
+            return []
 
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -1900,12 +1908,11 @@ def get_chatgpt_suggestions(query, db_list):
         )
         excluded = ', '.join([f'"{s}"' for s in db_list]) if db_list else 'none'
         
-        # CHANGE HERE: Prompt mein 15 maange hain
         system_prompt = "You are a technical recruiting expert. Output only a comma-separated list of 15 related short technical skill names. No explanations."
         user_prompt = f'User typed: "{query}". Exclude these DB results: {excluded}. Suggest 15 related technical skills.'
 
         response = client.chat.completions.create(
-            model="google/gemini-2.0-flash-001",
+            model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -1927,7 +1934,7 @@ def get_chatgpt_suggestions(query, db_list):
         return []
 
     except Exception as e:
-        print(f"OpenAI Error: {e}")
+        print(f"AI Suggestion Error ({model_name}): {e}")
         return []
 
 

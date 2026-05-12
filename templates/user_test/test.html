@@ -2225,50 +2225,6 @@
       }
     }
 
-    function outf(text, questionId) {
-      const outputElement = document.getElementById(`output-${questionId}`);
-      outputElement.textContent += text;
-      outputElement.classList.remove("hidden");
-      outputElement.classList.remove("bg-red-100", "text-red-800");
-      outputElement.classList.add("bg-slate-800", "text-emerald-300");
-    }
-
-    function builtinRead(x) {
-      if (Sk.builtinFiles?.files?.[x] === undefined) throw "File not found: '" + x + "'";
-      return Sk.builtinFiles["files"][x];
-    }
-
-    function runJavaScript(code, outputElement, runButton) {
-      let output = "";
-      const originalConsoleLog = console.log;
-      console.log = (...args) => { output += args.map(String).join(" ") + "\n"; };
-
-      try {
-        new Function(code)();
-        outputElement.textContent = output.trim() || "Code executed with no console output.";
-        outputElement.classList.remove("bg-red-100", "text-red-800", "bg-sky-100", "text-sky-800");
-        outputElement.classList.add("bg-slate-800", "text-emerald-300");
-      } catch (err) {
-        outputElement.textContent = "Error:\n" + err.toString();
-        outputElement.classList.remove("bg-slate-800", "text-emerald-300", "bg-sky-100", "text-sky-800");
-        outputElement.classList.add("bg-red-100", "text-red-800");
-      } finally {
-        console.log = originalConsoleLog;
-        runButton.innerHTML = '<i class="fas fa-play"></i> Run Code';
-        runButton.disabled = false;
-      }
-    }
-
-    function mockServerRunner(language, outputElement, runButton) {
-      outputElement.textContent = `NOTE: ${language.toUpperCase()} code is not run in the browser.\nYour code is saved and will be fully evaluated on the server upon submission.`;
-      outputElement.classList.remove("bg-red-100", "text-red-800", "bg-slate-800", "text-emerald-300");
-      outputElement.classList.add("bg-sky-100", "text-sky-800");
-      setTimeout(() => {
-        runButton.innerHTML = '<i class="fas fa-play"></i> Run Code';
-        runButton.disabled = false;
-      }, 500);
-    }
-
     function changeLanguage(questionId, newLanguage) {
       const editor = editorInstances[questionId];
       const editorContainer = document.getElementById(`editor-${questionId}`);
@@ -2302,33 +2258,56 @@
       const code = editor.getValue();
       const outputElement = document.getElementById(`output-${questionId}`);
       const runButton = document.getElementById(`run-btn-${questionId}`);
-      const language = document.getElementById(`editor-${questionId}`).getAttribute("data-language") || "python";
+      const editorContainer = document.getElementById(`editor-${questionId}`);
+      const language = editorContainer.getAttribute("data-language") || "python";
+      
+      // Get question text for context
+      const questionBlock = document.getElementById(`question-${questionId}`);
+      const questionText = questionBlock ? questionBlock.querySelector('.prose').textContent.trim() : "";
 
-      outputElement.textContent = "Running...";
+      outputElement.textContent = "Processing code and simulating execution...";
       outputElement.classList.remove("hidden", "bg-red-100", "text-red-800", "bg-slate-800", "text-emerald-300", "bg-sky-100", "text-sky-800");
-      outputElement.classList.add("bg-slate-100", "text-slate-700");
+      outputElement.classList.add("bg-slate-100", "text-slate-700", "animate-pulse");
+      
       runButton.disabled = true;
-      runButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+      runButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Running...';
 
-      if (language === "javascript") {
-        runJavaScript(code, outputElement, runButton);
-      } else if (language === "python") {
-        Sk.pre = `output-${questionId}`;
-        Sk.configure({ output: (text) => outf(text, questionId), read: builtinRead, execLimit: 5000 });
-        Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
-          .then(
-            () => runButton.innerHTML = '<i class="fas fa-play"></i> Run Code',
-            (err) => {
-              outputElement.textContent = "Error:\n" + err.toString();
-              outputElement.classList.remove("bg-slate-800", "text-emerald-300");
-              outputElement.classList.add("bg-red-100", "text-red-800");
-              runButton.innerHTML = '<i class="fas fa-play"></i> Run Code';
-            }
-          )
-          .finally(() => runButton.disabled = false);
-      } else {
-        mockServerRunner(language, outputElement, runButton);
-      }
+      fetch("{% url 'test:run_code_ai' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+          code: code,
+          language: language,
+          question_text: questionText
+        })
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Execution failed. Please try again.");
+        return response.json();
+      })
+      .then(data => {
+        outputElement.classList.remove("animate-pulse", "bg-slate-100", "text-slate-700");
+        
+        if (data.error) {
+          outputElement.textContent = "Error: " + data.error;
+          outputElement.classList.add("bg-red-100", "text-red-800");
+        } else {
+          outputElement.textContent = data.output;
+          outputElement.classList.add("bg-slate-800", "text-emerald-300");
+        }
+      })
+      .catch(error => {
+        outputElement.classList.remove("animate-pulse", "bg-slate-100", "text-slate-700");
+        outputElement.textContent = "Connection Error: " + error.message;
+        outputElement.classList.add("bg-red-100", "text-red-800");
+      })
+      .finally(() => {
+        runButton.disabled = false;
+        runButton.innerHTML = '<i class="fas fa-play mr-1"></i> Run Code';
+      });
     }
 
     document.addEventListener("DOMContentLoaded", function () {

@@ -24,9 +24,13 @@
               alt="User avatar" />
             <div>
               <h1 class="text-3xl font-bold text-slate-800">
-                {{ profile_user.first_name }} {{ profile_user.last_name }}
+                {% if profile_user.get_full_name %}
+                {{ profile_user.get_full_name }}
+                {% else %}
+                {{ profile_user.username }}
+                {% endif %}
               </h1>
-              <p class="text-slate-500">@{{ profile_user.username }}</p>
+              <p class="text-slate-500">{{ profile_user.username }}</p>
             </div>
 
             {% if request.user == profile_user or request.user.is_superuser %}
@@ -53,7 +57,11 @@
                   Full Name
                 </dt>
                 <dd class="text-lg text-slate-800 mt-1">
+                  {% if profile_user.get_full_name %}
                   {{ profile_user.get_full_name }}
+                  {% else %}
+                  <span class="text-slate-400 italic">Not Provided</span>
+                  {% endif %}
                 </dd>
               </div>
               <div class="bg-slate-50 p-4 rounded-lg">
@@ -70,6 +78,22 @@
                 </dt>
                 <dd class="text-lg text-slate-800 mt-1">
                   {{ profile_user.date_joined|date:"F j, Y" }}
+                </dd>
+              </div>
+              <div class="bg-slate-50 p-4 rounded-lg">
+                <dt class="text-sm font-medium text-slate-500">
+                  Phone Number
+                </dt>
+                <dd class="text-lg text-slate-800 mt-1">
+                  {{ profile_user.profile.phone_number|default:"Not Provided" }}
+                </dd>
+              </div>
+              <div class="bg-slate-50 p-4 rounded-lg">
+                <dt class="text-sm font-medium text-slate-500">
+                  Address
+                </dt>
+                <dd class="text-lg text-slate-800 mt-1">
+                  {{ profile_user.profile.address|default:"Not Provided" }}
                 </dd>
               </div>
             </dl>

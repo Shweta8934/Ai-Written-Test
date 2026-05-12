@@ -1454,15 +1454,30 @@
                         const availableDbSkills = (data.skills || []).filter(s => !selectedSkills.includes(s));
                         const hasAiSuggestions = data.suggestions && data.suggestions.length > 0;
 
-                        // If no results, just hide the dropdown.
-                        if (availableDbSkills.length === 0 && !hasAiSuggestions) {
-                            skillsDropdown.classList.add("hidden");
+                        // 1. Add "Add New Skill" option at the very top for manual entry
+                        if (query.length > 0 && !data.skills.some(s => s.toLowerCase() === query.toLowerCase()) && !selectedSkills.includes(query)) {
+                            const addOption = document.createElement("div");
+                            addOption.className = "px-4 py-3 cursor-pointer bg-slate-50 hover:bg-[#736b8e] hover:text-white flex items-center transition-colors border-b";
+                            addOption.innerHTML = `<span class="w-5 h-5 flex items-center justify-center bg-[#736b8e] text-white rounded-full mr-3 text-[10px]">+</span> <span>Add "<strong>${query}</strong>"</span>`;
+                            addOption.addEventListener("click", () => selectSkill(query));
+                            skillsDropdown.appendChild(addOption);
+                        }
+
+                        // If no results, show a message instead of just hiding the dropdown.
+                        if (availableDbSkills.length === 0 && !hasAiSuggestions && skillsDropdown.childNodes.length === 0) {
+                            skillsDropdown.innerHTML = `
+                                <div class="p-4 text-center">
+                                    <div class="text-slate-500 text-sm font-medium">No matching skills found</div>
+                                    <p class="text-xs text-slate-400 mt-1">Try a different keyword or check your spelling.</p>
+                                </div>
+                            `;
+                            skillsDropdown.classList.remove("hidden");
                             return;
                         }
 
                         // Agar results hain, toh unhe render karein
 
-                        // 1. DB Skills
+                        // 2. DB Skills
                         availableDbSkills.forEach(skill => {
                             const option = document.createElement("div");
                             option.className = "px-4 py-2 cursor-pointer hover:bg-slate-50 flex items-center transition-colors border-l-4 border-transparent hover:border-[#736b8e]";
@@ -1471,9 +1486,9 @@
                             skillsDropdown.appendChild(option);
                         });
 
-                        // 2. AI Suggestions
+                        // 3. AI Suggestions
                         if (hasAiSuggestions) {
-                            if (availableDbSkills.length > 0) {
+                            if (availableDbSkills.length > 0 || skillsDropdown.childNodes.length > 0) {
                                 const sep = document.createElement("div");
                                 sep.className = "border-t border-slate-100 my-1";
                                 skillsDropdown.appendChild(sep);
@@ -1499,9 +1514,20 @@
                         console.error("Search error:", error);
                         // Hide silently on error (or uncomment to show error)
                         skillsDropdown.classList.add("hidden");
-                        // skillsDropdown.innerHTML = '<div class="p-3 text-sm text-red-500 text-center">Error loading results.</div>';
                     }
                 }, 300);
+            });
+
+            // HANDLE ENTER KEY: Pressing enter adds the current query as a skill
+            skillsInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    const query = skillsInput.value.trim();
+                    if (query.length > 0) {
+                        selectSkill(query);
+                        skillsDropdown.classList.add("hidden");
+                    }
+                }
             });
 
             document.addEventListener("click", (e) => {
@@ -1519,8 +1545,6 @@
 
         // Call init once DOM is loaded
         document.addEventListener("DOMContentLoaded", initSkillsAutoSuggest);
-        document.addEventListener("DOMContentLoaded", initSkillsAutoSuggest);
-        initSkillsAutoSuggest();
 
         function selectSkill(skill) {
             const skillsInput = document.getElementById("skills-input");
@@ -2811,94 +2835,7 @@
                     }
                 });
             }
-            let skillSearchTimeout;
-
-            const skillsInput = document.getElementById("skills-input");
-            const skillsDropdown = document.getElementById("skills-dropdown");
-
-            if (skillsInput) {
-                skillsInput.addEventListener("input", async (e) => {
-                    clearTimeout(skillSearchTimeout);
-                    const query = e.target.value.trim();
-
-                    if (query.length >= 1) {
-                        skillSearchTimeout = setTimeout(async () => {
-                            try {
-                                const response = await fetch(
-                                    "{% url 'search_skills_suggestions' %}?q=" + encodeURIComponent(query)
-                                );
-                                const data = await response.json();
-
-                                const availableDbSkills = data.skills.filter(
-                                    s => !selectedSkills.includes(s)
-                                );
-
-                                skillsDropdown.innerHTML = "";
-
-                                // Database skills (green)
-                                if (availableDbSkills && availableDbSkills.length > 0) {
-                                    availableDbSkills.forEach(skill => {
-                                        const option = document.createElement("div");
-                                        option.className = "px-4 py-2 cursor-pointer hover:bg-slate-100 flex items-center transition-colors";
-                                        option.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> ${skill}`;
-                                        option.addEventListener("click", () => selectSkill(skill));
-                                        skillsDropdown.appendChild(option);
-                                    });
-                                }
-
-                                // AI suggestions (blue)
-                                if (data.suggestions && data.suggestions.length > 0) {
-                                    if (availableDbSkills.length > 0) {
-                                        const separator = document.createElement("div");
-                                        separator.className = "border-t border-slate-200 my-2";
-                                        skillsDropdown.appendChild(separator);
-                                    }
-
-                                    const aiHeader = document.createElement("div");
-                                    aiHeader.className = "px-4 py-2 font-semibold text-blue-600 text-sm bg-blue-50";
-                                    aiHeader.textContent = "🤖 AI Suggestions:";
-                                    skillsDropdown.appendChild(aiHeader);
-
-                                    data.suggestions.forEach(skill => {
-                                        const option = document.createElement("div");
-                                        option.className = "px-4 py-2 cursor-pointer hover:bg-blue-50 flex items-center transition-colors";
-                                        option.innerHTML = `<span class="text-blue-500 mr-2">✨</span> ${skill}`;
-                                        option.addEventListener("click", () => selectSkill(skill));
-                                        skillsDropdown.appendChild(option);
-                                    });
-                                }
-
-                                // No results
-                                if (availableDbSkills.length === 0 && (!data.suggestions || data.suggestions.length === 0)) {
-                                    const noResult = document.createElement("div");
-                                    noResult.className = "px-4 py-2 text-center text-slate-500 text-sm";
-                                    noResult.textContent = "No skills found";
-                                    skillsDropdown.appendChild(noResult);
-                                }
-
-                                if (skillsDropdown) skillsDropdown.classList.remove("hidden");
-
-                            } catch (error) {
-                                console.error("AI suggestion error:", error);
-                                showToast("Error loading suggestions", "error");
-                            }
-                        }, 300);
-                    } else if (query.length === 0) {
-                        renderDropdown();
-                        if (skillsDropdown) skillsDropdown.classList.remove("hidden");
-                    } else {
-                        if (skillsDropdown) skillsDropdown.classList.add("hidden");
-                    }
-                });
-
-                // Close dropdown on outside click
-                document.addEventListener("click", (e) => {
-                    if (skillsInput && !skillsInput.contains(e.target) &&
-                        skillsDropdown && !skillsDropdown.contains(e.target)) {
-                        skillsDropdown.classList.add("hidden");
-                    }
-                });
-            }
+            // Redundant skill logic removed - handled by initSkillsAutoSuggest()
         });
     </script>
 

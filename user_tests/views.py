@@ -4,12 +4,18 @@ from django.db import IntegrityError, transaction
 from django.http import HttpResponse, JsonResponse  # <-- JsonResponse imported
 from django.utils import timezone  # <-- timezone imported
 from datetime import timedelta  # <-- timedelta imported
+import re
 
 # IMPORTS
 from app.models import QuestionPaper, Question
 from .models import TestRegistration, UserResponse
 from .forms import TestRegistrationForm
 from django.urls import reverse  # Required for redirecting using named URLs
+
+from openai import OpenAI
+from django.conf import settings
+import json
+from django.views.decorators.csrf import csrf_exempt
 
 # --- HELPER FUNCTION FOR FLOW CONTROL ---
 
@@ -144,6 +150,79 @@ def get_time_remaining_api(request, link_id):
         return JsonResponse({"remaining_seconds": 0, "time_up": True})
 
     return JsonResponse({"remaining_seconds": remaining_seconds, "time_up": False})
+
+
+@csrf_exempt
+def run_code_ai(request):
+    """
+    Simulates code execution using Gemini via OpenRouter.
+    Provides a unified way to 'run' all supported languages.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        code = data.get("code")
+        language = data.get("language", "python")
+        question_text = data.get("question_text", "")
+
+        if not code:
+            return JsonResponse({"error": "No code provided"}, status=400)
+
+        prompt = f"""
+        Act as a high-performance code execution engine and compiler.
+        
+        TASK:
+        Execute the following {language} code and provide the output exactly as it would appear in a terminal/console.
+        
+        CONTEXT (Question being solved):
+        {question_text}
+        
+        CODE TO EXECUTE:
+        ```{language}
+        {code}
+        ```
+        
+        RULES:
+        1. If the code is correct, return ONLY the output of the execution.
+        2. If there are syntax errors or runtime errors, return the error message exactly as the compiler/interpreter would.
+        3. Do NOT provide any explanations, comments, or markdown formatting in your response.
+        4. If the code takes input, assume reasonable defaults based on the question context.
+        5. If the code prints nothing, return "Code executed successfully (no output)".
+        
+        Return ONLY the terminal output:
+        """
+
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.OPENAI_API_KEY.strip(),
+            default_headers={
+                "HTTP-Referer": "http://10.0.0.17:8000",
+                "X-Title": "AI Written Test Platform",
+            }
+        )
+
+        response = client.chat.completions.create(
+            model="google/gemini-2.0-flash-001",
+            messages=[
+                {"role": "system", "content": "You are a terminal emulator that executes code and returns only the output or errors."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0, # Keep it deterministic
+        )
+
+        output = response.choices[0].message.content.strip()
+        
+        # Clean up any accidental markdown
+        if output.startswith("```"):
+            output = re.sub(r"```[^\n]*\n", "", output)
+            output = output.replace("```", "")
+
+        return JsonResponse({"output": output})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 # --- VIEWS START HERE ---
