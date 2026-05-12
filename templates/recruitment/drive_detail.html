@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ drive.title }} - Drive Details</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            "theme-primary": "#736b8e",
+            "theme-dark": "#5f5778",
+            "theme-light": "#e5e3e9",
+            "gray-text": "#6B7280",
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-gray-800">
+  
+  <div class="flex h-screen">
+    {% include 'partials/sidebar.html' %}
+
+    <div class="flex-1 flex flex-col overflow-hidden">
+      {% include 'partials/header.html' with page_title="Drive Details" %}
+      
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div class="max-w-7xl mx-auto">
+          
+          <!-- Breadcrumb -->
+          <div class="mb-4 sm:mb-6">
+            <nav class="flex" aria-label="Breadcrumb">
+              <ol class="inline-flex items-center space-x-1 md:space-x-2 text-sm">
+                <li class="inline-flex items-center">
+                  <a href="{% url 'dashboard' %}" class="inline-flex items-center text-gray-600 hover:text-theme-primary transition-colors">
+                    <i class="fas fa-home mr-1.5 text-xs"></i>
+                    <span class="hidden sm:inline">Dashboard</span>
+                  </a>
+                </li>
+                <li>
+                  <div class="flex items-center">
+                    <i class="fas fa-chevron-right text-gray-400 mx-1 text-xs"></i>
+                    <span class="text-gray-500">Drive Details</span>
+                  </div>
+                </li>
+              </ol>
+            </nav>
+          </div>
+
+          <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="px-3 py-1 text-xs font-semibold rounded-full bg-white bg-opacity-20">
+                    {{ drive.get_drive_status_display }}
+                  </span>
+                  {% if drive.require_test %}
+                  <span class="px-3 py-1 text-xs font-semibold rounded-full bg-white bg-opacity-20">
+                    <i class="fas fa-clipboard-check mr-1"></i>Test Required
+                  </span>
+                  {% endif %}
+                </div>
+
+                <!-- Status Badge -->
+<div class="mb-3">
+    {% if drive.drive_status == 'OPEN' %}
+        <span class="badge bg-success">🟢 OPEN - Accepting Applications</span>
+    {% elif drive.drive_status == 'IN_PROGRESS' %}
+        <span class="badge bg-warning">🟡 IN PROGRESS</span>
+    {% elif drive.drive_status == 'COMPLETED' %}
+        <span class="badge bg-info">✅ COMPLETED - All Positions Filled</span>
+    {% elif drive.drive_status == 'CANCELLED' %}
+        <span class="badge bg-danger">❌ CANCELLED</span>
+    {% else %}
+        <span class="badge bg-secondary">{{ drive.drive_status }}</span>
+    {% endif %}
+    
+    {% if drive.is_public_link_active %}
+        <span class="badge bg-primary">🔗 Public Link Active</span>
+    {% endif %}
+</div>
+
+<!-- Progress Bar for Positions -->
+<div class="mb-4">
+    <p class="mb-1"><strong>Hiring Progress:</strong> {{ drive.filled_positions }}/{{ drive.total_positions }} positions filled</p>
+    <div class="progress" style="height: 25px;">
+        <div class="progress-bar {% if drive.hiring_progress_percentage >= 100 %}bg-success{% else %}bg-primary{% endif %}" 
+             role="progressbar" 
+             style="width: {{ drive.hiring_progress_percentage }}%"
+             aria-valuenow="{{ drive.hiring_progress_percentage }}" 
+             aria-valuemin="0" 
+             aria-valuemax="100">
+            {{ drive.hiring_progress_percentage }}%
+        </div>
+    </div>
+    {% if drive.hiring_progress_percentage >= 100 %}
+        <p class="text-success mt-2">🎉 All positions have been filled!</p>
+    {% endif %}
+</div>
+
+                <h1 class="text-2xl sm:text-3xl font-bold mb-2">{{ drive.title }}</h1>
+                <p class="text-purple-100 text-lg">{{ drive.position }}</p>
+                <p class="text-purple-200 text-sm mt-2">
+                  <i class="fas fa-building mr-2"></i>{{ drive.department.name|default:"All Departments" }}
+                </p>
+              </div>
+              
+              <div class="flex flex-col sm:flex-row gap-2">
+                <a href="{% url 'drive_edit' drive.id %}" 
+                   class="inline-flex items-center justify-center bg-white text-purple-600 px-4 py-2 rounded-lg hover:bg-purple-50 transition-all font-medium">
+                  <i class="fas fa-edit mr-2"></i>Edit
+                </a>
+                <a href="{% url 'drive_candidates' drive.id %}" 
+                   class="inline-flex items-center justify-center bg-white bg-opacity-20 text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all font-medium border border-white border-opacity-30">
+                  <i class="fas fa-users mr-2"></i>Candidates
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">Total Applications</p>
+                  <p class="text-2xl font-bold text-gray-900">{{ drive.applications.count }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                  <i class="fas fa-users text-blue-600 text-xl"></i>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">Positions</p>
+                  <p class="text-2xl font-bold text-gray-900">
+                    {{ drive.filled_positions }}/{{ drive.total_positions }}
+                  </p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <i class="fas fa-chair text-green-600 text-xl"></i>
+                </div>
+              </div>
+              <div class="mt-2">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class="bg-green-600 h-2 rounded-full" 
+                       style="width: {{ drive.hiring_progress_percentage }}%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">Active Candidates</p>
+                  <p class="text-2xl font-bold text-gray-900">
+                    {{ active_candidates_count }}
+                  </p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                  <i class="fas fa-user-clock text-yellow-600 text-xl"></i>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">Hired</p>
+                  <p class="text-2xl font-bold text-gray-900">
+                    {{ hired_count }}
+                  </p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                  <i class="fas fa-check-circle text-purple-600 text-xl"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Content Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left Column - Details -->
+            <div class="lg:col-span-2 space-y-6">
+              
+              <!-- Job Description -->
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                  <i class="fas fa-info-circle text-blue-600 mr-2"></i>Job Description
+                </h2>
+                <p class="text-gray-700 whitespace-pre-line">{{ drive.description }}</p>
+              </div>
+
+              <!-- Assessment Rounds -->
+              {% if drive.test_papers.exists %}
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                  <i class="fas fa-clipboard-list text-indigo-600 mr-2"></i>Assessment Rounds
+                </h2>
+                <div class="space-y-3">
+                  {% for paper in drive.test_papers.all %}
+                  <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                        <span class="text-indigo-600 font-semibold">{{ forloop.counter }}</span>
+                      </div>
+                      <div>
+                        <h3 class="font-medium text-gray-900">{{ paper.title }}</h3>
+                        <p class="text-sm text-gray-600">{{ paper.total_questions }} questions • {{ paper.duration }} mins</p>
+                      </div>
+                    </div>
+                    <a href="{% url 'paper_detail' paper.id %}" 
+                       class="text-theme-primary hover:text-theme-dark text-sm font-medium">
+                      View <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+
+              <!-- Recent Applications -->
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="text-xl font-semibold text-gray-900">
+                    <i class="fas fa-user-check text-green-600 mr-2"></i>Recent Applications
+                  </h2>
+                  <a href="{% url 'drive_candidates' drive.id %}" 
+                     class="text-theme-primary hover:text-theme-dark text-sm font-medium">
+                    View All <i class="fas fa-arrow-right ml-1"></i>
+                  </a>
+                </div>
+                
+                {% if recent_applications %}
+                <div class="space-y-3">
+                  {% for application in recent_applications %}
+                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p class="font-medium text-gray-900">{{ application.full_name }}</p>
+                      <p class="text-sm text-gray-600">{{ application.email }}</p>
+                    </div>
+                    <div class="text-right">
+                      <span class="px-2 py-1 text-xs font-semibold rounded-full
+                        {% if application.current_stage == 'APPLIED' %}bg-blue-100 text-blue-700
+                        {% elif application.current_stage == 'HIRED' %}bg-green-100 text-green-700
+                        {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                        {{ application.get_current_stage_display }}
+                      </span>
+                      <p class="text-xs text-gray-500 mt-1">{{ application.applied_at|timesince }} ago</p>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-center py-8">No applications yet</p>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Right Column - Timeline & Actions -->
+            <div class="space-y-6">
+              
+              <!-- Timeline -->
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                  <i class="fas fa-calendar text-orange-600 mr-2"></i>Timeline
+                </h2>
+                <div class="space-y-4">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <i class="fas fa-play text-green-600 text-xs"></i>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">Applications Open</p>
+                      <p class="text-sm text-gray-600">{{ drive.application_start_date|date:"M d, Y" }}</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                      <i class="fas fa-stop text-red-600 text-xs"></i>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">Applications Close</p>
+                      <p class="text-sm text-gray-600">{{ drive.application_end_date|date:"M d, Y" }}</p>
+                    </div>
+                  </div>
+                  
+                  {% if drive.expected_joining_date %}
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <i class="fas fa-user-plus text-blue-600 text-xs"></i>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">Expected Joining</p>
+                      <p class="text-sm text-gray-600">{{ drive.expected_joining_date|date:"M d, Y" }}</p>
+                    </div>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+
+             
+              {% if drive.is_public_link_active %}
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                  <i class="fas fa-link text-purple-600 mr-2"></i>Public Link
+                </h2>
+                <div class="bg-gray-50 rounded-lg p-3 mb-3">
+                  <p class="text-xs text-gray-600 mb-1">Application URL</p>
+                  <p class="text-sm font-mono text-gray-800 break-all">
+                    {{ request.scheme }}://{{ request.get_host }}{{ drive.get_public_link }}
+                  </p>
+                </div>
+                <button onclick="copyLink()" 
+                        class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition-all">
+                  <i class="fas fa-copy mr-2"></i>Copy Link
+                </button>
+              </div>
+              {% endif %}
+
+       
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Actions</h2>
+                <div class="space-y-2">
+                  <button class="w-full bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-all text-sm">
+                    <i class="fas fa-download mr-2"></i>Export Applications
+                  </button>
+                  <button class="w-full bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-all text-sm">
+                    <i class="fas fa-envelope mr-2"></i>Email Candidates
+                  </button>
+                  {% if drive.drive_status == 'OPEN' %}
+                  <button class="w-full bg-yellow-100 text-yellow-700 py-2 rounded-lg hover:bg-yellow-200 transition-all text-sm">
+                    <i class="fas fa-pause mr-2"></i>Pause Drive
+                  </button>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    function copyLink() {
+      const link = "{{ request.scheme }}://{{ request.get_host }}{{ drive.get_public_link }}";
+      navigator.clipboard.writeText(link).then(() => {
+        alert('Link copied to clipboard!');
+      });
+    }
+  </script>
+</body>
+</html>

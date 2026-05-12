@@ -247,19 +247,20 @@
               <form method="GET" action="" class="flex items-center gap-3">
                 <select name="status" onchange="this.form.submit()"
                   class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-theme-primary focus:border-theme-primary block w-36 p-2">
-                  <option value="all" {% if selected_status == 'all' %}selected{% endif %}>Show All</option>
-                  <option value="pass" {% if selected_status == 'pass' %}selected{% endif %}>Passed</option>
-                  <option value="fail" {% if selected_status == 'fail' %}selected{% endif %}>Failed</option>
-                  <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+                  <option value="all" {% if selected_status=='all' %}selected{% endif %}>Show All</option>
+                  <option value="pass" {% if selected_status=='pass' %}selected{% endif %}>Passed</option>
+                  <option value="fail" {% if selected_status=='fail' %}selected{% endif %}>Failed</option>
+                  <option value="pending" {% if selected_status=='pending' %}selected{% endif %}>Pending</option>
                 </select>
 
                 <select name="shortlist_status" onchange="this.form.submit()"
                   class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-theme-primary focus:border-theme-primary block w-44 p-2">
-                  <option value="all" {% if selected_shortlist_status == 'all' %}selected{% endif %}>All Candidates
+                  <option value="all" {% if selected_shortlist_status=='all' %}selected{% endif %}>All Candidates
                   </option>
-                  <option value="shortlisted" {% if selected_shortlist_status == 'shortlisted' %}selected{% endif %}>
+                  <option value="shortlisted" {% if selected_shortlist_status=='shortlisted' %}selected{% endif %}>
                     Shortlisted</option>
-                  <option value="not_shortlisted" {% if selected_shortlist_status == 'not_shortlisted' %}selected{% endif %}>Not Shortlisted</option>
+                  <option value="not_shortlisted" {% if selected_shortlist_status=='not_shortlisted' %}selected{% endif
+                    %}>Not Shortlisted</option>
 
                 </select>
 
