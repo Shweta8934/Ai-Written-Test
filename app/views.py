@@ -216,7 +216,7 @@ def generate_questions(request):
                 base_url="https://openrouter.ai/api/v1",
                 api_key=settings.OPENAI_API_KEY.strip(),
                 default_headers={
-                    "HTTP-Referer": "http://localhost:8000",
+                    "HTTP-Referer": "http://10.0.0.17:8000",
                     "X-Title": "AI Written Test Platform",
                 }
             )
@@ -920,7 +920,7 @@ def regenerate_question(request):
             base_url="https://openrouter.ai/api/v1",
             api_key=settings.OPENAI_API_KEY.strip(),
             default_headers={
-                "HTTP-Referer": "http://localhost:8000",
+                "HTTP-Referer": "http://10.0.0.17:8000",
                 "X-Title": "AI Written Test Platform",
             }
         )
@@ -1146,7 +1146,7 @@ client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=settings.OPENAI_API_KEY.strip(),
     default_headers={
-        "HTTP-Referer": "http://localhost:8000",
+        "HTTP-Referer": "http://10.0.0.17:8000",
         "X-Title": "AI Written Test Platform",
     }
 )
@@ -1904,7 +1904,7 @@ def get_chatgpt_suggestions(query, db_list):
             base_url="https://openrouter.ai/api/v1",
             api_key=settings.OPENAI_API_KEY.strip(),
             default_headers={
-                "HTTP-Referer": "http://localhost:8000",
+                "HTTP-Referer": "http://10.0.0.17:8000",
                 "X-Title": "AI Written Test Platform",
             }
         )

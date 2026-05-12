@@ -98,7 +98,18 @@ class QuestionPaper(models.Model):
     created_at = models.DateTimeField(default=timezone.now, editable=False)
     is_active = models.BooleanField(default=False)
     is_public_active = models.BooleanField(null=True, blank=True)
-    is_private_link_active = models.BooleanField(default=False) # <--- ADD default=False
+    is_private_link_active = models.BooleanField(default=False)
+    
+    # Missing fields from database schema
+    round_number = models.IntegerField(null=True, blank=True, default=1)
+    job_location = models.CharField(max_length=100, null=True, blank=True, default="")
+    job_type = models.CharField(max_length=50, null=True, blank=True, default="Full-time")
+    pay_scale = models.CharField(max_length=100, null=True, blank=True, default="")
+    positions = models.IntegerField(null=True, blank=True, default=1)
+    rounds = models.CharField(max_length=100, null=True, blank=True, default="")
+    is_interview_round = models.BooleanField(default=False)
+    end_date = models.DateField(null=True, blank=True)
+    recruitment_drive = models.ForeignKey('recruitment.JobPost', on_delete=models.SET_NULL, null=True, blank=True)
     def __str__(self):
         return f"{self.title} for {self.job_title}"
 
