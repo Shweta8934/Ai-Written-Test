@@ -7,7 +7,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Candidates for {{ job.title }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "theme-primary": "#736b8e",
+                        "theme-dark": "#5f5778",
+                        "theme-light": "#e5e3e9",
+                        "gray-text": "#6B7280",
+                    },
+                },
+            },
+        };
+    </script>
     <style>
+        body {
+            font-family: "Inter", sans-serif;
+        }
+
         /* Custom scrollbar for better aesthetics */
         .overflow-y-auto {
             scrollbar-width: thin;
@@ -41,12 +60,12 @@
                     <div
                         class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b pb-4">
                         <h1 class="text-2xl font-bold text-gray-900">
-                            Candidates for: <span class="text-indigo-600">{{ job.title }}</span>
+                            Candidates for: <span class="text-theme-primary">{{ job.title }}</span>
                         </h1>
                         <div class="mt-3 sm:mt-0 flex space-x-2">
 
                             <a href="{% url 'candidate_kanban' pk=job.pk %}"
-                                class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition duration-150 shadow-sm flex items-center">
+                                class="px-4 py-2 text-sm bg-theme-primary text-white rounded-md hover:bg-theme-dark transition duration-150 shadow-sm flex items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -62,24 +81,24 @@
                             <span class="text-sm font-medium text-gray-700 mr-2">Filter by Round:</span>
 
                             <a href="{% url 'candidate_list' job_pk=job.pk %}"
-                                class="px-3 py-1 text-xs rounded-full {% if not request.GET.round %}bg-indigo-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                                class="px-3 py-1 text-xs rounded-full {% if not request.GET.round %}bg-theme-primary text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
                                 All ({{ candidates|length }})
                             </a>
 
                             {% for key, value in round_choices %}
                             <a href="{% url 'candidate_list' job_pk=job.pk %}?round={{ key }}"
                                 class="px-3 py-1 text-xs rounded-full 
-                                   {% if request.GET.round == key %}bg-indigo-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                                   {% if request.GET.round == key %}bg-theme-primary text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
                                 {{ value }}
                             </a>
                             {% endfor %}
 
                             <form method="get" class="ml-auto flex items-center">
                                 <input type="text" name="search" placeholder="Search by name/email"
-                                    class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                    class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-theme-primary focus:border-theme-primary"
                                     value="{{ request.GET.search|default:'' }}">
                                 <button type="submit"
-                                    class="ml-2 p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                                    class="ml-2 p-1.5 bg-theme-primary text-white rounded-md hover:bg-theme-dark">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
                                         class="w-5 h-5">
                                         <path fill-rule="evenodd"
@@ -101,17 +120,15 @@
                                 <div class="w-full sm:w-1/2 lg:w-1/4 mb-3 sm:mb-0">
                                     <p class="text-lg font-semibold text-gray-900 text-truncate"
                                         title="{{ candidate.name }}">{{ candidate.name }}</p>
-                                    <p class="text-sm text-indigo-600 text-truncate"
-                                        title="{{ candidate.test_registration.email }}">{{
-                                        candidate.test_registration.email }}</p>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        {{ candidate.get_is_experienced_display|default:'N/A' }} | Exp: {{
-                                        candidate.total_experience|default:0 }} Yrs
+                                    <p class="text-sm text-theme-primary text-truncate"
+                                        title="{{ candidate.test_registration.email }}">{{ candidate.test_registration.email }}</p>
+                                    <p class="text-xs text-gray-text mt-1">
+                                        {{ candidate.get_is_experienced_display|default:'N/A' }} | Exp: {{ candidate.total_experience|default:0 }} Yrs
                                     </p>
                                 </div>
 
                                 <div class="w-1/2 sm:w-1/4 lg:w-1/4">
-                                    <p class="text-xs text-gray-500">Current Round</p>
+                                    <p class="text-xs text-gray-text">Current Round</p>
                                     <span
                                         class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium 
                                         {% if candidate.current_round == 'Final Offer' %}bg-green-100 text-green-800{% elif candidate.current_round == 'Rejected' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
@@ -120,11 +137,11 @@
                                 </div>
 
                                 <div class="w-1/2 sm:w-1/4 lg:w-1/6 text-right sm:text-left">
-                                    <p class="text-xs text-gray-500">Test Score</p>
+                                    <p class="text-xs text-gray-text">Test Score</p>
                                     <p class="text-lg font-bold text-gray-900">
                                         {% if candidate.test_registration.score %}
                                         {{ candidate.test_registration.score|floatformat:1 }} <span
-                                            class="text-sm text-gray-500">/ 100</span>
+                                            class="text-sm text-gray-text">/ 100</span>
                                         {% else %}
                                         N/A
                                         {% endif %}
@@ -134,14 +151,14 @@
                                 <div class="w-full sm:w-1/4 lg:w-1/4 mt-3 sm:mt-0 flex justify-end space-x-2">
 
                                     <a href="{% url 'candidate_detail' pk=candidate.pk %}"
-                                        class="px-3 py-1 text-sm text-indigo-600 border border-indigo-300 rounded-md hover:bg-indigo-50 transition duration-150">
+                                        class="px-3 py-1 text-sm text-theme-primary border border-indigo-300 rounded-md hover:bg-theme-light transition duration-150">
                                         View Details
                                     </a>
 
                                     <div class="relative inline-block text-left" x-data="{ open: false }"
                                         @click.away="open = false">
                                         <button @click="open = !open" type="button"
-                                            class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-theme-primary"
                                             id="menu-button-{{ candidate.pk }}" aria-expanded="true"
                                             aria-haspopup="true">
                                             Actions
@@ -178,8 +195,7 @@
                                                 {% endcomment %}
 
                                                 {% for key, value in round_choices %}
-                                                {% if key != candidate.current_round and key != 'Rejected' and key !=
-                                                'Applied' %}
+                                                {% if key != candidate.current_round and key != 'Rejected' and key != 'Applied' %}
                                                 <a href="{% url 'candidate_move_round' pk=candidate.pk round_name=key %}"
                                                     class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100"
                                                     role="menuitem" tabindex="-1">
@@ -207,9 +223,9 @@
                         </div>
                         {% empty %}
                         <div class="text-center p-10 bg-white rounded-lg shadow-md">
-                            <p class="text-xl text-gray-500">No candidates have applied for this job yet.</p>
+                            <p class="text-xl text-gray-text">No candidates have applied for this job yet.</p>
                             <a href="{% url 'job_detail' pk=job.pk %}"
-                                class="mt-4 inline-block px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50">
+                                class="mt-4 inline-block px-4 py-2 text-sm font-medium text-theme-primary border border-theme-primary rounded-md hover:bg-theme-light">
                                 Share Application Link
                             </a>
                         </div>
