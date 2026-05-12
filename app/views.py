@@ -829,11 +829,13 @@ def test_result(request, registration_id):
 
     incorrect_answers = total_questions - score - unattempted_count
     
-    # ✅ Always read the authoritative score directly from the database
-    if registration.score is not None:
-        percentage = int(registration.score)
-    else:
-        percentage = round((score / total_questions) * 100) if total_questions > 0 else 0
+    # Calculate percentage based on current evaluation
+    percentage = round((score / total_questions) * 100) if total_questions > 0 else 0
+
+    # Sync the final evaluated score back to the database so the dashboard is also correct
+    if registration.score != percentage:
+        registration.score = percentage
+        registration.save(update_fields=["score"])
 
     status = "Pass" if percentage >= cutoff_score else "Fail"
 
@@ -1297,46 +1299,34 @@ Respond with ONLY a valid JSON object (no markdown, no extra text):
 
 def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> str:
     """
-    Generate a highly flexible prompt that forces AI to ignore language differences
-    and boilerplate code unless specifically required by the question.
+    Generate a prompt for AI to evaluate coding logic and language correctness.
     """
-    return f"""You are an expert multi-language code evaluator. Your ONLY job is to check if the user's logic solves the problem, regardless of the language used.
+    return f"""You are an expert code evaluator. Your task is to evaluate if the user's code correctly solves the problem using the requested programming language.
 
 **Question:**
 {question_text}
 
-**User's Code (EVALUATE THIS LOGIC):**
-```
+**Reference Solution (Expected Language and Logic):**
+{model_code}
+
+**User's Submitted Code:**
 {user_code}
 
-**Question:**
-{question_text}
+**Evaluation Rules:**
+1. **Language Consistency**: The user MUST use the programming language requested in the question (or the one used in the reference solution). If the user solves the problem in a DIFFERENT language (e.g., Java code for a C# question), it is **INCORRECT**.
+2. **Logical Correctness**: Does the code actually solve the problem described in the question?
+3. **Boilerplate**: Ignore minor syntax errors or missing boilerplate (like class declarations or imports) if the core logic is correct, as long as the language itself is right.
+4. **Placeholders**: If the code is just the default placeholder (e.g., "// write your code here"), it is **INCORRECT**.
 
-**User's Code (Evaluate THIS based on its own language's syntax/logic):**
-
-**Reference Solution (FOR CONTEXT ONLY - IGNORE LANGUAGE USED HERE):**
-
-
-3. **✅ STRICT LANGUAGE ENFORCEMENT:**
-   - The user **MUST** use the programming language requested in the question or the one shown in the reference solution.
-   - If the user writes code in a different language (e.g., Python code for a JavaScript question), mark it as **INCORRECT** even if the logic is right.
-   - Logic must be correct **AND** the language must match.
-
-4. **✅ LOGIC IS KING (BUT REJECT PLACEHOLDERS):**
-   - Does the code actually solve the problem?
-   - **CRITICAL**: If the user's code is just a comment like `# Write your code here` or `// Your code`, it is **INCORRECT**.
-   - If it runs and produces the correct output (like "madam" -> true), it is **CORRECT**.
-   - Ignore minor syntax errors (like missing semicolons) if the logic is sound.
-
-**SCORING:**
-- `is_correct: true` -> Logic is correct in ANY standard standard programming language.
-- `is_correct: false` -> Logic is wrong, OR question EXPLICITLY forbade this language.
+**Scoring Requirements:**
+- `is_correct: true` only if the logic is correct AND the programming language is correct.
+- `is_correct: false` if the logic is wrong OR the language does not match the request.
 
 Output strictly valid JSON:
 {{
     "is_correct": true/false,
     "confidence": 0-100,
-    "reason": "One sentence feedback focusing ONLY on logic."
+    "reason": "One sentence explanation of why the answer is correct or incorrect."
 }}"""
 
 def _evaluate_mcq(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
