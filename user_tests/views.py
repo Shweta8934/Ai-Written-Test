@@ -183,12 +183,30 @@ def user_register_view(request, link_id):
     if request.method == "POST":
         form = TestRegistrationForm(request.POST)
         if form.is_valid():
+            email = form.cleaned_data['email']
+
+            # ✅ Check BEFORE saving to avoid broken PostgreSQL transactions
+            existing_reg = TestRegistration.objects.filter(
+                email=email,
+                question_paper=paper
+            ).first()
+
+            if existing_reg:
+                # Registration already exists (e.g. from job application)
+                if existing_reg.is_completed:
+                    return redirect("test:user_already_submitted")
+                # Resume the incomplete test
+                request.session["current_registration_id"] = existing_reg.id
+                request.session[get_session_key(link_id)] = "registered"
+                request.session.modified = True
+                return redirect("test:user_instructions", link_id=link_id)
+
+            # New registration — save to DB
             try:
                 registration = form.save(commit=False)
                 registration.question_paper = paper
                 registration.save()
 
-                # Set Session for BOTH registration ID and flow status
                 request.session["current_registration_id"] = registration.id
                 request.session[get_session_key(link_id)] = "registered"
                 request.session.modified = True
@@ -196,14 +214,24 @@ def user_register_view(request, link_id):
                 messages.success(
                     request, "Registration successful. Please read instructions."
                 )
-
                 return redirect("test:user_instructions", link_id=link_id)
 
-            except IntegrityError:
-                # Already registered with this email for this paper
+            except Exception as e:
+                # Race condition fallback (two requests at the same time)
+                fallback_reg = TestRegistration.objects.filter(
+                    email=email, question_paper=paper
+                ).first()
+                if fallback_reg:
+                    if fallback_reg.is_completed:
+                        return redirect("test:user_already_submitted")
+                    request.session["current_registration_id"] = fallback_reg.id
+                    request.session[get_session_key(link_id)] = "registered"
+                    request.session.modified = True
+                    return redirect("test:user_instructions", link_id=link_id)
+
                 messages.error(
                     request,
-                    "You have already registered for this test with this email address.",
+                    "An error occurred during registration. Please try again.",
                 )
                 return redirect("test:user_register_link", link_id=link_id)
 

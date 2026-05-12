@@ -184,10 +184,8 @@
 
       const nameInput = document.getElementById("id_name");
       if (nameInput) {
-        nameInput.setAttribute("maxlength", "34");
-        nameInput.addEventListener("keypress", function (e) {
-          if (!isNameKey(e)) e.preventDefault();
-        });
+        nameInput.setAttribute("maxlength", "100");
+        // No keypress restriction — allow all characters including Unicode/Hindi names
       }
 
       const phoneInput = document.getElementById("id_phone_number");
@@ -217,9 +215,8 @@
           }
 
           if (input.id === "id_name" && value) {
-            const minLength = 3;
-            const maxLength = 34;
-            const namePattern = /^[a-zA-Z\s]+$/;
+            const minLength = 2;
+            const maxLength = 100;
 
             if (value.length < minLength || value.length > maxLength) {
               isValid = false;
@@ -228,18 +225,14 @@
                 input,
                 `Name must be between ${minLength} and ${maxLength} characters.`
               );
-            } else if (!namePattern.test(value)) {
-              isValid = false;
-              input.classList.add("invalid");
-              showError(input, "Name can only contain letters and spaces.");
             }
           }
 
           if (input.name === "phone_number" && value) {
-            if (!/^[0-9]{10}$/.test(value)) {
+            if (!/^[0-9]{10,15}$/.test(value)) {
               isValid = false;
               input.classList.add("invalid");
-              showError(input, "Please enter a valid 10-digit phone number.");
+              showError(input, "Please enter a valid phone number (10-15 digits).");
             }
           }
 

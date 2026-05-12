@@ -20,6 +20,8 @@ class TestRegistration(models.Model):
     address = models.TextField(null=True, blank=True)
     score = models.FloatField(null=True, blank=True)
     is_shortlisted = models.BooleanField(default=False)
+    is_evaluated = models.BooleanField(default=False)
+    evaluated_at = models.DateTimeField(null=True, blank=True)
 
     question_paper = models.ForeignKey(
         QuestionPaper,
