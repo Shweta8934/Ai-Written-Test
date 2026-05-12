@@ -356,7 +356,7 @@
                     
                     <div class="mb-4">
                       <h2 class="text-lg font-bold text-gray-700 mb-2">{{ section.title }}</h2>
-                      <div class="text-sm text-gray-600">Question {{ forloop.counter }}</div>
+                      <div class="text-sm text-gray-600">Question {{ forloop.counter }} of {{ section.questions|length }}</div>
                     </div>
 
                     <div class="bg-gray-50 p-5 rounded-lg border border-gray-200 mb-6">
@@ -1575,8 +1575,7 @@
               <div class="p-6 border-b border-slate-200">
                 <div class="flex justify-between items-center mb-1">
                   <h2 class="text-sm font-semibold text-primary uppercase tracking-wider">{{ section.title }}</h2>
-                  <div class="text-sm font-medium text-slate-500">Question {{ forloop.counter }} of {{
-                    section.questions|length }}</div>
+                  <div class="text-sm font-medium text-slate-500">Question {{ forloop.counter }} of {{ section.questions|length }}</div>
                 </div>
                 <div class="prose max-w-none text-slate-800 mt-4">
                   {{ q.text | safe }}
