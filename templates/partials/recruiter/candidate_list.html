@@ -101,9 +101,12 @@
                                 <div class="w-full sm:w-1/2 lg:w-1/4 mb-3 sm:mb-0">
                                     <p class="text-lg font-semibold text-gray-900 text-truncate"
                                         title="{{ candidate.name }}">{{ candidate.name }}</p>
-                                    <p class="text-sm text-indigo-600 text-truncate" title="{{ candidate.test_registration.email }}">{{ candidate.test_registration.email }}</p>
+                                    <p class="text-sm text-indigo-600 text-truncate"
+                                        title="{{ candidate.test_registration.email }}">{{
+                                        candidate.test_registration.email }}</p>
                                     <p class="text-xs text-gray-500 mt-1">
-                                        {{ candidate.get_is_experienced_display|default:'N/A' }} | Exp: {{ candidate.total_experience|default:0 }} Yrs
+                                        {{ candidate.get_is_experienced_display|default:'N/A' }} | Exp: {{
+                                        candidate.total_experience|default:0 }} Yrs
                                     </p>
                                 </div>
 
@@ -175,7 +178,8 @@
                                                 {% endcomment %}
 
                                                 {% for key, value in round_choices %}
-                                                {% if key != candidate.current_round and key != 'Rejected' and key != 'Applied' %}
+                                                {% if key != candidate.current_round and key != 'Rejected' and key !=
+                                                'Applied' %}
                                                 <a href="{% url 'candidate_move_round' pk=candidate.pk round_name=key %}"
                                                     class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100"
                                                     role="menuitem" tabindex="-1">
