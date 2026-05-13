@@ -90,13 +90,22 @@
                                     <label for="job_type" class="block text-sm font-semibold text-gray-700">
                                         Job Type <span class="text-red-500 font-bold ml-1">*</span>
                                     </label>
-                                    <select id="job_type" name="job_type" required
-                                            class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-3 custom-focus outline-none transition duration-150 bg-white">
-                                        <option value="Full-Time">Full-Time</option>
-                                        <option value="Part-Time">Part-Time</option>
-                                        <option value="Contract">Contract</option>
-                                        <option value="Internship">Internship</option>
-                                    </select>
+                                    <div class="relative custom-select-container mt-1" id="container-job_type">
+                                        <input type="hidden" name="job_type" id="job_type" value="Full-Time" required>
+                                        <button type="button" 
+                                                class="select-trigger w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-left flex justify-between items-center bg-white custom-focus outline-none transition duration-150">
+                                            <span class="select-label text-sm">Full-Time</span>
+                                            <svg class="w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        </button>
+                                        <div class="select-options-container absolute z-50 mt-1 w-full bg-white shadow-xl rounded-lg border border-gray-200 hidden">
+                                            <ul class="py-1">
+                                                <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm" data-value="Full-Time">Full-Time</li>
+                                                <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm" data-value="Part-Time">Part-Time</li>
+                                                <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm" data-value="Contract">Contract</li>
+                                                <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm" data-value="Internship">Internship</li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                     <div id="error-job_type" class="text-sm text-red-500 mt-1 hidden"></div>
                                 </div>
                             </div>
@@ -130,29 +139,55 @@
                                     <label for="status" class="block text-sm font-semibold text-gray-700">
                                         Status <span class="text-red-500 font-bold ml-1">*</span>
                                     </label>
-                                    <select id="status" name="status" required
-                                            class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-3 custom-focus outline-none transition duration-150 bg-white">
-                                        <option value="Open">Open</option>
-                                        <option value="Closed">Closed</option>
-                                        <option value="Archived">Archived</option>
-                                    </select>
+                                    <div class="relative custom-select-container mt-1" id="container-status">
+                                        <input type="hidden" name="status" id="status" value="Open" required>
+                                        <button type="button" 
+                                                class="select-trigger w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-left flex justify-between items-center bg-white custom-focus outline-none transition duration-150">
+                                            <span class="select-label text-sm">Open</span>
+                                            <svg class="w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        </button>
+                                        <div class="select-options-container absolute z-50 mt-1 w-full bg-white shadow-xl rounded-lg border border-gray-200 hidden">
+                                            <ul class="py-1">
+                                                <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm" data-value="Open">Open</li>
+                                                <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm" data-value="Closed">Closed</li>
+                                                <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm" data-value="Archived">Archived</li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                     <div id="error-status" class="text-sm text-red-500 mt-1 hidden"></div>
                                 </div>
 
                                 <div>
                                     <label for="question_paper" class="block text-sm font-semibold text-gray-700">Written Test Question Paper</label>
                                     <div class="flex items-start space-x-4 mt-1">
-                                        <select id="question_paper" name="question_paper"
-                                                class="block w-full border border-gray-300 rounded-lg shadow-sm p-3 custom-focus outline-none transition duration-150 bg-white">
-                                            <option value="" selected>Select an existing Question Paper </option>
-                                            
-                                            {% for paper in question_papers %}
-                                                <option value="{{ paper.id }}">
-                                                    Paper ID: {{ paper.id }} ({{ paper.title }})
-                                                </option>
-                                            {% endfor %}
-                                            
-                                        </select>
+                                        <div class="relative flex-1 custom-select-container searchable" id="container-question_paper">
+                                            <input type="hidden" name="question_paper" id="question_paper" value="">
+                                            <button type="button" 
+                                                    class="select-trigger w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-left flex justify-between items-center bg-white custom-focus outline-none transition duration-150">
+                                                <span class="select-label text-sm text-gray-400">Select an existing Question Paper</span>
+                                                <svg class="w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            </button>
+                                            <div class="select-options-container absolute z-50 mt-1 w-full bg-white shadow-2xl rounded-xl border border-gray-200 hidden overflow-hidden">
+                                                <div class="p-2 bg-gray-50 border-b border-gray-100">
+                                                    <input type="text" 
+                                                           placeholder="Search papers..." 
+                                                           class="select-search-input w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-theme-primary outline-none">
+                                                </div>
+                                                <ul class="max-h-60 overflow-y-auto py-1 select-list">
+                                                    <li class="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-500 italic border-b border-gray-50" data-value="">
+                                                        None / Select Later
+                                                    </li>
+                                                    {% for paper in question_papers %}
+                                                        <li class="px-4 py-2 hover:bg-theme-light cursor-pointer text-sm border-b border-gray-50 last:border-0" data-value="{{ paper.id }}">
+                                                            <div class="flex items-center justify-between">
+                                                                <span class="font-semibold text-gray-900 truncate mr-2">{{ paper.title }}</span>
+                                                                <span class="text-[9px] text-gray-400 shrink-0 font-mono">#{{ paper.id }}</span>
+                                                            </div>
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        </div>
                                         
                                         <a href="{% url 'generate_questions' %}" target="_blank"
                                            class="flex-shrink-0 px-4 py-3 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-theme-primary hover:bg-theme-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-theme-primary transition duration-150">
@@ -286,8 +321,12 @@
             requiredFields.forEach(fieldId => {
                 const inputElement = document.getElementById(fieldId);
                 const errorElement = document.getElementById(`error-${fieldId}`);
+                const container = document.getElementById(`container-${fieldId}`);
+                const trigger = container ? container.querySelector('.select-trigger') : null;
                 
                 inputElement.classList.remove('input-error');
+                if(trigger) trigger.classList.remove('input-error');
+
                 if(errorElement) {
                     errorElement.classList.add('hidden');
                     errorElement.innerHTML = '';
@@ -298,15 +337,19 @@
             requiredFields.forEach(fieldId => {
                 const inputElement = document.getElementById(fieldId);
                 const errorElement = document.getElementById(`error-${fieldId}`);
+                const container = document.getElementById(`container-${fieldId}`);
+                const trigger = container ? container.querySelector('.select-trigger') : null;
                 
                 if (!inputElement.value || inputElement.value.trim() === '') {
                     isValid = false;
                     
                     inputElement.classList.add('input-error');
+                    if(trigger) trigger.classList.add('input-error');
+
                     if(errorElement) {
                         errorElement.classList.remove('hidden');
                         
-                        const labelElement = inputElement.previousElementSibling;
+                        const labelElement = container ? container.previousElementSibling : inputElement.previousElementSibling;
                         let labelText = labelElement ? labelElement.textContent.replace('*', '').trim() : fieldId;
                         errorElement.innerHTML = `**${labelText}** field is required.`;
                     }
@@ -397,6 +440,74 @@
 
             // Attach listeners to initial rows
             document.querySelectorAll('.round-row').forEach(row => attachDeleteListener(row));
+
+            // --- Custom Select Dropdown Logic ---
+            const customSelects = document.querySelectorAll('.custom-select-container');
+
+            customSelects.forEach(selectContainer => {
+                const trigger = selectContainer.querySelector('.select-trigger');
+                const optionsContainer = selectContainer.querySelector('.select-options-container');
+                const hiddenInput = selectContainer.querySelector('input[type="hidden"]');
+                const label = selectContainer.querySelector('.select-label');
+                const searchInput = selectContainer.querySelector('.select-search-input');
+                const listItems = selectContainer.querySelectorAll('li');
+
+                // Toggle dropdown
+                trigger.addEventListener('click', () => {
+                    // Close all other dropdowns
+                    document.querySelectorAll('.select-options-container').forEach(cont => {
+                        if (cont !== optionsContainer) cont.classList.add('hidden');
+                    });
+                    document.querySelectorAll('.select-trigger svg').forEach(svg => {
+                        if (svg !== trigger.querySelector('svg')) svg.classList.remove('rotate-180');
+                    });
+
+                    const isOpen = !optionsContainer.classList.contains('hidden');
+                    optionsContainer.classList.toggle('hidden');
+                    trigger.querySelector('svg').classList.toggle('rotate-180');
+
+                    if (!isOpen && searchInput) {
+                        setTimeout(() => searchInput.focus(), 50);
+                    }
+                });
+
+                // Option selection
+                listItems.forEach(item => {
+                    item.addEventListener('click', () => {
+                        const value = item.getAttribute('data-value');
+                        const itemLabel = item.querySelector('span') ? item.querySelector('span').innerText : item.innerText;
+                        
+                        hiddenInput.value = value;
+                        label.innerText = itemLabel;
+                        label.classList.remove('text-gray-400');
+                        
+                        optionsContainer.classList.add('hidden');
+                        trigger.querySelector('svg').classList.remove('rotate-180');
+
+                        // Custom event for any listeners
+                        hiddenInput.dispatchEvent(new Event('change'));
+                    });
+                });
+
+                // Search logic
+                if (searchInput) {
+                    searchInput.addEventListener('input', (e) => {
+                        const term = e.target.value.toLowerCase();
+                        listItems.forEach(item => {
+                            const text = item.innerText.toLowerCase();
+                            item.style.display = text.includes(term) ? '' : 'none';
+                        });
+                    });
+                }
+            });
+
+            // Close dropdowns on click outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.custom-select-container')) {
+                    document.querySelectorAll('.select-options-container').forEach(cont => cont.classList.add('hidden'));
+                    document.querySelectorAll('.select-trigger svg').forEach(svg => svg.classList.remove('rotate-180'));
+                }
+            });
         });
     </script>
 </body>

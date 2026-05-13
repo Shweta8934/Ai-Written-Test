@@ -14,7 +14,7 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.db.models import Count, Max
 from django.shortcuts import get_object_or_404, render, redirect
 from .models import QuestionPaper, Question
 from django.contrib.auth.models import User
@@ -468,46 +468,47 @@ def paper_edit_view(request, paper_id):
 
         if form.is_valid():
             updated_paper = form.save()
+            
+            # 0. Handle Question Deletions
+            delete_ids = request.POST.getlist("delete-question-id")
+            if delete_ids:
+                Question.objects.filter(id__in=delete_ids, section__question_paper=updated_paper).delete()
+            
             total_questions_count = 0
 
             # 1. Iterate over existing sections to update weightage and questions
             for section in updated_paper.paper_sections.all():
                 
-                # WEIGHTAGE UPDATE LOGIC: Get weightage from POST data
+                # WEIGHTAGE UPDATE LOGIC
                 weightage_name = f"section-weightage-{section.id}"
-                
                 if weightage_name in request.POST:
                     try:
                         new_weightage = int(request.POST[weightage_name])
                         if 0 <= new_weightage <= 100:
                             section.weightage = new_weightage
-                            section.save(update_fields=["weightage"]) # Save weightage
+                            section.save(update_fields=["weightage"])
                     except ValueError:
-                        messages.warning(request, f"Invalid weightage provided for section {section.title}. Not saved.")
-                        pass # Ignore invalid inputs, but continue processing
+                        pass
                 
-                # 2. Iterate over questions to update text/answer/options
+                # 2. Update existing questions
                 for question in section.questions.all():
                     question_text_name = f"question-text-{question.id}"
                     question_answer_name = f"question-answer-{question.id}"
 
                     question_updated = False
                     
-                    # Update Question Text
                     if question_text_name in request.POST:
                         new_text = request.POST[question_text_name].strip()
                         if new_text and new_text != question.text:  
                             question.text = new_text
                             question_updated = True
 
-                    # Update Question Answer
                     if question_answer_name in request.POST:
                         new_answer = request.POST[question_answer_name].strip()
                         if new_answer and new_answer != question.answer:  
                             question.answer = new_answer
                             question_updated = True
 
-                        # Update MCQ Options if type is MCQ
                         if question.question_type == "MCQ":
                             options = []
                             for opt_num in range(1, 11):  
@@ -523,18 +524,41 @@ def paper_edit_view(request, paper_id):
 
                     if question_updated:
                         question.save()
-                   
-                    # This count needs to be updated regardless of whether the question was edited
+                    
                     total_questions_count += 1
 
-            # 3. Save total questions count back to the paper model
+                # 3. Handle NEW questions for this section
+                prefix = f"new-question-type-{section.id}-"
+                for key in request.POST:
+                    if key.startswith(prefix):
+                        temp_id = key.replace(prefix, "")
+                        q_type = request.POST[key]
+                        q_text = request.POST.get(f"new-question-text-{section.id}-{temp_id}", "").strip()
+                        q_answer = request.POST.get(f"new-question-answer-{section.id}-{temp_id}", "").strip()
+                        
+                        if q_text and q_answer:
+                            max_order = section.questions.aggregate(Max('order'))['order__max'] or 0
+                            new_q = Question.objects.create(
+                                section=section,
+                                text=q_text,
+                                answer=q_answer,
+                                question_type=q_type,
+                                order=max_order + 1
+                            )
+                            if q_type == "MCQ":
+                                options = []
+                                for opt_num in range(1, 11):
+                                    opt_key = f"new-option-{section.id}-{temp_id}-{opt_num}"
+                                    if opt_key in request.POST:
+                                        val = request.POST[opt_key].strip()
+                                        if val: options.append(val)
+                                new_q.options = options
+                                new_q.save()
+                            total_questions_count += 1
+
             updated_paper.total_questions = total_questions_count
             updated_paper.save(update_fields=["total_questions"])
-
-            messages.success(
-                request,
-                f"Paper '{updated_paper.title}' successfully updated with {total_questions_count} questions!",
-            )
+            messages.success(request, f"Paper '{updated_paper.title}' successfully updated!")
             return redirect("paper_detail", paper_id=paper.id)
 
         else:

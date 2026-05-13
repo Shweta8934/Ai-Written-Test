@@ -345,16 +345,26 @@ def job_application_view(request, slug):
                 
             except IntegrityError as e:
                 # Handle database errors, including unique constraints
-                print(f"Database Error: {e}") 
-                messages.error(request, "An unexpected error occurred. Please contact support.")
+                error_msg = f"Database Error: {e}"
+                print(f"❌ {error_msg}") 
+                # Show the actual error to the user for debugging
+                messages.error(request, f"An unexpected error occurred: {e}. Please contact support.")
+                
                 # If registration was created but candidate failed, clean up registration
                 if 'registration' in locals():
                     registration.delete()
                 return redirect('job_application', slug=slug) 
             except Exception as e:
-                print(f"General Error: {e}")
-                messages.error(request, "An application error occurred. Please try again.")
+                error_msg = f"General Application Error: {e}"
+                print(f"❌ {error_msg}")
+                messages.error(request, f"An application error occurred: {e}. Please try again.")
                 return redirect('job_application', slug=slug) 
+
+        else:
+            print("❌ FORM INVALID")
+            print(f"Errors: {form.errors}")
+            # If form is invalid, we don't hit the try/except, but we still want to show the form again.
+            pass
 
     else:
         initial_data = {'job_post_pk': job_post.pk, 'is_experienced': 'fresher'}

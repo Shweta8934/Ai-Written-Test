@@ -26,7 +26,8 @@ class TestRegistration(models.Model):
     question_paper = models.ForeignKey(
         QuestionPaper,
         on_delete=models.CASCADE,
-        related_name="registrations"
+        related_name="registrations",
+        null=True, blank=True
     )
 
     start_time = models.DateTimeField(auto_now_add=True)
