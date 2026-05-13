@@ -221,7 +221,7 @@ def generate_questions(request):
                 }
             )
             response = client.chat.completions.create(
-                model="google/gemini-2.0-flash-001",
+                model="openai/gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that generates technical assessments in strictly valid JSON format."},
                     {"role": "user", "content": prompt}
@@ -976,7 +976,7 @@ def regenerate_question(request):
         """
 
         response = client.chat.completions.create(
-            model="google/gemini-2.0-flash-001",
+            model="openai/gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that generates technical assessments in strictly valid JSON format."},
                 {"role": "user", "content": prompt}
@@ -1184,7 +1184,7 @@ def evaluate_answer_with_ai(
     question_type: str = "short",
 ) -> Tuple[bool, Dict[str, Any]]:
     """
-    Uses OpenRouter (google/gemini-2.0-flash-001) to evaluate if a user's answer is conceptually correct.
+    Uses OpenRouter (openai/gpt-4o-mini) to evaluate if a user's answer is conceptually correct.
     """
     
     # 1. Check for empty answers
@@ -1244,7 +1244,7 @@ def evaluate_answer_with_ai(
 
         # OpenAI API Call
         response = client.chat.completions.create(
-            model="google/gemini-2.0-flash-001",
+            model="openai/gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
@@ -1891,7 +1891,8 @@ def search_skills_with_suggestions(request):
              return JsonResponse({'skills': db_list, 'suggestions': []})
         
         if ai_provider == 'gemini':
-            ai_suggestions = get_gemini_suggestions(query, db_list)
+            # Default to OpenAI even if Gemini is requested, as per user requirement
+            ai_suggestions = get_chatgpt_suggestions(query, db_list)
         else:
             # Default to ChatGPT suggestions
             ai_suggestions = get_chatgpt_suggestions(query, db_list)
@@ -1913,8 +1914,8 @@ def get_chatgpt_suggestions(query, db_list):
     return get_ai_suggestions(query, db_list, "openai/gpt-4o-mini")
 
 def get_gemini_suggestions(query, db_list):
-    """Get 15 skill suggestions using Google Gemini 2.0 Flash via OpenRouter"""
-    return get_ai_suggestions(query, db_list, "google/gemini-2.0-flash-001")
+    """Fallback name for skill suggestions using OpenAI GPT-4o-mini via OpenRouter"""
+    return get_ai_suggestions(query, db_list, "openai/gpt-4o-mini")
 
 def get_ai_suggestions(query, db_list, model_name):
     """Generic helper to fetch skill suggestions from OpenRouter"""
