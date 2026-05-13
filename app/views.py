@@ -808,29 +808,43 @@ def test_result(request, registration_id):
             attempt_status = "unattempted"
             unattempted_count += 1
         else:
-            # Question has been attempted, now evaluate it
-            if question.question_type == "MCQ":
-                model_answer = question.answer.strip()
-                is_correct = user_answer.lower() == model_answer.lower()
+            # Check if we already have a saved evaluation
+            if response.is_correct is not None:
+                is_correct = response.is_correct
             else:
-                # Map internal question type to evaluator type
-                qtype = question.question_type.upper()
-                if qtype in ("CODE", "CODING"):
-                    evaluator_type = "coding"
-                elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
-                    evaluator_type = "short"
-                elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
-                    evaluator_type = "true_false"
+                # Legacy data or missing evaluation, evaluate now
+                if question.question_type == "MCQ":
+                    model_answer = question.answer.strip()
+                    is_correct = user_answer.lower() == model_answer.lower()
                 else:
-                    evaluator_type = "short"
+                    # Map internal question type to evaluator type
+                    qtype = question.question_type.upper()
+                    if qtype in ("CODE", "CODING"):
+                        evaluator_type = "coding"
+                    elif qtype in ("SA", "SHORT", "SUBJECTIVE"):
+                        evaluator_type = "short"
+                    elif qtype in ("TF", "TRUE_FALSE", "BOOLEAN"):
+                        evaluator_type = "true_false"
+                    else:
+                        evaluator_type = "short"
 
-                # evaluate_answer_with_ai returns (is_correct, details)
-                is_correct, _ = evaluate_answer_with_ai(
-                    question_text=question.text,
-                    user_answer=user_answer,
-                    model_answer=question.answer.strip(),
-                    question_type=evaluator_type,
-                )
+                    # evaluate_answer_with_ai returns (is_correct, details)
+                    is_correct, details = evaluate_answer_with_ai(
+                        question_text=question.text,
+                        user_answer=user_answer,
+                        model_answer=question.answer.strip(),
+                        question_type=evaluator_type,
+                    )
+                
+                # Save the result to prevent future AI calls
+                response.is_correct = is_correct
+                if question.question_type == "MCQ":
+                    response.evaluation_reason = "Exact match" if is_correct else "Incorrect option"
+                else:
+                    response.evaluation_reason = details.get("reason", "No reason provided")
+                
+                # Using a safer save method to avoid concrete field errors
+                response.save() 
 
             # Set status based on correctness
             if is_correct:
@@ -844,10 +858,11 @@ def test_result(request, registration_id):
                 "question_text": response.question.text,
                 "user_answer": (
                     response.user_answer if user_answer else "Not Attempted"
-                ),  # ✅ NEW
+                ),
                 "correct_answer": response.question.answer,
                 "is_correct": is_correct,
-                "attempt_status": attempt_status,  # ✅ NEW: Pass status to template
+                "attempt_status": attempt_status,
+                "reason": response.evaluation_reason, # Added to UI context
             }
         )
 
@@ -1154,9 +1169,12 @@ def toggle_shortlist(request, registration_id):
 
 import json
 import re
+import time
 from typing import Tuple, Dict, Any
-# Removed Gemini imports
 from django.conf import settings
+from openai import OpenAI 
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from rapidfuzz import fuzz # NEW: For advanced semantic matching fallback
 
 
 
@@ -1165,9 +1183,12 @@ from django.conf import settings
 
 import json
 import re
+import time
 from typing import Tuple, Dict, Any
 from django.conf import settings
 from openai import OpenAI 
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=settings.OPENAI_API_KEY.strip(),
@@ -1176,6 +1197,26 @@ client = OpenAI(
         "X-Title": "AI Written Test Platform",
     }
 )
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type(Exception), # Catch OpenRouter/API errors
+    reraise=True
+)
+def _call_ai_api(system_instruction, prompt):
+    """Helper to call AI API with retry logic"""
+    response = client.chat.completions.create(
+        model="openai/gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3,
+        max_tokens=500,
+        response_format={"type": "json_object"}
+    )
+    return response
 
 def evaluate_answer_with_ai(
     question_text: str,
@@ -1232,8 +1273,6 @@ def evaluate_answer_with_ai(
         elif question_type.lower() in ["true_false", "boolean"]:
             return _evaluate_boolean(user_answer, model_answer)
 
-        # --- AI Evaluation Section Changed Here ---
-
         # Different prompts for different question types
         if question_type.lower() == "coding":
             prompt = _get_coding_prompt(question_text, user_answer, model_answer)
@@ -1242,115 +1281,90 @@ def evaluate_answer_with_ai(
             prompt = _get_short_answer_prompt(question_text, user_answer, model_answer)
             system_instruction = "You are an expert technical evaluator. Output ONLY JSON."
 
-        # OpenAI API Call
-        response = client.chat.completions.create(
-            model="openai/gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,  # Lower temperature for more consistent evaluations
-            max_tokens=500,
-            response_format={"type": "json_object"}  # Forces valid JSON output
-        )
+        # Call AI API with retry
+        response = _call_ai_api(system_instruction, prompt)
 
         # Extract content
         cleaned_text = response.choices[0].message.content.strip()
         result = json.loads(cleaned_text)
 
         is_correct = result.get("is_correct", False)
+        # Standardize the reason/reasoning key
+        result["reason"] = result.get("reasoning", result.get("reason", "No reason provided."))
+        
         return is_correct, result
 
-    except json.JSONDecodeError:
-        print("AI Evaluation Error: Invalid JSON received from OpenAI")
-        return _fallback_evaluation(user_answer, model_answer, question_type)
-
     except Exception as e:
-        print(f"AI Evaluation Error: {e}")
+        print(f"AI Evaluation Error after retries: {e}")
         return _fallback_evaluation(user_answer, model_answer, question_type)
 
 def _get_short_answer_prompt(
     question_text: str, user_answer: str, model_answer: str
 ) -> str:
-    """Generate prompt for short answer evaluation"""
-    return f"""You are an expert technical evaluator. Evaluate if the user's answer demonstrates understanding of the concept.
+    """Generate a rigorous rubric-based prompt for short answer evaluation"""
+    return f"""You are a Senior Technical Interviewer. Evaluate the candidate's answer with high precision.
 
-**Question:**
+**QUESTION:**
 {question_text}
 
-**Reference Answer:**
+**EXPECTED CORE CONCEPT:**
 {model_answer}
 
-**User's Answer:**
+**CANDIDATE'S ANSWER:**
 {user_answer}
 
-**Evaluation Criteria:**
-1. Check if the user's answer conveys the CORE CONCEPT correctly
-2. Accept answers that are at least 50% conceptually correct
-3. Ignore minor grammar mistakes, typos, spelling errors, or extra/missing articles
-4. Accept synonyms, paraphrases, and alternative explanations if conceptually correct
-5. Accept answers in different languages (Hindi/English/Hinglish) if meaning is correct
-6. Focus on understanding, not exact word matching
-7. Accept partial answers if they cover the main points
-8. Be lenient with formatting, structure, and presentation
-9. Accept additional correct information beyond the reference answer
-10. Ignore irrelevant extra words if core concept is present
+**EVALUATION RUBRIC:**
+1. **Core Understanding (60%)**: Does the candidate understand the fundamental "Why" and "How" of the concept?
+2. **Technical Accuracy (30%)**: Are the terms used correctly? (Accept synonyms like 'method' for 'function').
+3. **Completeness (10%)**: Did they address all parts of the question?
 
-**Examples of Acceptable Variations:**
-- Technical terms with synonyms: "function" = "method", "array" = "list", "variable" = "identifier"
-- Word order changes that preserve meaning
-- Additional explanations, examples, or context
-- Simpler or more complex language that captures the concept
-- Missing articles (a, an, the), conjunctions, or prepositions
-- Common abbreviations: "func", "var", "obj", "arr"
-- Different sentence structures expressing same idea
-- Casual/conversational tone vs formal tone
+**GRADING RULES:**
+- Be lenient with Hinglish/Hindi or informal language if the technical concept is clear.
+- Ignore typos and grammar.
+- If the candidate provides a DIFFERENT but technically valid solution/explanation, mark it as CORRECT.
+- If the answer is vague or just repeats the question, mark it as INCORRECT.
 
-**Scoring Guide:**
-- is_correct: true if answer demonstrates understanding (50%+ concept match)
-- is_correct: false if answer is fundamentally wrong or irrelevant
-- confidence: 90-100% for excellent answers
-- confidence: 70-89% for good answers with minor issues
-- confidence: 50-69% for acceptable answers covering basics
-- confidence: below 50% for incorrect/incomplete answers
+**SCORING PROCESS:**
+First, provide your internal reasoning. Then, determine if they passed the 50% threshold.
 
-Respond with ONLY a valid JSON object (no markdown, no extra text):
+Respond with ONLY this JSON structure:
 {{
+    "reasoning": "Step-by-step analysis of why this answer is right or wrong.",
     "is_correct": true/false,
-    "confidence": 0-100,
-    "reason": "brief explanation in one line"
+    "confidence_score": 0-100,
+    "match_percentage": 0-100
 }}"""
 
 def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> str:
     """
-    Generate a prompt for AI to evaluate coding logic and language correctness.
+    Generate a rigorous prompt for coding logic evaluation.
     """
-    return f"""You are an expert code evaluator. Your task is to evaluate if the user's code correctly solves the problem using the requested programming language.
+    return f"""You are an automated code reviewer. Evaluate the following code submission.
 
-**Question:**
+**PROBLEM:**
 {question_text}
 
-**Reference Solution (Expected Language and Logic):**
+**REFERENCE SOLUTION:**
 {model_code}
 
-**User's Submitted Code:**
+**CANDIDATE SUBMISSION:**
 {user_code}
 
-**Evaluation Rules:**
-1. **Language Consistency**: The user MUST use the programming language requested in the question (or the one used in the reference solution). If the user solves the problem in a DIFFERENT language (e.g., Java code for a C# question), it is **INCORRECT**.
-2. **Logical Correctness**: Does the code actually solve the problem described in the question?
-3. **Boilerplate**: Ignore minor syntax errors or missing boilerplate (like class declarations or imports) if the core logic is correct, as long as the language itself is right.
-4. **Placeholders**: If the code is just the default placeholder (e.g., "// write your code here"), it is **INCORRECT**.
+**STRICT EVALUATION CRITERIA:**
+1. **Language Check**: Does the candidate's code use the same programming language as the reference solution? (CRITICAL: If language differs, mark is_correct=false).
+2. **Logic Check**: Is the algorithm fundamentally correct? Does it solve the edge cases?
+3. **Executable-ish**: Would this code run if basic boilerplate (imports/main) were added?
 
-**Scoring Requirements:**
-- `is_correct: true` only if the logic is correct AND the programming language is correct.
-- `is_correct: false` if the logic is wrong OR the language does not match the request.
+**SCORING RULES:**
+- Ignore minor semicolon or casing issues if the language doesn't strictly require them.
+- If the submission is just the default placeholder text, it is INCORRECT.
 
-Output strictly valid JSON:
+Respond with ONLY this JSON structure:
 {{
+    "reasoning": "Analysis of the code logic and language choice.",
     "is_correct": true/false,
-    "confidence": 0-100,
-    "reason": "One sentence explanation of why the answer is correct or incorrect."
+    "confidence_score": 0-100,
+    "detected_language": "string"
 }}"""
 
 def _evaluate_mcq(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
@@ -1509,74 +1523,38 @@ def _evaluate_boolean(user_answer: str, model_answer: str) -> Tuple[bool, Dict]:
 def _fallback_evaluation(
     user_answer: str, model_answer: str, question_type: str
 ) -> Tuple[bool, Dict]:
-    """Fallback evaluation when AI fails"""
-
+    """
+    Advanced fallback evaluation using RapidFuzz when AI fails.
+    This is much more robust than simple word matching.
+    """
     user_clean = user_answer.lower().strip()
     model_clean = model_answer.lower().strip()
 
-    if user_clean == model_clean:
+    # 1. Exact or Substring Match
+    if user_clean == model_clean or user_clean in model_clean or model_clean in user_clean:
         return True, {
             "is_correct": True,
             "confidence": 100,
-            "reason": "Exact match (fallback mode)",
+            "reason": "Direct text match (Fallback Mode)",
         }
 
-    if len(user_clean) > 10 and (
-        user_clean in model_clean or model_clean in user_clean
-    ):
+    # 2. Token Set Ratio (RapidFuzz) - Handles word reordering and partial matches
+    similarity_score = fuzz.token_set_ratio(user_clean, model_clean)
+    
+    # Thresholds: 70% for short answers, 50% for code logic
+    threshold = 50 if question_type.lower() == "coding" else 70
+
+    if similarity_score >= threshold:
         return True, {
             "is_correct": True,
-            "confidence": 85,
-            "reason": "Substring match (fallback mode)",
-        }
-
-    user_words = set(re.findall(r"\w+", user_clean))
-    model_words = set(re.findall(r"\w+", model_clean))
-
-    stop_words = {
-        "the",
-        "a",
-        "an",
-        "is",
-        "are",
-        "was",
-        "were",
-        "in",
-        "on",
-        "at",
-        "to",
-        "for",
-        "of",
-        "and",
-        "or",
-        "but",
-    }
-    user_words -= stop_words
-    model_words -= stop_words
-
-    if len(model_words) > 0:
-        overlap = len(user_words & model_words) / len(model_words)
-
-        threshold = 0.4 if question_type.lower() == "coding" else 0.6
-
-        if overlap >= threshold:
-            return True, {
-                "is_correct": True,
-                "confidence": int(overlap * 100),
-                "reason": f"Word overlap: {overlap:.0%} (fallback mode)",
-            }
-
-    if len(model_words) <= 3 and len(user_words & model_words) >= 1:
-        return True, {
-            "is_correct": True,
-            "confidence": 70,
-            "reason": "Key term match (fallback mode)",
+            "confidence": int(similarity_score),
+            "reason": f"Semantic similarity score: {similarity_score}% (Fallback Mode)",
         }
 
     return False, {
         "is_correct": False,
-        "confidence": 60,
-        "reason": "No sufficient match (fallback mode)",
+        "confidence": int(similarity_score),
+        "reason": f"Insufficient similarity: {similarity_score}% (Fallback Mode)",
     }
 
 
@@ -1618,6 +1596,7 @@ def submit_test(request, registration_id):
             if question.question_type == "MCQ":
                 model_answer = question.answer.strip()
                 is_correct = user_answer.lower() == model_answer.lower()
+                evaluation_reason = "Exact match" if is_correct else "Incorrect option"
             else:
                 qtype = question.question_type.upper()
                 if qtype in ("CODE", "CODING"):
@@ -1629,12 +1608,18 @@ def submit_test(request, registration_id):
                 else:
                     evaluator_type = "short"
 
-                is_correct, _ = evaluate_answer_with_ai(
+                is_correct, details = evaluate_answer_with_ai(
                     question_text=question.text,
                     user_answer=user_answer,
                     model_answer=question.answer.strip(),
                     question_type=evaluator_type,
                 )
+                evaluation_reason = details.get("reason", "")
+
+            # SAVE the result to the database
+            response.is_correct = is_correct
+            response.evaluation_reason = evaluation_reason
+            response.save()
 
             if is_correct:
                 correct_answers_count += 1

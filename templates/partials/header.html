@@ -17,10 +17,10 @@
         src="{% if request.user.profile.profile_image %}{{ request.user.profile.profile_image.url }}{% else %}https://ui-avatars.com/api/?name={{ request.user.first_name }}+{{ request.user.last_name }}&background=e2e8f0&color=64748b{% endif %}"
         alt="User avatar" />
       <span class="hidden md:block font-medium">
-        {% if user.get_full_name %}
-          {{ user.get_full_name }}
+        {% if request.user.get_full_name %}
+          {{ request.user.get_full_name }}
         {% else %}
-          {{ user.username }}
+          {{ request.user.username }}
         {% endif %}
       </span>
       <svg class="hidden md:block w-4 h-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -49,8 +49,7 @@
         </div>
       </div>
       <div class="py-1">
-        {% if user.profile %} {% endif %}
-        <a href="{% url 'user_profile' pk=user.pk %}"
+        <a href="{% url 'user_profile' pk=request.user.pk %}"
           class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Profile</a>
       </div>
       <div class="py-1 border-t">

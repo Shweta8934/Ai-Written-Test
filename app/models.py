@@ -191,6 +191,7 @@ class UserResponse(models.Model):
     question = models.ForeignKey(Question, on_delete=models.DO_NOTHING)
     registration = models.ForeignKey(TestRegistration, on_delete=models.DO_NOTHING)
     is_correct = models.BooleanField(null=True, blank=True)
+    evaluation_reason = models.TextField(blank=True, null=True)
     class Meta:
         db_table = "user_tests_userresponse"
         managed = False
