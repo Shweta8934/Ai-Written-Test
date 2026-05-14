@@ -1745,97 +1745,106 @@ def invite_candidate(request):
     FIXED: Now adds email parameter to the link.
     """
     try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse(
-            {"status": "error", "message": "Invalid JSON data."}, status=400
-        )
-
-    form = InviteCandidateForm(data)
-
-    if form.is_valid():
-        candidate_email = form.cleaned_data["email"]
-        paper_id = form.cleaned_data["paper_id"]
-
         try:
-            paper = QuestionPaper.objects.get(pk=paper_id, created_by=request.user)
-        except QuestionPaper.DoesNotExist:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
             return JsonResponse(
-                {"status": "error", "message": "Paper not found or unauthorized."},
-                status=404,
+                {"status": "error", "message": "Invalid JSON data."}, status=400
             )
 
-        if not paper.is_public_active:
-            paper.is_public_active = True
-            paper.save(update_fields=["is_public_active"])
-            messages.info(
-                request, f"Public link for '{paper.title}' was automatically activated."
+        form = InviteCandidateForm(data)
+
+        if form.is_valid():
+            candidate_email = form.cleaned_data["email"]
+            paper_id = form.cleaned_data["paper_id"]
+
+            try:
+                paper = QuestionPaper.objects.get(pk=paper_id, created_by=request.user)
+            except QuestionPaper.DoesNotExist:
+                return JsonResponse(
+                    {"status": "error", "message": "Paper not found or unauthorized."},
+                    status=404,
+                )
+
+            if not paper.is_public_active:
+                paper.is_public_active = True
+                paper.save(update_fields=["is_public_active"])
+                messages.info(
+                    request, f"Public link for '{paper.title}' was automatically activated."
+                )
+
+            registration_url = reverse(
+                "test:user_register_link", kwargs={"link_id": str(paper.id)}
             )
 
-        registration_url = reverse(
-            "test:user_register_link", kwargs={"link_id": str(paper.id)}
-        )
+            query_string = urlencode({"email": candidate_email})
+            test_link = request.build_absolute_uri(f"{registration_url}?{query_string}")
 
-        query_string = urlencode({"email": candidate_email})
-        test_link = request.build_absolute_uri(f"{registration_url}?{query_string}")
+            context = {
+                "paper_title": paper.title,
+                "job_title": paper.job_title,
+                "recruiter_name": request.user.get_full_name() or request.user.username,
+                "test_link": test_link,  
+                "duration": paper.duration,
+                "total_questions": paper.total_questions,
+                "skills_list": paper.skills_list.split(","),
+            }
 
-        context = {
-            "paper_title": paper.title,
-            "job_title": paper.job_title,
-            "recruiter_name": request.user.get_full_name() or request.user.username,
-            "test_link": test_link,  
-            "duration": paper.duration,
-            "total_questions": paper.total_questions,
-            "skills_list": paper.skills_list.split(","),
-        }
+           
+            html_message = render_to_string("emails/candidate_invite.html", context)
+            plain_message = strip_tags(html_message)
 
-       
-        html_message = render_to_string("emails/candidate_invite.html", context)
-        plain_message = strip_tags(html_message)
+            try:
+                send_mail(
+                    subject=f"Invitation to Take Assessment: {paper.title} for {paper.job_title}",
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[candidate_email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+                return JsonResponse(
+                    {
+                        "status": "success",
+                        "message": f"Invitation sent successfully to {candidate_email}!",
+                        "is_public_active": paper.is_public_active,
+                    },
+                    status=200,
+                )
 
-        try:
-            send_mail(
-                subject=f"Invitation to Take Assessment: {paper.title} for {paper.job_title}",
-                message=plain_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[candidate_email],
-                html_message=html_message,
-                fail_silently=False,
-            )
-            return JsonResponse(
-                {
-                    "status": "success",
-                    "message": f"Invitation sent successfully to {candidate_email}!",
-                    "is_public_active": paper.is_public_active,
-                },
-                status=200,
-            )
-
-        except Exception as e:
-            logger.error(f"Error sending email to {candidate_email}: {e}")
-            
-            # Check if it's a Gmail quota error
-            error_message = str(e)
-            if "Daily user sending limit exceeded" in error_message:
-                frontend_message = "Gmail Daily Sending Limit Exceeded. Please try again tomorrow or update SMTP credentials."
-            else:
-                frontend_message = f"Email sending failed: {error_message}"
+            except Exception as e:
+                logger.error(f"Error sending email to {candidate_email}: {e}")
                 
+                # Check if it's a Gmail quota error
+                error_message = str(e)
+                if "Daily user sending limit exceeded" in error_message:
+                    frontend_message = "Gmail Daily Sending Limit Exceeded. Please try again tomorrow or update SMTP credentials."
+                else:
+                    frontend_message = f"Email sending failed: {error_message}"
+                    
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": frontend_message,
+                    },
+                    status=500,
+                )
+        else:
             return JsonResponse(
                 {
                     "status": "error",
-                    "message": frontend_message,
+                    "message": "Form validation failed.",
+                    "errors": form.errors,
                 },
-                status=500,
+                status=400,
             )
-    else:
+
+    except Exception as e:
+        # Top-level catch-all: ensures we NEVER return an HTML 500 page
+        logger.error(f"Unexpected error in invite_candidate: {e}", exc_info=True)
         return JsonResponse(
-            {
-                "status": "error",
-                "message": "Form validation failed.",
-                "errors": form.errors,
-            },
-            status=400,
+            {"status": "error", "message": f"An unexpected server error occurred: {str(e)}"},
+            status=500,
         )
 
 
