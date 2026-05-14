@@ -1795,14 +1795,28 @@ def invite_candidate(request):
             plain_message = strip_tags(html_message)
 
             try:
-                send_mail(
-                    subject=f"Invitation to Take Assessment: {paper.title} for {paper.job_title}",
-                    message=plain_message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[candidate_email],
-                    html_message=html_message,
-                    fail_silently=False,
-                )
+                import requests
+                
+                url = "https://api.brevo.com/v3/smtp/email"
+                
+                payload = {
+                    "sender": {"email": settings.DEFAULT_FROM_EMAIL},
+                    "to": [{"email": candidate_email}],
+                    "subject": f"Invitation to Take Assessment: {paper.title} for {paper.job_title}",
+                    "htmlContent": html_message
+                }
+                
+                headers = {
+                    "accept": "application/json",
+                    "api-key": settings.BREVO_API_KEY,
+                    "content-type": "application/json"
+                }
+                
+                response = requests.post(url, json=payload, headers=headers)
+                
+                if response.status_code not in [200, 201, 202]:
+                    raise Exception(f"Brevo API error: {response.text}")
+
                 return JsonResponse(
                     {
                         "status": "success",
@@ -1813,19 +1827,13 @@ def invite_candidate(request):
                 )
 
             except Exception as e:
-                logger.error(f"Error sending email to {candidate_email}: {e}")
+                logger.error(f"Error sending email via SendGrid to {candidate_email}: {e}")
                 
-                # Check if it's a Gmail quota error
                 error_message = str(e)
-                if "Daily user sending limit exceeded" in error_message:
-                    frontend_message = "Gmail Daily Sending Limit Exceeded. Please try again tomorrow or update SMTP credentials."
-                else:
-                    frontend_message = f"Email sending failed: {error_message}"
-                    
                 return JsonResponse(
                     {
                         "status": "error",
-                        "message": frontend_message,
+                        "message": f"Email sending failed. Make sure SendGrid API Key is set.",
                     },
                     status=500,
                 )
