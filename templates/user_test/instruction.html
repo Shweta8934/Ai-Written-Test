@@ -1,6 +1,7 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -28,6 +29,7 @@
       font-family: "Inter", sans-serif;
       background-color: #f7f8fa;
     }
+
     .custom-focus:focus {
       border-color: #736b8e;
       box-shadow: 0 0 0 2px rgba(115, 107, 142, 0.3);
@@ -45,7 +47,7 @@
     }
   </style>
   <script>
-    (function() {
+    (function () {
       function blockEvent(e) {
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -58,7 +60,7 @@
       document.addEventListener('contextmenu', blockEvent, true);
       document.addEventListener('dragstart', blockEvent, true);
 
-      document.addEventListener('keydown', function(e) {
+      document.addEventListener('keydown', function (e) {
         const isMeta = e.ctrlKey || e.metaKey;
         const key = e.key ? e.key.toLowerCase() : '';
         if (isMeta && ['c', 'v', 'x', 'u', 's', 'p'].includes(key)) {
@@ -70,28 +72,21 @@
     })();
   </script>
 </head>
-<body 
-  class="text-gray-800" 
-  onload="noBack()" 
-  onpageshow="if (event.persisted) noBack();"
-  onselectstart="return false"
-  oncopy="return false"
-  onpaste="return false"
-  oncut="return false"
-  oncontextmenu="return false"
-  ondragstart="return false"
->
+
+<body class="text-gray-800" onload="noBack()" onpageshow="if (event.persisted) noBack();" onselectstart="return false"
+  oncopy="return false" onpaste="return false" oncut="return false" oncontextmenu="return false"
+  ondragstart="return false">
 
   <div class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-2xl bg-white p-6 sm:p-8 rounded-lg shadow-md border border-gray-100">
-      
+
       <h1 class="text-2xl font-bold text-theme-dark mb-1 text-center">Test Instructions</h1>
 
       <div class="bg-gray-50 p-3 rounded-md mb-6 border border-gray-200 text-sm">
         <h2 class="text-lg font-semibold text-gray-800 mb-1">{{ paper.title }}</h2>
         <p class="text-gray-600">Job Title: <strong>{{ paper.job_title }}</strong></p>
         <p class="text-gray-700 mt-1">
-          Duration: <strong>{{ paper.duration }} minutes</strong> | Total Questions: <strong>{{ paper.total_questions }}</strong>
+          Duration: <strong>{{ paper.duration }} minutes</strong> | Total Questions: <strong>{{ actual_total_questions }}</strong>
         </p>
       </div>
 
@@ -99,76 +94,91 @@
         <h3 class="text-lg font-semibold text-theme-dark border-b pb-2 mb-3">Exam Guidelines</h3>
         <ul class="list-disc pl-5 text-sm text-gray-700 space-y-2">
           <li>The test duration is strictly <strong>{{ paper.duration }} minutes</strong>.</li>
-          <li>There are approximately <strong>{{ paper.total_questions }}</strong> questions in total.</li>
+          <li>There are <strong>{{ actual_total_questions }}</strong> questions in total.</li>
           <li>Once a question is submitted, you may not be able to return to it.</li>
           <li>Ensure you click “Submit Test” at the end. The system will auto-submit when time runs out.</li>
           <li>Avoid switching tabs or windows during the test to prevent disqualification.</li>
         </ul>
       </div>
 
-      <form 
-        id="start-test-form" 
-        method="post" 
-        action="{% url 'test:user_instructions' link_id=link_id %}"
-      >
+      <form id="start-test-form" method="post" action="{% url 'test:user_instructions' link_id=link_id %}">
         {% csrf_token %}
-        <div class="flex items-start mb-5 pt-3 border-t border-gray-200">
-          <input 
-            type="checkbox" 
-            id="accept_terms" 
-            name="accept_terms" 
-            required 
-            class="h-4 w-4 text-theme-dark border-gray-300 rounded custom-focus mt-1"
-          >
-          <label for="accept_terms" class="ml-2 text-sm text-gray-700">
-            I have read and understood the <strong class="text-theme-dark">Terms and Conditions</strong>.
-          </label>
+        <div class="space-y-4 pt-3 border-t border-gray-200">
+          <div class="flex items-start">
+            <input type="checkbox" id="accept_terms" name="accept_terms" required
+              class="h-4 w-4 text-theme-dark border-gray-300 rounded custom-focus mt-1">
+            <label for="accept_terms" class="ml-2 text-sm text-gray-700">
+              I have read and understood the <strong class="text-theme-dark">Terms and Conditions</strong>.
+            </label>
+          </div>
+
+          <div class="flex items-start">
+            <input type="checkbox" id="proctor_consent" name="proctor_consent" required
+              class="h-4 w-4 text-theme-dark border-gray-300 rounded custom-focus mt-1">
+            <label for="proctor_consent" class="ml-2 text-sm text-gray-700">
+              I consent to periodic <strong class="text-theme-dark">AI snapshots and screen monitoring</strong> for
+              assessment integrity.
+            </label>
+          </div>
         </div>
 
-        <button 
-          type="submit" 
-          id="start-button"
-          disabled
-          class="w-full bg-gray-400 text-white font-semibold py-2.5 rounded-md text-base 
-                 transition-all cursor-not-allowed"
-        >
-          Start Assessment
+        <button type="submit" id="start-button" disabled class="w-full mt-6 bg-gray-400 text-white font-semibold py-2.5 rounded-md text-base 
+                 transition-all cursor-not-allowed">
+          Verify Camera & Start
         </button>
       </form>
     </div>
   </div>
 
-  <div id="camera-modal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+  <!-- Camera Verification Modal (Strict) -->
+  <div id="camera-modal"
+    class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center hidden p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full border border-gray-100">
       <div class="text-center">
-        <div class="bg-gray-100 rounded-lg overflow-hidden mb-4 relative aspect-video">
-          <video id="camera-preview" autoplay playsinline muted class="w-full h-full object-cover"></video>
-          <div id="camera-status" class="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
-            Waiting for camera...
+        <div class="bg-slate-900 rounded-lg overflow-hidden mb-4 relative aspect-video shadow-inner">
+          <video id="camera-preview" autoplay playsinline muted class="w-full h-full object-cover scale-x-[-1]"></video>
+          <div id="camera-status" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+            <div class="flex flex-col items-center gap-2">
+              <i class="fas fa-camera fa-2x animate-pulse"></i>
+              <span>Initializing Camera...</span>
+            </div>
           </div>
         </div>
-        <h3 class="text-xl font-bold text-gray-900 mb-2">Camera Verification</h3>
-        <p class="text-gray-600 mb-6 text-sm">We recommend enabling your camera for assessment integrity. However, you can choose to skip this step for now.</p>
-        <div id="camera-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-xs mb-6 text-left border border-red-100"></div>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">Hardware Check</h3>
+        <p class="text-gray-600 mb-6 text-sm">We recommend enabling your camera for assessment integrity. However, you
+          can choose to skip this step for now.</p>
+        <div id="camera-error"
+          class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-xs mb-6 text-left border border-red-100"></div>
+
         <div class="flex flex-col space-y-3">
-          <div class="flex space-x-3">
-            <button onclick="closeCameraModal()" class="flex-1 px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-            <button id="request-permission-btn" onclick="requestCameraAccess()" class="flex-1 bg-theme-primary text-white font-semibold py-2 px-4 rounded-lg hover:bg-theme-dark transition-colors">Grant Permission</button>
+          <button id="request-permission-btn" onclick="requestCameraAccess()"
+            class="w-full bg-theme-primary text-white font-semibold py-3 px-4 rounded-lg hover:bg-theme-dark transition-all flex items-center justify-center gap-2">
+            <i class="fas fa-shield-alt"></i> Grant & Verify
+          </button>
+          <div class="flex space-x-3 mt-2">
+            <button onclick="closeCameraModal()"
+              class="flex-1 px-4 py-2 text-gray-400 text-xs font-medium hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">Cancel</button>
+            <button onclick="skipAndStart()"
+              class="flex-1 px-4 py-2 text-gray-500 text-xs font-medium hover:text-theme-primary hover:bg-theme-light/50 rounded-lg transition-colors underline">Skip
+              and start anyway</button>
           </div>
-          <button onclick="skipAndStart()" class="text-sm text-gray-400 hover:text-theme-primary transition-colors underline">Skip verification and start anyway</button>
         </div>
       </div>
     </div>
   </div>
 
   <script>
+    function noBack() { window.history.forward(); }
+    window.history.forward();
+
+    let cameraStream = null;
+
     function skipAndStart() {
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
       }
       document.getElementById('start-test-form').submit();
     }
-    let cameraStream = null;
 
     function closeCameraModal() {
       if (cameraStream) {
@@ -178,42 +188,49 @@
     }
 
     async function requestCameraAccess() {
+      console.log("DEBUG: Executing requestCameraAccess()...");
       const video = document.getElementById('camera-preview');
       const status = document.getElementById('camera-status');
       const errorDiv = document.getElementById('camera-error');
-      
+      const requestBtn = document.getElementById('request-permission-btn');
+
+
       errorDiv.classList.add('hidden');
-      status.textContent = "Requesting permission...";
+      status.classList.remove('hidden');
+      requestBtn.disabled = true;
+      requestBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Verifying...`;
 
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = cameraStream;
         status.classList.add('hidden');
-        
-        // Show success and auto-submit form after 1.5s
-        const requestBtn = document.getElementById('request-permission-btn');
-        requestBtn.textContent = "Verified ✓";
-        requestBtn.classList.replace('bg-theme-primary', 'bg-green-600');
-        
+
+        requestBtn.innerHTML = `<i class="fas fa-check-circle"></i> Identity Verified`;
+        requestBtn.classList.replace('bg-theme-primary', 'bg-emerald-600');
+
         setTimeout(() => {
           document.getElementById('start-test-form').submit();
         }, 1500);
 
       } catch (err) {
         console.error("Camera error:", err);
-        status.textContent = "Camera access denied";
-        errorDiv.textContent = "Permission Error: " + (err.message || "Could not access camera. Please check your browser settings and ensure no other application is using it.");
+        status.classList.add('hidden');
+        errorDiv.innerHTML = `<strong>Hardware Error:</strong><br>${err.name === 'NotAllowedError' ? 'Access denied. Please enable camera in your browser settings.' : 'Could not detect a working camera. Please check your connections.'}`;
         errorDiv.classList.remove('hidden');
+        requestBtn.disabled = false;
+        requestBtn.innerHTML = `<i class="fas fa-redo"></i> Retry Verification`;
       }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-      const checkbox = document.getElementById('accept_terms');
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log("DEBUG: DOM Loaded, initializing form...");
+      const termsCheck = document.getElementById('accept_terms');
+      const proctorCheck = document.getElementById('proctor_consent');
       const startButton = document.getElementById('start-button');
       const form = document.getElementById('start-test-form');
-      
+
       const updateButtonState = () => {
-        if (checkbox.checked) {
+        if (termsCheck.checked && proctorCheck.checked) {
           startButton.disabled = false;
           startButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
           startButton.classList.add('bg-theme-primary', 'hover:bg-theme-dark');
@@ -224,21 +241,38 @@
         }
       };
 
-      updateButtonState();
-      checkbox.addEventListener('change', updateButtonState);
+      termsCheck.addEventListener('change', updateButtonState);
+      proctorCheck.addEventListener('change', updateButtonState);
 
-      form.addEventListener('submit', function(e) {
+      form.addEventListener('submit', function (e) {
+        console.log("DEBUG: Submit button clicked!");
         e.preventDefault();
-        if (!checkbox.checked) return;
 
-        // Open Camera Verification Modal
-        document.getElementById('camera-modal').classList.remove('hidden');
-        requestCameraAccess();
+        if (termsCheck.checked && proctorCheck.checked) {
+          console.log("DEBUG: Checkboxes verified. Attempting to open camera modal...");
+          try {
+            const modal = document.getElementById('camera-modal');
+            if (!modal) {
+              alert("DEBUG ERROR: Camera modal element not found in DOM.");
+              return;
+            }
+            modal.classList.remove('hidden');
+            console.log("DEBUG: Modal should be visible now. Requesting camera access...");
+            requestCameraAccess();
+          } catch (err) {
+            console.error("DEBUG CAUGHT ERROR:", err);
+            alert("DEBUG ERROR: " + err.message);
+          }
+        } else {
+          console.log("DEBUG: Checkboxes not checked, ignoring submit.");
+        }
       });
-      
+
       noBack();
     });
   </script>
 
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
 </body>
+
 </html>

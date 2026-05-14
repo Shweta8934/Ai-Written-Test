@@ -8,6 +8,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Flatpickr for Date Range -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -40,6 +43,139 @@
       border-radius: 10px;
     }
 
+    /* Custom Flatpickr Theme to match #736b8e */
+    .flatpickr-calendar {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+      border-radius: 16px !important;
+      border: 1px solid #f1f5f9 !important;
+      padding: 8px !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+
+    .flatpickr-day.selected,
+    .flatpickr-day.startRange,
+    .flatpickr-day.endRange,
+    .flatpickr-day.selected:hover,
+    .flatpickr-day.nextMonthDay.selected,
+    .flatpickr-day.prevMonthDay.selected {
+      background: #736b8e !important;
+      border-color: #736b8e !important;
+      box-shadow: none !important;
+    }
+
+    .flatpickr-day.inRange {
+      background: #f3f2f7 !important;
+      box-shadow: -5px 0 0 #f3f2f7, 5px 0 0 #f3f2f7 !important;
+      border-color: transparent !important;
+    }
+
+    .flatpickr-months .flatpickr-month {
+      background: transparent !important;
+      color: #1e293b !important;
+      fill: #1e293b !important;
+      height: 34px !important;
+    }
+
+    .flatpickr-current-month {
+      font-weight: 700 !important;
+      color: #1e293b !important;
+      font-size: 110% !important;
+    }
+
+    .flatpickr-current-month .flatpickr-monthDropdown-months {
+      font-weight: 700 !important;
+    }
+
+    .flatpickr-months .flatpickr-prev-month,
+    .flatpickr-months .flatpickr-next-month {
+      color: #64748b !important;
+      fill: #64748b !important;
+      padding: 10px !important;
+    }
+
+    .flatpickr-weekday {
+      background: transparent !important;
+      color: #94a3b8 !important;
+      font-weight: 700 !important;
+      font-size: 11px !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.05em !important;
+    }
+    
+    .flatpickr-calendar.arrowTop:before, .flatpickr-calendar.arrowTop:after {
+      border-bottom-color: #ffffff !important;
+    }
+
+    .filter-bar-container {
+      display: inline-flex;
+      align-items: center;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      height: 52px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .filter-section {
+      padding: 0 20px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-right: 1px solid #f3f4f6;
+    }
+
+    .filter-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .filter-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
+      background: transparent;
+      border: none;
+      padding: 0;
+      outline: none;
+      cursor: pointer;
+    }
+    
+    .search-section {
+      flex: 1;
+      min-width: 200px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .search-input {
+      border: none;
+      outline: none;
+      width: 100%;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1e293b;
+    }
+    
+    .search-input::placeholder {
+      color: #cbd5e1;
+    }
+
+    .action-section {
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-left: 1px solid #f3f4f6;
+    }
 
     .toast {
       transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
@@ -70,51 +206,55 @@
     <div class="flex-1 flex flex-col overflow-hidden">
       {% include 'partials/header.html' with page_title="" %}
       <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-        <div>
-          <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 flex-shrink-0">
-              Question Papers
-            </h2>
-            <div class="flex-1 flex flex-col sm:flex-row justify-start sm:justify-center items-center gap-4 w-full">
+        <div class="flex flex-col lg:flex-row lg:items-center gap-6 mb-8">
+          <h2 class="text-3xl font-extrabold text-slate-800 flex-shrink-0 tracking-tight">
+            Question Papers
+          </h2>
 
-              <div class="relative w-full sm:w-48">
-                <select id="filter-status"
-                  class="w-full p-2 pr-10 border border-gray-300 rounded-lg bg-white text-sm focus:ring-theme-primary focus:border-theme-primary appearance-none">
-                  <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Statuses</option>
+          <div class="filter-bar-container flex-grow max-w-5xl">
+            <!-- Duration -->
+            <div class="filter-section min-w-[200px]">
+              <div class="filter-label">Duration</div>
+              <input type="text" id="filter-date-range" placeholder="Start Date To End Date"
+                class="filter-value w-full" readonly />
+              <input type="hidden" id="filter-date-from" value="{{ date_from|default:'' }}">
+              <input type="hidden" id="filter-date-to" value="{{ date_to|default:'' }}">
+            </div>
+
+            <!-- Status -->
+            <div class="filter-section">
+              <div class="filter-label">Status</div>
+              <div class="relative flex items-center">
+                <select id="filter-status" class="filter-value pr-6 appearance-none">
+                  <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All</option>
                   <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
                   <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                  </svg>
-                </div>
+                <i class="fas fa-chevron-down absolute right-0 text-[10px] text-slate-400 pointer-events-none"></i>
               </div>
-
-              <div class="relative w-full sm:w-48">
-                <select id="filter-experience"
-                  class="w-full p-2 pr-10 border border-gray-300 rounded-lg bg-white text-sm focus:ring-theme-primary focus:border-theme-primary appearance-none">
-                  <option value="all" {% if selected_experience == 'all' %}selected{% endif %}>All Levels</option>
-                  <option value="0-2" {% if selected_experience == '0-2' %}selected{% endif %}>Beginner (0-2 Years)
-                  </option>
-                  <option value="3-5" {% if selected_experience == '3-5' %}selected{% endif %}>Intermediate (3-5 Years)
-                  </option>
-                  <option value="6+" {% if selected_experience == '6+' %}selected{% endif %}>Advanced (6+ Years)</option>
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                  </svg>
-                </div>
-              </div>
-
             </div>
 
-            <a href="{% url 'generate_questions' %}"
-              class="w-full sm:w-auto bg-theme-primary text-white text-center font-semibold py-2 px-5 rounded-lg hover:bg-theme-dark transition-all duration-300 shadow hover:shadow-lg transform hover:-translate-y-0.5">
-              <i class="fas fa-plus mr-2"></i>Create Paper
-            </a>
+            <!-- Search -->
+            <div class="search-section">
+              <i class="fas fa-search text-slate-300 text-sm"></i>
+              <input type="text" id="search-input" value="{{ search_query|default:'' }}" 
+                placeholder="Search papers..." class="search-input" />
+            </div>
+
+            <!-- Actions (Reset & New) -->
+            <div class="action-section">
+              <button id="reset-filters" title="Reset Filters" 
+                class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-400 hover:text-theme-primary transition-colors">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+              
+              <a href="{% url 'generate_questions' %}"
+                class="bg-theme-primary text-white text-xs font-bold py-2.5 px-6 rounded-lg hover:bg-theme-dark transition-all flex items-center gap-2 uppercase tracking-widest shadow-sm">
+                <i class="fas fa-plus"></i> New
+              </a>
+            </div>
           </div>
+        </div>
           <div class="space-y-4" id="papers-container">
             {% for paper in papers %}
             <div id="paper-card-{{ paper.id }}"
@@ -429,15 +569,81 @@
         for (let i = 0; i < cookies.length; i++) {
           const cookie = cookies[i].trim();
           if (cookie.startsWith(name + "=")) {
-            cookieValue = decodeURIComponent(
-              cookie.substring(name.length + 1)
-            );
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
             break;
           }
         }
       }
       return cookieValue;
     }
+
+    // --- NEW: Function to attach listeners to dynamically loaded cards ---
+    function attachCardListeners() {
+      // Re-attach Share Button listeners
+      document.querySelectorAll(".share-button").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const shareLink = button.dataset.shareLink;
+          const fullShareLink = window.location.origin + shareLink;
+          document.getElementById("share-link-input").value = fullShareLink;
+          document.getElementById("modal-paper-title").textContent = button.dataset.paperTitle;
+
+          const toggle = document.getElementById("public-link-toggle");
+          toggle.checked = button.dataset.isPublic === "true";
+          toggle.dataset.paperId = button.dataset.paperId;
+
+          document.getElementById("share-modal").classList.remove("hidden");
+        });
+      });
+
+      // Re-attach Invite Button listeners
+      document.querySelectorAll(".invite-button").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const paperId = button.dataset.paperId;
+          const paperTitle = button.dataset.paperTitle;
+
+          document.getElementById("invite-modal-paper-title").textContent = paperTitle;
+          document.getElementById("invite-paper-id-input").value = paperId;
+
+          document.getElementById("invite-modal").classList.remove("hidden");
+          document.getElementById("invite-email-input").focus();
+        });
+      });
+
+      // Re-attach Deactivate Button listeners
+      document.querySelectorAll(".deactivate-paper-button").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const paperId = button.dataset.paperId;
+          const paperTitle = button.dataset.paperTitle;
+
+          showConfirmModal(
+            "Deactivate Paper?",
+            `Are you sure you want to deactivate "<strong>${paperTitle}</strong>"? This action cannot be undone.`,
+            () => {
+              const card = document.getElementById(`paper-card-${paperId}`);
+              if (card) { card.style.opacity = "0.4"; }
+
+              const deactivateUrl = `/api/paper/${paperId}/deactivate/`;
+              fetch(deactivateUrl, {
+                method: "POST",
+                headers: { "X-CSRFToken": getCookie("csrftoken"), "Content-Type": "application/json" },
+              })
+                .then((res) => res.json())
+                .then((data) => {
+                  if (data.status === "success") { if (card) card.remove(); showToast(data.message); }
+                  else { showToast(data.message, "error"); if (card) card.style.opacity = "1"; }
+                });
+            }
+          );
+        });
+      });
+    }
+
 
     document.addEventListener("DOMContentLoaded", function () {
       // Sidebar toggle
@@ -479,319 +685,227 @@
           }
         });
       }
+      // NEW: Attach card listeners for the first time
+      attachCardListeners();
     });
 
-    // --- START: UPDATED FILTER LOGIC ---
-    const filterStatus = document.getElementById("filter-status");
-    const filterExperience = document.getElementById("filter-experience");
-    const paperCards = document.querySelectorAll(".paper-card");
-    const noResultsMessage = document.getElementById("no-results-message");
+    function attachCardListeners() {
+      document.querySelectorAll(".share-button").forEach((button) => {
+        button.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          document.getElementById("share-link-input").value = window.location.origin + button.dataset.shareLink;
+          document.getElementById("modal-paper-title").textContent = button.dataset.paperTitle;
+          const publicLinkToggle = document.getElementById("public-link-toggle");
+          publicLinkToggle.checked = button.dataset.isPublic === "true";
+          publicLinkToggle.dataset.paperId = button.dataset.paperId;
+          document.getElementById("share-modal").classList.remove("hidden");
+        });
+      });
 
-    function applyFilters() {
-      const statusValue = filterStatus.value;
-      const experienceValue = filterExperience.value;
-      // Build the new URL with query params
-      const params = new URLSearchParams(window.location.search);
-      params.set("status", statusValue);
-      params.set("experience", experienceValue);
-      params.delete("page"); // Reset to first page on filter change
-      window.location.search = params.toString();
+      document.querySelectorAll(".invite-button").forEach((button) => {
+        button.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          document.getElementById("invite-modal-paper-title").textContent = button.dataset.paperTitle;
+          document.getElementById("invite-paper-id-input").value = button.dataset.paperId;
+          document.getElementById("invite-modal").classList.remove("hidden");
+          document.getElementById("invite-email-input").focus();
+        });
+      });
+
+      document.querySelectorAll(".deactivate-paper-button").forEach((button) => {
+        button.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const { paperId, paperTitle } = button.dataset;
+          showConfirmModal("Deactivate Paper?", `Are you sure about "<strong>${paperTitle}</strong>"?`, () => {
+            const card = document.getElementById(`paper-card-${paperId}`);
+            if (card) card.style.opacity = "0.4";
+            fetch(`/api/paper/${paperId}/deactivate/`, {
+              method: "POST",
+              headers: { "X-CSRFToken": getCookie("csrftoken") },
+            }).then(res => res.json()).then(data => {
+              if (data.status === "success") { card?.remove(); showToast(data.message); }
+              else { showToast(data.message, "error"); if (card) card.style.opacity = "1"; }
+            });
+          });
+        });
+      });
     }
 
-    // Add event listeners to the filter inputs
-    if (filterStatus) filterStatus.addEventListener("change", applyFilters);
-    if (filterExperience) filterExperience.addEventListener("change", applyFilters);
-    // --- END: UPDATED FILTER LOGIC ---
-
-    const shareModal = document.getElementById("share-modal");
-    const closeShareModalButtons = document.querySelectorAll(
-      "#close-share-modal-top, #close-share-modal-footer"
-    );
-
-    // --- Open Share Modal ---
-    document.querySelectorAll(".share-button").forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const shareLink = button.dataset.shareLink;
-        const fullShareLink = window.location.origin + shareLink;
-        document.getElementById("share-link-input").value = fullShareLink;
-        document.getElementById("modal-paper-title").textContent =
-          button.dataset.paperTitle;
-
-        const toggle = document.getElementById("public-link-toggle");
-        toggle.checked = button.dataset.isPublic === "true";
-        toggle.dataset.paperId = button.dataset.paperId;
-
-        shareModal.classList.remove("hidden");
-      });
-    });
-
-    // --- Close Share Modal ---
-    const closeShareModal = () => shareModal.classList.add("hidden");
-    closeShareModalButtons.forEach((btn) =>
-      btn.addEventListener("click", closeShareModal)
-    );
-
-    // --- Copy Link Button ---
-    document
-      .getElementById("copy-link-button")
-      .addEventListener("click", (e) => {
-        const linkInput = document.getElementById("share-link-input");
-        copyToClipboard(linkInput.value).then(() => {
-          e.target.textContent = "Copied!";
-          showToast("Link copied!");
-          setTimeout(() => {
-            e.target.textContent = "Copy Link";
-          }, 2000);
-        }).catch(err => {
-          console.error("Copy failed:", err);
-          showToast("Failed to copy link", "error");
+    document.addEventListener("DOMContentLoaded", () => {
+      // --- Sidebar & Profile ---
+      const toggleBtn = document.getElementById("sidebar-toggle");
+      if (toggleBtn) {
+        toggleBtn.addEventListener("click", () => {
+          const sidebar = document.getElementById("sidebar");
+          sidebar.classList.toggle("w-64"); sidebar.classList.toggle("w-20");
+          document.getElementById("sidebar-logo").classList.toggle("hidden");
+          document.getElementById("sidebar-header").classList.toggle("justify-between");
+          document.getElementById("sidebar-header").classList.toggle("justify-center");
+          document.querySelectorAll(".sidebar-text").forEach(t => t.classList.toggle("hidden"));
         });
-      });
-
-    // --- REFACTORED: Public Link Toggle Switch Logic ---
-    const publicLinkToggle = document.getElementById("public-link-toggle");
-    publicLinkToggle.addEventListener("change", () => {
-      const paperId = publicLinkToggle.dataset.paperId;
-      const isChecked = publicLinkToggle.checked;
-      const toggleUrl = `/api/paper/${paperId}/toggle-public/`;
-
-      publicLinkToggle.disabled = true;
-
-      fetch(toggleUrl, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": getCookie("csrftoken"),
-          "Content-Type": "application/json",
-        },
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.status === "success") {
-            const message = data.is_public_active
-              ? "Public link activated!"
-              : "Public link deactivated!";
-            showToast(message);
-
-            // Update status dot on the main page
-            const statusDot = document.getElementById(
-              `status-dot-${paperId}`
-            );
-            statusDot.classList.toggle("bg-green-500", data.is_public_active);
-            statusDot.classList.toggle("bg-gray-400", !data.is_public_active);
-
-            // Update the data attribute on the share button for consistency
-            const shareButton = document.querySelector(
-              `.share-button[data-paper-id='${paperId}']`
-            );
-            shareButton.dataset.isPublic = data.is_public_active;
-          } else {
-            throw new Error(data.message || "Failed to update.");
-          }
-        })
-        .catch((error) => {
-          showToast("An error occurred. Please try again.", "error");
-          publicLinkToggle.checked = !isChecked; // Revert toggle on error
-        })
-        .finally(() => {
-          publicLinkToggle.disabled = false;
-        });
-    });
-
-    // --- NEW: Deactivate Paper Logic ---
-    // --- Deactivate Paper Logic ---
-    document
-      .querySelectorAll(".deactivate-paper-button")
-      .forEach((button) => {
-        button.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const paperId = button.dataset.paperId;
-          const paperTitle = button.dataset.paperTitle;
-
-          showConfirmModal(
-            "Deactivate Paper?",
-            `Are you sure you want to deactivate "<strong>${paperTitle}</strong>"? This action cannot be undone.`,
-            () => {
-              const card = document.getElementById(`paper-card-${paperId}`);
-              if (card) {
-                card.style.transition = "opacity 0.5s ease";
-                card.style.opacity = "0.4";
-              }
-
-              // ✨ REPLACED FAKE CALL WITH REAL FETCH REQUEST ✨
-              const deactivateUrl = `/api/paper/${paperId}/deactivate/`;
-
-              fetch(deactivateUrl, {
-                method: "POST",
-                headers: {
-                  "X-CSRFToken": getCookie("csrftoken"), // Important for security
-                  "Content-Type": "application/json",
-                },
-              })
-                .then((response) => response.json())
-                .then((data) => {
-                  if (data.status === "success") {
-                    // On success, remove the card from the page
-                    if (card) {
-                      card.remove();
-                    }
-                    showToast(data.message, "success");
-                  } else {
-                    // If the backend sends an error, show it
-                    showToast(data.message || "An error occurred.", "error");
-                    if (card) {
-                      card.style.opacity = "1"; // Restore opacity on failure
-                    }
-                  }
-                })
-                .catch((error) => {
-                  // Handle network errors
-                  console.error("Deactivation Error:", error);
-                  showToast(
-                    "Could not connect to the server. Please try again.",
-                    "error"
-                  );
-                  if (card) {
-                    card.style.opacity = "1";
-                  }
-                });
-            }
-          );
-        });
-      });
-    // ... inside the main <script> tag ...
-
-    // --- Invite Modal Logic Variables ---
-    const inviteModal = document.getElementById("invite-modal");
-    const inviteForm = document.getElementById("invite-form");
-    const inviteEmailInput = document.getElementById("invite-email-input");
-    const invitePaperIdInput = document.getElementById("invite-paper-id-input");
-    const inviteEmailError = document.getElementById("invite-email-error");
-    const sendInviteButton = document.getElementById("send-invite-button");
-    const closeInviteModalButtons = document.querySelectorAll(
-      "#close-invite-modal-top, #close-invite-modal-footer"
-    );
-
-    const closeInviteModal = () => {
-      inviteModal.classList.add("hidden");
-      inviteEmailError.classList.add("hidden");
-      inviteEmailInput.classList.remove("invalid");
-      inviteEmailInput.value = ""; // Clear the email field
-      sendInviteButton.textContent = 'Send Invitation'; // Reset button text
-      sendInviteButton.disabled = false; // Enable button
-    };
-
-    // --- Open Invite Modal ---
-    document.querySelectorAll(".invite-button").forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const paperId = button.dataset.paperId;
-        const paperTitle = button.dataset.paperTitle;
-
-        document.getElementById("invite-modal-paper-title").textContent = paperTitle;
-        invitePaperIdInput.value = paperId;
-
-        inviteModal.classList.remove("hidden");
-        inviteEmailInput.focus();
-      });
-    });
-
-    // --- Close Invite Modal ---
-    closeInviteModalButtons.forEach((btn) =>
-      btn.addEventListener("click", closeInviteModal)
-    );
-
-    // --- Invite Form Submission (AJAX) ---
-    inviteForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-
-      let email = inviteEmailInput.value.trim();
-      let paper_id = invitePaperIdInput.value;
-
-      // Basic client-side email format validation
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        inviteEmailInput.classList.add("invalid");
-        inviteEmailError.textContent = "Please enter a valid email address.";
-        inviteEmailError.classList.remove("hidden");
-        return;
+      }
+      const userBtn = document.getElementById("user-menu-button");
+      const userMenu = document.getElementById("user-menu");
+      if (userBtn && userMenu) {
+        userBtn.addEventListener("click", (e) => { userMenu.classList.toggle("hidden"); e.stopPropagation(); });
+        document.addEventListener("click", () => userMenu.classList.add("hidden"));
       }
 
-      inviteEmailInput.classList.remove("invalid");
-      inviteEmailError.classList.add("hidden");
+      // --- Filter Logic ---
+      const filterStatus = document.getElementById("filter-status");
+      const filterDateFrom = document.getElementById("filter-date-from");
+      const filterDateTo = document.getElementById("filter-date-to");
+      const dateRangeInput = document.getElementById("filter-date-range");
+      const searchInput = document.getElementById("search-input");
+      const resetBtn = document.getElementById("reset-filters");
 
-      sendInviteButton.disabled = true;
-      sendInviteButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+      async function applyFilters() {
+        const params = new URLSearchParams(window.location.search);
+        params.set("status", filterStatus.value || 'all');
+        if (filterDateFrom.value) params.set("date_from", filterDateFrom.value); else params.delete("date_from");
+        if (filterDateTo.value) params.set("date_to", filterDateTo.value); else params.delete("date_to");
+        if (searchInput.value.trim()) params.set("search", searchInput.value.trim()); else params.delete("search");
+        params.delete("page"); 
 
-      const inviteUrl = "{% url 'invite_candidate' %}";
-      console.log("Starting Invitation Fetch...");
-      console.log("URL:", inviteUrl);
-      console.log("Payload:", { email: email, paper_id: paper_id });
+        const newUrl = window.location.pathname + "?" + params.toString();
+        window.history.pushState({}, "", newUrl);
 
-      fetch(inviteUrl, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": getCookie("csrftoken"),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: email, paper_id: paper_id }),
-      })
-        .then((res) => {
-          console.log("Response Status:", res.status);
-          console.log("Response OK:", res.ok);
+        const container = document.getElementById("papers-container");
+        if (container) container.style.opacity = "0.5";
 
-          if (res.status === 400 || res.status === 500) {
-            // Handle errors from the backend (including my custom 500 SMTP errors)
-            return res.json().then(data => {
-              console.error("Server Error Data:", data);
-              if (data.errors && data.errors.email) {
-                inviteEmailInput.classList.add("invalid");
-                inviteEmailError.textContent = data.errors.email[0];
-                inviteEmailError.classList.remove("hidden");
-              } else {
-                showToast(data.message || "Invitation failed.", "error");
-              }
-              throw new Error(data.message || "Server error occurred.");
-            });
+        try {
+          const response = await fetch(newUrl);
+          const html = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+
+          const newContainer = doc.getElementById("papers-container");
+          const oldContainer = document.getElementById("papers-container");
+          if (newContainer && oldContainer) {
+            oldContainer.innerHTML = newContainer.innerHTML;
+            oldContainer.style.opacity = "1";
           }
 
-          if (!res.ok) {
-            console.error("Unknown Server Error (not 400/500)");
-            throw new Error("Server error occurred.");
+          const newPagination = doc.querySelector(".mt-8.flex.justify-center");
+          const oldPagination = document.querySelector(".mt-8.flex.justify-center");
+          if (newPagination && oldPagination) {
+            oldPagination.innerHTML = newPagination.innerHTML;
           }
-          return res.json();
-        })
-        .then((data) => {
-          if (data.status === "success") {
-            showToast(data.message, "success");
-            closeInviteModal();
 
-            // CRITICAL: Update the dashboard status dot if the public status changed
-            const statusDot = document.getElementById(`status-dot-${paper_id}`);
-            if (statusDot) {
-              statusDot.classList.toggle("bg-green-500", data.is_public_active);
-              statusDot.classList.toggle("bg-gray-400", !data.is_public_active);
-            }
+          attachCardListeners();
+        } catch (err) {
+          console.error("AJAX filter failed:", err);
+          if (container) container.style.opacity = "1";
+        }
+      }
 
+      let flatpickrInstance = flatpickr(dateRangeInput, {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "M j, Y",
+        defaultDate: [filterDateFrom.value, filterDateTo.value].filter(Boolean),
+        onClose: function (selectedDates, dateStr, instance) {
+          if (selectedDates.length > 0) {
+            filterDateFrom.value = instance.formatDate(selectedDates[0], "Y-m-d");
+            // If only one date is selected, use it for both from and to (filter for that day)
+            filterDateTo.value = selectedDates[1] 
+              ? instance.formatDate(selectedDates[1], "Y-m-d") 
+              : instance.formatDate(selectedDates[0], "Y-m-d");
+            applyFilters();
           } else {
-            showToast(data.message || "Invitation failed.", "error");
+            filterDateFrom.value = ""; 
+            filterDateTo.value = ""; 
+            applyFilters();
           }
-        })
-        .catch((error) => {
-          if (error.message !== "Validation Failed") { // Ignore validation-only errors
-            console.error("Invite Error:", error);
-            showToast("An unexpected error occurred. Please try again.", "error");
-          }
-        })
-        .finally(() => {
-          sendInviteButton.disabled = false;
-          sendInviteButton.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Invitation';
+        }
+      });
+
+      if (filterStatus) filterStatus.addEventListener("change", applyFilters);
+      if (searchInput) {
+        let debounceTimer;
+        searchInput.addEventListener("input", function () {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(applyFilters, 500);
         });
+      }
+      if (resetBtn) {
+        resetBtn.addEventListener("click", () => {
+          filterStatus.value = "all";
+          filterDateFrom.value = "";
+          filterDateTo.value = "";
+          searchInput.value = "";
+          if (flatpickrInstance) flatpickrInstance.clear();
+          applyFilters();
+        });
+      }
+
+      // --- Modals ---
+      const shareModal = document.getElementById("share-modal");
+      const closeShareModalButtons = document.querySelectorAll("#close-share-modal-top, #close-share-modal-footer");
+      const publicLinkToggle = document.getElementById("public-link-toggle");
+      const closeShareModal = () => shareModal.classList.add("hidden");
+      closeShareModalButtons.forEach((btn) => btn.addEventListener("click", closeShareModal));
+      document.getElementById("copy-link-button").addEventListener("click", (e) => {
+        const linkInput = document.getElementById("share-link-input");
+        copyToClipboard(linkInput.value).then(() => {
+          const originalText = e.target.textContent;
+          e.target.textContent = "Copied!";
+          showToast("Link copied!");
+          setTimeout(() => { e.target.textContent = originalText; }, 2000);
+        });
+      });
+      publicLinkToggle.addEventListener("change", () => {
+        const paperId = publicLinkToggle.dataset.paperId;
+        fetch(`/api/paper/${paperId}/toggle-public/`, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "Content-Type": "application/json" },
+        }).then(res => res.json()).then(data => {
+          if (data.status === "success") {
+            showToast(data.is_public_active ? "Public link activated!" : "Public link deactivated!");
+            const dot = document.getElementById(`status-dot-${paperId}`);
+            if (dot) { dot.classList.toggle("bg-green-500", data.is_public_active); dot.classList.toggle("bg-gray-400", !data.is_public_active); }
+            const shareBtn = document.querySelector(`.share-button[data-paper-id='${paperId}']`);
+            if (shareBtn) shareBtn.dataset.isPublic = data.is_public_active;
+          }
+        });
+      });
+
+      const inviteModal = document.getElementById("invite-modal");
+      const inviteForm = document.getElementById("invite-form");
+      const inviteEmailInput = document.getElementById("invite-email-input");
+      const inviteEmailError = document.getElementById("invite-email-error");
+      const sendInviteButton = document.getElementById("send-invite-button");
+      const closeInviteModalButtons = document.querySelectorAll("#close-invite-modal-top, #close-invite-modal-footer");
+      const closeInviteModal = () => {
+        inviteModal.classList.add("hidden"); inviteEmailError.classList.add("hidden");
+        inviteEmailInput.classList.remove("border-red-500"); inviteEmailInput.value = "";
+      };
+      closeInviteModalButtons.forEach((btn) => btn.addEventListener("click", closeInviteModal));
+      inviteForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const email = inviteEmailInput.value.trim();
+        const paper_id = document.getElementById("invite-paper-id-input").value;
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          inviteEmailError.textContent = "Please enter a valid email."; inviteEmailError.classList.remove("hidden");
+          inviteEmailInput.classList.add("border-red-500"); return;
+        }
+        sendInviteButton.disabled = true;
+        sendInviteButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+        fetch("{% url 'invite_candidate' %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "Content-Type": "application/json" },
+          body: JSON.stringify({ email, paper_id }),
+        }).then(res => res.json()).then(data => {
+          if (data.status === "success") { showToast(data.message, "success"); closeInviteModal(); }
+          else { showToast(data.message || "Invitation failed.", "error"); }
+        }).finally(() => {
+          sendInviteButton.disabled = false; sendInviteButton.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Invitation';
+        });
+      });
+
+      attachCardListeners();
     });
-    // ... rest of the script ...
   </script>
 </body>
-
 </html>

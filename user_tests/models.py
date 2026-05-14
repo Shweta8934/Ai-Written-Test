@@ -33,6 +33,11 @@ class TestRegistration(models.Model):
     start_time = models.DateTimeField(auto_now_add=True)
     is_completed = models.BooleanField(default=False)
 
+    # --- PROCTORING SUMMARY FIELDS ---
+    total_violations = models.PositiveIntegerField(default=0)
+    proctoring_score = models.FloatField(default=100.0, help_text="Trust percentage (0-100)")
+    camera_access_granted = models.BooleanField(default=False)
+
     class Meta:
         # **THE FIX:** Use the old table name to match the existing data
         db_table = 'app_testregistration'
@@ -72,3 +77,56 @@ class UserResponse(models.Model):
         
     def __str__(self):
         return f"Response for Q{self.question.id} by {self.registration.name}"
+class CheatingLog(models.Model):
+    """
+    Logs potential cheating activities like tab switching or window blurring.
+    """
+    registration = models.ForeignKey(
+        TestRegistration, 
+        on_delete=models.CASCADE, 
+        related_name="cheating_logs"
+    )
+    event_type = models.CharField(max_length=100) # e.g., 'tab_switch', 'window_blur', 'focus'
+    url_at_time = models.CharField(max_length=500, null=True, blank=True)
+    tab_title = models.CharField(max_length=255, null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.event_type} - {self.registration.email} at {self.timestamp}"
+
+class TestViolation(models.Model):
+    """
+    Robust model for proctoring violations with media proof.
+    """
+    VIOLATION_TYPES = [
+        ('TAB_SWITCH', 'Tab Switch'),
+        ('WINDOW_BLUR', 'Window Blur'),
+        ('FULLSCREEN_EXIT', 'Fullscreen Exit'),
+        ('FACE_NOT_FOUND', 'Face Not Found'),
+        ('MULTIPLE_FACES', 'Multiple Faces Detected'),
+        ('SCREEN_RECORDING_STOPPED', 'Screen Recording Stopped'),
+        ('CAMERA_ACTIVE', 'Camera Activated'),
+        ('CAMERA_DENIED', 'Camera Denied'),
+        ('PERIODIC_CHECK', 'Periodic Identity Check'),
+    ]
+
+    registration = models.ForeignKey(
+        TestRegistration, 
+        on_delete=models.CASCADE, 
+        related_name="violations"
+    )
+    violation_type = models.CharField(max_length=50, choices=VIOLATION_TYPES)
+    timestamp = models.DateTimeField(default=timezone.now)
+    duration = models.FloatField(default=0.0, help_text="Duration in seconds (if applicable)")
+    snapshot = models.ImageField(upload_to='proctoring/snapshots/', null=True, blank=True)
+    video_clip = models.FileField(upload_to='proctoring/clips/', null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.get_violation_type_display()} - {self.registration.email}"

@@ -74,6 +74,7 @@ urlpatterns = [
     path("users/delete/<int:user_id>/", views.delete_user, name="delete_user"),
     path("profile/<int:pk>/", views.user_profile_view, name="user_profile"),
     path("test-report/<int:registration_id>/", views.test_result, name="test_report"),
+    path("test-report/<int:registration_id>/export/", views.export_test_report_csv, name="export_test_report_csv"),
     path("regenerate-question/", views.regenerate_question, name="regenerate_question"),
     path(
         "paper/<int:paper_id>/export-participants/",

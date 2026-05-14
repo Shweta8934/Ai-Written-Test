@@ -184,170 +184,302 @@
                         </div>
                       </div>
                     </div>
-                    </div>
-                    <div class="space-y-4" id="questions-container-{{ section.id }}">
-                      {% for question in section.questions.all %}
-                      <div class="question-item p-4 border border-gray-200 rounded-lg bg-gray-50">
-                        <div class="flex items-start gap-2 mb-2">
-                          <span
-                            class="inline-block bg-theme-primary text-white px-2 py-1 rounded text-xs font-semibold">
-                            Q{{ forloop.counter }}
-                          </span>
-                          <span class="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                            {{ question.question_type }}
-                          </span>
-                          <button type="button" onclick="deleteQuestion({{ question.id }}, this)" class="ml-auto text-red-500 hover:text-red-700 p-1" title="Delete Question">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
+                  </div>
+                  <div class="space-y-4" id="questions-container-{{ section.id }}">
+                    {% for question in section.questions.all %}
+                    <div class="question-item p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div class="flex items-start gap-2 mb-2">
+                        <span class="inline-block bg-theme-primary text-white px-2 py-1 rounded text-xs font-semibold">
+                          Q{{ forloop.counter }}
+                        </span>
+                        <span class="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                          {{ question.question_type }}
+                        </span>
+                        <button type="button" onclick="deleteQuestion({{ question.id }}, this)"
+                          class="ml-auto text-red-500 hover:text-red-700 p-1" title="Delete Question">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
 
-                        <label for="question-text-{{ question.id }}"
-                          class="block text-sm font-medium text-gray-700 mb-1">
-                          Question Text:
-                        </label>
-                        <textarea id="question-text-{{ question.id }}" name="question-text-{{ question.id }}" rows="3"
-                          class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-theme-primary focus:border-theme-primary"
-                          required>
+                      <label for="question-text-{{ question.id }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        Question Text:
+                      </label>
+                      <textarea id="question-text-{{ question.id }}" name="question-text-{{ question.id }}" rows="3"
+                        class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-theme-primary focus:border-theme-primary"
+                        required>
 {{ question.text | safe | striptags | safe }}</textarea>
 
 
-                        {% if question.question_type == "MCQ" %}
-                        <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <label class="block text-sm font-semibold text-blue-900 mb-3">
-                            📋 MCQ Options:
-                          </label>
+                      {% if question.question_type == "MCQ" %}
+                      <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <label class="block text-sm font-semibold text-blue-900 mb-3">
+                          📋 MCQ Options:
+                        </label>
+                        <div class="space-y-2">
+                          {% for option in question.options %}
+                          <div class="flex items-center gap-2">
+                            <span
+                              class="inline-block w-8 h-8 bg-blue-200 text-blue-900 rounded-full flex items-center justify-center text-xs font-bold">
+                              {{ forloop.counter }}
+                            </span>
+                            <input type="text" name="option-{{ question.id }}-{{ forloop.counter }}"
+                              placeholder="Option {{ forloop.counter }}" value="{{ option }}"
+                              class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              required />
+                          </div>
+                          {% endfor %}
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-blue-200">
+                          <p class="text-xs text-blue-700 mb-2">
+                            Add more options (up to 10):
+                          </p>
                           <div class="space-y-2">
-                            {% for option in question.options %}
+                            {% for i in "56789" %}
                             <div class="flex items-center gap-2">
                               <span
-                                class="inline-block w-8 h-8 bg-blue-200 text-blue-900 rounded-full flex items-center justify-center text-xs font-bold">
-                                {{ forloop.counter }}
+                                class="inline-block w-8 h-8 bg-gray-300 text-gray-700 rounded-full flex items-center justify-center text-xs font-bold">
+                                {{ i }}
                               </span>
-                              <input type="text" name="option-{{ question.id }}-{{ forloop.counter }}"
-                                placeholder="Option {{ forloop.counter }}" value="{{ option }}"
+                              <input type="text" name="option-{{ question.id }}-{{ i }}"
+                                placeholder="Option {{ i }} (optional)" value=""
                                 class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
                             </div>
                             {% endfor %}
                           </div>
-                          <div class="mt-3 pt-3 border-t border-blue-200">
-                            <p class="text-xs text-blue-700 mb-2">
-                              Add more options (up to 10):
-                            </p>
-                            <div class="space-y-2">
-                              {% for i in "56789" %}
-                              <div class="flex items-center gap-2">
-                                <span
-                                  class="inline-block w-8 h-8 bg-gray-300 text-gray-700 rounded-full flex items-center justify-center text-xs font-bold">
-                                  {{ i }}
-                                </span>
-                                <input type="text" name="option-{{ question.id }}-{{ i }}"
-                                  placeholder="Option {{ i }} (optional)" value=""
-                                  class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-                              </div>
-                              {% endfor %}
-                            </div>
-                          </div>
-                        </div>
-                        {% endif %}
-
-                        <div class="mt-3">
-                          <label for="question-answer-{{ question.id }}"
-                            class="block text-sm font-medium text-green-700 mb-1">
-                            ✓ Correct Answer:
-                          </label>
-                          <textarea id="question-answer-{{ question.id }}" name="question-answer-{{ question.id }}"
-                            rows="2"
-                            class="w-full p-2 border border-green-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-green-50"
-                            required>
-{{ question.answer | safe | striptags | safe }}</textarea>
-                          {% if question.question_type == "MCQ" %}
-                          <p class="text-xs text-gray-600 mt-1">
-                            💡 For MCQ: Enter the option letter (A, B, C, D,
-                            etc.) or the full option text
-                          </p>
-                          {% endif %}
                         </div>
                       </div>
-                      {% endfor %}
-                    </div>
-                    <div class="mt-4 flex flex-wrap gap-2 pt-4 border-t border-gray-100">
-                      <button type="button" onclick="addNewQuestion({{ section.id }}, 'CODE')" class="bg-indigo-50 text-indigo-700 px-3 py-2 rounded-md text-xs font-medium border border-indigo-200 hover:bg-indigo-100 transition-colors flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                        Add Coding Question
-                      </button>
-                      <button type="button" onclick="addNewQuestion({{ section.id }}, 'MCQ')" class="bg-blue-50 text-blue-700 px-3 py-2 rounded-md text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                        Add MCQ
-                      </button>
-                      <button type="button" onclick="addNewQuestion({{ section.id }}, 'SA')" class="bg-green-50 text-green-700 px-3 py-2 rounded-md text-xs font-medium border border-green-200 hover:bg-green-100 transition-colors flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                        Add Short Answer
-                      </button>
-                    </div>
-                  </div>
-                  {% endfor %}
-                </div>
-              </div>
+                      {% endif %}
 
-              <!-- Action Buttons -->
-              <div class="flex items-center justify-end gap-4 pt-6 mt-6 border-t">
-                <a href="{% url 'paper_detail' paper.id %}"
-                  class="text-gray-600 font-semibold py-2 px-6 rounded-lg hover:bg-gray-100 border border-gray-300">
-                  Cancel
-                </a>
-                <button type="submit"
-                  class="bg-theme-primary text-white font-semibold py-2 px-6 rounded-lg hover:bg-theme-dark transition-colors shadow-md">
-                  💾 Save All Changes
-                </button>
+                      <div class="mt-3">
+                        <label for="question-answer-{{ question.id }}"
+                          class="block text-sm font-medium text-green-700 mb-1">
+                          ✓ Correct Answer:
+                        </label>
+                        <textarea id="question-answer-{{ question.id }}" name="question-answer-{{ question.id }}"
+                          rows="2"
+                          class="w-full p-2 border border-green-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-green-50"
+                          required>
+{{ question.answer | safe | striptags | safe }}</textarea>
+                        {% if question.question_type == "MCQ" %}
+                        <p class="text-xs text-gray-600 mt-1">
+                          💡 For MCQ: Enter the option letter (A, B, C, D,
+                          etc.) or the full option text
+                        </p>
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  <div class="mt-4 flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                    <button type="button" onclick="addNewQuestion({{ section.id }}, 'CODE')"
+                      class="bg-indigo-50 text-indigo-700 px-3 py-2 rounded-md text-xs font-medium border border-indigo-200 hover:bg-indigo-100 transition-colors flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Coding Question
+                    </button>
+                    <button type="button" onclick="addNewQuestion({{ section.id }}, 'MCQ')"
+                      class="bg-blue-50 text-blue-700 px-3 py-2 rounded-md text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add MCQ
+                    </button>
+                    <button type="button" onclick="addNewQuestion({{ section.id }}, 'SA')"
+                      class="bg-green-50 text-green-700 px-3 py-2 rounded-md text-xs font-medium border border-green-200 hover:bg-green-100 transition-colors flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Short Answer
+                    </button>
+                  </div>
+                </div>
+                {% endfor %}
               </div>
             </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end gap-4 pt-6 mt-6 border-t">
+              <a href="{% url 'paper_detail' paper.id %}"
+                class="text-gray-600 font-semibold py-2 px-6 rounded-lg hover:bg-gray-100 border border-gray-300">
+                Cancel
+              </a>
+              <button type="submit"
+                class="bg-theme-primary text-white font-semibold py-2 px-6 rounded-lg hover:bg-theme-dark transition-colors shadow-md">
+                💾 Save All Changes
+              </button>
+            </div>
+          </div>
         </form>
       </main>
     </div>
   </div>
+  </div>
+
+  <!-- --- CUSTOM REUSABLE MODAL (Alert/Confirm) --- -->
+  <div id="generic-modal"
+    class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center p-4 z-[100] hidden">
+    <div id="generic-modal-content"
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all border border-slate-100 overflow-hidden">
+      <div class="p-8">
+        <div class="flex flex-col items-center text-center">
+          <div id="modal-icon-container" class="w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm">
+            <!-- Icon will be inserted here -->
+          </div>
+          <h3 id="modal-title" class="text-2xl font-extrabold text-slate-800 mb-2">Title</h3>
+          <p id="modal-message" class="text-slate-500 leading-relaxed text-sm sm:text-base">Message goes here.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 p-6 bg-slate-50 border-t border-slate-100">
+        <button id="modal-cancel-btn"
+          class="flex-1 px-5 py-3 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all hidden">
+          Cancel
+        </button>
+        <button id="modal-ok-btn"
+          class="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-[#736b8e] hover:bg-[#5f5778] shadow-md shadow-purple-100 transition-all">
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    // Character counter for job title
-    const jobTitleInput = document.querySelector(
-      "#{{ form.job_title.id_for_label }}"
-    );
-    const charCounter = document.getElementById("jobTitleCount");
+    // --- Modal Helper Functions ---
+    function showModal({ title, message, type = 'info', confirmText = 'OK', cancelText = 'Cancel', onConfirm = null }) {
+      const modal = document.getElementById('generic-modal');
+      const titleEl = document.getElementById('modal-title');
+      const messageEl = document.getElementById('modal-message');
+      const iconContainer = document.getElementById('modal-icon-container');
+      const okBtn = document.getElementById('modal-ok-btn');
+      const cancelBtn = document.getElementById('modal-cancel-btn');
 
-    if (jobTitleInput && charCounter) {
-      jobTitleInput.addEventListener("input", function () {
-        charCounter.textContent = this.value.length;
+      titleEl.textContent = title;
+      messageEl.innerHTML = message;
+      okBtn.textContent = confirmText;
+      cancelBtn.textContent = cancelText;
 
-        if (this.value.length > 30) {
-          charCounter.classList.add("text-red-500", "font-bold");
-        } else {
-          charCounter.classList.remove("text-red-500", "font-bold");
-        }
-      });
+      // Theme-based Styles
+      iconContainer.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm ';
+      let iconHtml = '';
+
+      if (type === 'error') {
+        iconContainer.classList.add('bg-red-50', 'text-red-500');
+        iconHtml = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+      } else if (type === 'warning') {
+        iconContainer.classList.add('bg-amber-50', 'text-amber-500');
+        iconHtml = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+      } else {
+        iconContainer.classList.add('bg-purple-50', 'text-[#736b8e]');
+        iconHtml = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+      }
+      iconContainer.innerHTML = iconHtml;
+
+      // Button visibility
+      if (onConfirm) {
+        cancelBtn.classList.remove('hidden');
+      } else {
+        cancelBtn.classList.add('hidden');
+      }
+
+      modal.classList.remove('hidden');
+
+      // Click Handlers
+      okBtn.onclick = () => {
+        modal.classList.add('hidden');
+        if (onConfirm) onConfirm();
+      };
+      cancelBtn.onclick = () => {
+        modal.classList.add('hidden');
+      };
     }
 
     // Form submission confirmation
     document
       .getElementById("editPaperForm")
       .addEventListener("submit", function (e) {
-        const confirmSave = confirm(
-          "Are you sure you want to save all changes to this paper?"
-        );
-        if (!confirmSave) {
+        const form = this;
+        // --- Added Validation Check ---
+        const requiredFields = form.querySelectorAll("[required]");
+        let firstEmptyField = null;
+        let hasDefaultContent = false;
+
+        const defaultStrings = [
+          "[Enter Question Text]",
+          "[Enter Correct Answer]",
+          "[Enter Option Text]"
+        ];
+
+        requiredFields.forEach(field => {
+          const val = field.value.trim();
+          if (!val) {
+            if (!firstEmptyField) firstEmptyField = field;
+            field.classList.add("border-red-500", "bg-red-50");
+          } else if (defaultStrings.includes(val)) {
+            hasDefaultContent = true;
+            field.classList.add("border-orange-500", "bg-orange-50");
+          } else {
+            field.classList.remove("border-red-500", "bg-red-50", "border-orange-500", "bg-orange-50");
+          }
+        });
+
+        if (firstEmptyField) {
           e.preventDefault();
+          firstEmptyField.focus();
+          showModal({
+            title: 'Incomplete Fields',
+            message: 'Please fill in all required fields (Questions, Answers, and Weightage) before saving.',
+            type: 'error'
+          });
+          return;
+        }
+
+        e.preventDefault(); // Pause submission to show modal
+
+        if (hasDefaultContent) {
+          showModal({
+            title: 'Update Default Content',
+            message: 'Some questions still have default placeholder text (e.g., "[Enter Question Text]"). Do you still want to save, or would you like to update them first?',
+            type: 'warning',
+            confirmText: 'Save Anyway',
+            cancelText: 'Update Now',
+            onConfirm: () => {
+              confirmFinalSave(form);
+            }
+          });
+        } else {
+          confirmFinalSave(form);
         }
       });
+
+    function confirmFinalSave(form) {
+      showModal({
+        title: 'Confirm Save',
+        message: 'Are you sure you want to save all changes to this paper?',
+        type: 'info',
+        confirmText: 'Yes, Save',
+        cancelText: 'No, Wait',
+        onConfirm: () => {
+          form.submit(); // Actually submit the form
+        }
+      });
+    }
 
     let newQuestionCounter = 0;
 
     function addNewQuestion(sectionId, type) {
       const container = document.getElementById(`questions-container-${sectionId}`);
       const newId = Date.now() + "_" + (newQuestionCounter++);
-      
+
       let typeColor = "blue";
-      if(type === "CODE") typeColor = "indigo";
-      if(type === "SA") typeColor = "green";
+      if (type === "CODE") typeColor = "indigo";
+      if (type === "SA") typeColor = "green";
 
       let html = `
         <div class="question-item p-4 border border-${typeColor}-200 rounded-lg bg-${typeColor}-50 mt-4">
@@ -365,7 +497,7 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">Question Text:</label>
           <textarea name="new-question-text-${sectionId}-${newId}" rows="3" 
             class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-theme-primary focus:border-theme-primary" 
-            required></textarea>
+            required>[Enter Question Text]</textarea>
           
           ${type === 'MCQ' ? `
           <div class="mt-4 p-3 bg-white rounded-lg border border-blue-200">
@@ -374,7 +506,7 @@
               ${[1, 2, 3, 4].map(num => `
                 <div class="flex items-center gap-2">
                   <span class="inline-block w-8 h-8 bg-blue-200 text-blue-900 rounded-full flex items-center justify-center text-xs font-bold">${num}</span>
-                  <input type="text" name="new-option-${sectionId}-${newId}-${num}" placeholder="Option ${num}" class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm" required />
+                  <input type="text" name="new-option-${sectionId}-${newId}-${num}" value="[Enter Option Text]" class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm" required />
                 </div>
               `).join('')}
             </div>
@@ -385,7 +517,7 @@
             <label class="block text-sm font-medium text-green-700 mb-1">✓ Correct Answer:</label>
             <textarea name="new-question-answer-${sectionId}-${newId}" rows="2" 
               class="w-full p-2 border border-green-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-white" 
-              required></textarea>
+              required>[Enter Correct Answer]</textarea>
           </div>
         </div>
       `;

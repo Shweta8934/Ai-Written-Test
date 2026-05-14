@@ -368,9 +368,16 @@ def user_instruction_view(request, link_id):
         request.session.modified = True
         return redirect("test:user_test", link_id=link_id)
 
+    # Calculate actual question count live from DB
+    actual_total_questions = Question.objects.filter(section__question_paper=paper).count()
+
     # All checks passed
     return render(
-        request, "user_test/instruction.html", {"link_id": link_id, "paper": paper}
+        request, "user_test/instruction.html", {
+            "link_id": link_id,
+            "paper": paper,
+            "actual_total_questions": actual_total_questions,
+        }
     )
 
 
@@ -496,12 +503,13 @@ def user_test_view(request, link_id):
         )
 
     sections_list = list(sections_with_questions.values())
+    actual_total_questions = sum(len(s["questions"]) for s in sections_list)
 
     context = {
         "paper": paper,
         "sections_list": sections_list,
         "link_id": link_id,
-        # "total_duration": paper.duration * 60, <-- REMOVED (now handled by API)
+        "actual_total_questions": actual_total_questions,
     }
     return render(request, "user_test/test.html", context)
 
@@ -511,3 +519,133 @@ def user_already_submitted_view(request):
     Shows the final 'Response Recorded' screen.
     """
     return render(request, "user_test/already_submitted.html")
+
+
+# --- PROCTORING & ANTI-CHEATING ENDPOINTS ---
+
+@csrf_exempt
+def log_violation(request):
+    """
+    API endpoint to log a proctoring violation.
+
+    COUNTABLE (increment total_violations + deduct proctoring score):
+      - TAB_SWITCH       → user left the test tab  (-10 pts)
+      - FULLSCREEN_EXIT  → user exited fullscreen   (-15 pts)
+      - IDENTITY_CHECK_FAIL                         (-20 pts)
+
+    NON-COUNTABLE (stored in DB for audit, but do NOT affect warning count):
+      - TAB_SWITCH_RETURN  → user came back
+      - CAMERA_DENIED      → camera blocked
+      - CAMERA_ACTIVE      → camera granted
+      - PERIODIC_CHECK     → routine snapshot
+      - WINDOW_BLUR        → window lost focus (not a real tab switch)
+      - (anything else)
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    registration_id = request.session.get("current_registration_id")
+    if not registration_id:
+        return JsonResponse({"error": "No active registration"}, status=403)
+
+    try:
+        from .models import TestViolation
+        data = json.loads(request.body)
+        violation_type = data.get("violation_type")
+        duration = data.get("duration", 0.0)
+        description = data.get("description", "")
+
+        registration = get_object_or_404(TestRegistration, pk=registration_id)
+
+        # --- Define which types actually COUNT as warnings ---
+        COUNTABLE_VIOLATIONS = {
+            'TAB_SWITCH',
+            'FULLSCREEN_EXIT',
+            'IDENTITY_CHECK_FAIL',
+        }
+
+        # Score deductions (only applied to countable violations)
+        weights = {
+            'TAB_SWITCH': 10.0,
+            'FULLSCREEN_EXIT': 15.0,
+            'IDENTITY_CHECK_FAIL': 20.0,
+        }
+
+        # Always log to DB for full audit trail
+        violation_obj = TestViolation.objects.create(
+            registration=registration,
+            violation_type=violation_type,
+            duration=duration,
+            description=description
+        )
+
+        # Only increment warning counter for real violations
+        if violation_type in COUNTABLE_VIOLATIONS:
+            deduction = weights.get(violation_type, 0.0)
+            registration.total_violations += 1
+            registration.proctoring_score = max(0, float(registration.proctoring_score) - deduction)
+            registration.save(update_fields=["total_violations", "proctoring_score"])
+        else:
+            # Refresh to get current values without modifying them
+            registration.refresh_from_db(fields=["total_violations", "proctoring_score"])
+
+        return JsonResponse({
+            "status": "success",
+            "violation_id": violation_obj.id,
+            "total_violations": registration.total_violations,
+            "proctoring_score": registration.proctoring_score,
+            "counted": violation_type in COUNTABLE_VIOLATIONS,
+        })
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+@csrf_exempt
+def upload_proctoring_media(request):
+    """
+    API endpoint to upload snapshots or video clips.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    registration_id = request.session.get("current_registration_id")
+    if not registration_id:
+        return JsonResponse({"error": "No active registration"}, status=403)
+
+    try:
+        from .models import TestViolation
+        file_obj = request.FILES.get("file")
+        if not file_obj:
+            return JsonResponse({"error": "No file uploaded"}, status=400)
+
+        registration = get_object_or_404(TestRegistration, pk=registration_id)
+        violation_id = request.POST.get("violation_id")
+        
+        if violation_id:
+            violation = get_object_or_404(TestViolation, pk=violation_id, registration=registration)
+        else:
+            # Periodic snapshot
+            violation = TestViolation.objects.create(
+                registration=registration,
+                violation_type='PERIODIC_CHECK',
+                description="Periodic proctoring snapshot"
+            )
+
+        if 'webm' in file_obj.name or 'mp4' in file_obj.name:
+            violation.video_clip = file_obj
+        else:
+            violation.snapshot = file_obj
+        
+        violation.save()
+
+        return JsonResponse({"status": "success", "violation_id": violation.id})
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+@csrf_exempt
+def log_cheating_event(request):
+    """Fallback for legacy integrations."""
+    return log_violation(request)

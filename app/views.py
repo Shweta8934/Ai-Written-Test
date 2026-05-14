@@ -14,7 +14,7 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count, Max
+from django.db.models import Count, Q, Max
 from django.shortcuts import get_object_or_404, render, redirect
 from .models import QuestionPaper, Question
 from django.contrib.auth.models import User
@@ -29,10 +29,7 @@ from .forms import (
 import csv  
 from .models import QuestionPaper, PaperSection, Question, Department, Skill
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
-from .models import (
-    TestRegistration,
-    UserResponse,
-)
+from user_tests.models import TestRegistration, UserResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from django.contrib import messages
@@ -100,24 +97,41 @@ def user_register(request):
 @login_required
 def dashboard(request):
     status_filter = request.GET.get("status", "all")
-    experience_filter = request.GET.get("experience", "all")
-
+    # experience_filter = request.GET.get("experience", "all")
+    search_query = request.GET.get("search", "").strip()
+    
     papers_query = QuestionPaper.objects.filter(created_by=request.user, is_active=True)
+
+    if search_query:
+        papers_query = papers_query.filter(
+            Q(title__icontains=search_query) | 
+            Q(job_title__icontains=search_query) |
+            Q(department_name__icontains=search_query) |
+            Q(skills_list__icontains=search_query)
+        )
 
     if status_filter == "active":
         papers_query = papers_query.filter(is_public_active=True)
     elif status_filter == "inactive":
         papers_query = papers_query.filter(is_public_active=False)
 
-    if experience_filter and experience_filter != "all":
-        if "+" in experience_filter:  # e.g. "6+"
-            lower_bound = int(experience_filter.replace("+", ""))
-            papers_query = papers_query.filter(min_exp__gte=lower_bound)
-        elif "-" in experience_filter:  # e.g. "0-2"
-            min_exp, max_exp = experience_filter.split("-")
-            papers_query = papers_query.filter(
-                min_exp__lte=int(max_exp), max_exp__gte=int(min_exp)
-            )
+    date_from = request.GET.get("date_from")
+    date_to = request.GET.get("date_to")
+
+    if date_from and date_from != "None" and date_from != "undefined":
+        papers_query = papers_query.filter(created_at__date__gte=date_from)
+    if date_to and date_to != "None" and date_to != "undefined":
+        papers_query = papers_query.filter(created_at__date__lte=date_to)
+
+    # if experience_filter and experience_filter != "all":
+    #     if "+" in experience_filter:  # e.g. "6+"
+    #         lower_bound = int(experience_filter.replace("+", ""))
+    #         papers_query = papers_query.filter(min_exp__gte=lower_bound)
+    #     elif "-" in experience_filter:  # e.g. "0-2"
+    #         min_exp, max_exp = experience_filter.split("-")
+    #         papers_query = papers_query.filter(
+    #             min_exp__lte=int(max_exp), max_exp__gte=int(min_exp)
+    #         )
 
     all_papers_list = papers_query.annotate(
         participant_count=Count("testregistration")
@@ -132,7 +146,10 @@ def dashboard(request):
         "title": "User Dashboard",
         "papers": papers_on_page,
         "selected_status": status_filter,
-        "selected_experience": experience_filter,
+        # "selected_experience": experience_filter,
+        "search_query": search_query,
+        "date_from": date_from,
+        "date_to": date_to,
     }
     return render(request, "dashboard.html", context)
 
@@ -292,7 +309,7 @@ def save_paper(request):
         logger.info(f"Sections Data (First 2 items): {section_items_list[:2]}")
         logger.info(f"Total Questions Count: {total_questions_count}")
         
-        # 2. Create QuestionPaper object (UNCHANGED)
+        # 2. Create QuestionPaper object
         paper = QuestionPaper.objects.create(
             created_by=request.user,
             title=data.get("title", "Generated Assessment"),
@@ -302,6 +319,7 @@ def save_paper(request):
             max_exp=data.get("max_exp"),
             is_active=True,
             duration=data.get("duration"),
+            cutoff_score=data.get("cutoff_score", 70), # Default to 70 if not provided
             is_public_active=False,
             is_private_link_active=False,  
             skills_list=data.get("skills"), 
@@ -316,7 +334,7 @@ def save_paper(request):
             # For List of Dicts, we extract the title from the content dict instead of the key
             section_title = section_content.get("title")
             
-            # Extract weightage (यह मान अब section_content dict में होना चाहिए)
+            # Extract weightage ( section_content dict में होना चाहिए)
             section_weightage = section_content.get("weightage", 0) 
             questions_list = section_content.get("questions", [])
 
@@ -384,15 +402,12 @@ from urllib.parse import urlencode
 
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import QuestionPaper, TestRegistration
+from .models import QuestionPaper
 
 
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import QuestionPaper, TestRegistration
-
-
-from .models import UserResponse
+from .models import QuestionPaper
 
 from django.db.models import Count 
 @login_required
@@ -878,6 +893,11 @@ def test_result(request, registration_id):
 
     status = "Pass" if percentage >= cutoff_score else "Fail"
 
+    status = "Pass" if percentage >= cutoff_score else "Fail"
+
+    # --- PROCTORING DATA ---
+    violations = registration.violations.all().order_by('timestamp')
+
     context = {
         "registration": registration,
         "results": results_data,
@@ -889,6 +909,7 @@ def test_result(request, registration_id):
         "title": f"Test Report for {registration.email}",
         "status": status,
         "cutoff_score": cutoff_score,
+        "violations": violations,
     }
 
     return render(request, "partials/users/test_report.html", context)
@@ -910,6 +931,8 @@ def partial_update_view(request, paper_id):
                 paper.job_title = data["job_title"] or paper.job_title
             if "duration" in data:
                 paper.duration = data["duration"] or paper.duration
+            if "cutoff_score" in data:
+                paper.cutoff_score = data["cutoff_score"] or paper.cutoff_score
             if "skills_list" in data:
                 skills_list = data["skills_list"]
                 if isinstance(skills_list, list):
@@ -1141,7 +1164,6 @@ from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
-from .models import TestRegistration
 
 
 @login_required
@@ -1204,7 +1226,7 @@ client = OpenAI(
     retry=retry_if_exception_type(Exception), # Catch OpenRouter/API errors
     reraise=True
 )
-def _call_ai_api(system_instruction, prompt):
+def _call_ai_api(system_instruction, prompt, temperature=0.3):
     """Helper to call AI API with retry logic"""
     response = client.chat.completions.create(
         model="openai/gpt-4o-mini",
@@ -1212,7 +1234,7 @@ def _call_ai_api(system_instruction, prompt):
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.3,
+        temperature=temperature,
         max_tokens=500,
         response_format={"type": "json_object"}
     )
@@ -1274,15 +1296,23 @@ def evaluate_answer_with_ai(
             return _evaluate_boolean(user_answer, model_answer)
 
         # Different prompts for different question types
+        ai_temperature = 0.3
         if question_type.lower() == "coding":
-            prompt = _get_coding_prompt(question_text, user_answer, model_answer)
-            system_instruction = "You are an expert programming instructor evaluating code. Output ONLY JSON."
+            ai_temperature = 0.0  # Enforce determinism for code
+            
+            # Dynamic Language Policy
+            language_keywords = ["in python", "using python", "in java", "using java", "in c++", "using c++", "in javascript", "using javascript", "in c#", "using c#", "in go", "using go", "in ruby", "using ruby", "in php", "using php", "in sql", "using sql"]
+            q_lower = question_text.lower()
+            strict_language = any(kw in q_lower for kw in language_keywords)
+            
+            prompt = _get_coding_prompt(question_text, user_answer, model_answer, strict_language)
+            system_instruction = "You are an automated code reviewer. Output ONLY JSON."
         else:
             prompt = _get_short_answer_prompt(question_text, user_answer, model_answer)
             system_instruction = "You are an expert technical evaluator. Output ONLY JSON."
 
         # Call AI API with retry
-        response = _call_ai_api(system_instruction, prompt)
+        response = _call_ai_api(system_instruction, prompt, temperature=ai_temperature)
 
         # Extract content
         cleaned_text = response.choices[0].message.content.strip()
@@ -1291,6 +1321,8 @@ def evaluate_answer_with_ai(
         is_correct = result.get("is_correct", False)
         # Standardize the reason/reasoning key
         result["reason"] = result.get("reasoning", result.get("reason", "No reason provided."))
+        
+        print(f"✅ AI EVALUATION SUCCESSFUL for {question_type}: is_correct={is_correct}")
         
         return is_correct, result
 
@@ -1325,7 +1357,7 @@ def _get_short_answer_prompt(
 - If the answer is vague or just repeats the question, mark it as INCORRECT.
 
 **SCORING PROCESS:**
-First, provide your internal reasoning. Then, determine if they passed the 50% threshold.
+First, provide your internal reasoning. Then, determine if the answer is at least 70% correct/complete based on the rubric above. If it meets or exceeds the 70% threshold, mark is_correct=true.
 
 Respond with ONLY this JSON structure:
 {{
@@ -1335,7 +1367,7 @@ Respond with ONLY this JSON structure:
     "match_percentage": 0-100
 }}"""
 
-def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> str:
+def _get_coding_prompt(question_text: str, user_code: str, model_code: str, strict_language: bool) -> str:
     """
     Generate a rigorous prompt for coding logic evaluation.
     """
@@ -1351,17 +1383,22 @@ def _get_coding_prompt(question_text: str, user_code: str, model_code: str) -> s
 {user_code}
 
 **STRICT EVALUATION CRITERIA:**
-1. **Language Check**: Does the candidate's code use the same programming language as the reference solution? (CRITICAL: If language differs, mark is_correct=false).
-2. **Logic Check**: Is the algorithm fundamentally correct? Does it solve the edge cases?
-3. **Executable-ish**: Would this code run if basic boilerplate (imports/main) were added?
+1. **Language Check**: 
+   - Strict Language Requirement: {strict_language}
+   - If True: The candidate MUST use the exact language requested in the problem. If they used a different language, mark is_correct=false and set reasoning to "Language Mismatch".
+   - If False: Accept ANY valid programming language as long as the underlying logic is correct.
+2. **Logic Check**: Is the algorithm fundamentally correct? Does it solve the edge cases? If wrong, reasoning must explicitly state "Incorrect Logic".
+3. **Executable-ish**: Would this code run if basic boilerplate were added? If not or incomplete, reasoning must explicitly state "Incomplete Solution".
+4. **Placeholder**: If the submission is just default placeholder text or unattempted, reasoning must explicitly state "Placeholder/Unattempted".
 
 **SCORING RULES:**
 - Ignore minor semicolon or casing issues if the language doesn't strictly require them.
+- If the submission is at least 70% logically correct/complete, mark is_correct=true.
 - If the submission is just the default placeholder text, it is INCORRECT.
 
 Respond with ONLY this JSON structure:
 {{
-    "reasoning": "Analysis of the code logic and language choice.",
+    "reasoning": "Explicit reasoning matching the failure categories above, or analysis if correct.",
     "is_correct": true/false,
     "confidence_score": 0-100,
     "detected_language": "string"
@@ -1538,11 +1575,18 @@ def _fallback_evaluation(
             "reason": "Direct text match (Fallback Mode)",
         }
 
+    # Ensure coding questions DO NOT use fuzzy matching
+    if question_type.lower() == "coding":
+        return False, {
+            "is_correct": False,
+            "confidence": 0,
+            "reason": "AI evaluation unavailable; fuzzy matching disabled for code logic.",
+        }
+
     # 2. Token Set Ratio (RapidFuzz) - Handles word reordering and partial matches
     similarity_score = fuzz.token_set_ratio(user_clean, model_clean)
     
-    # Thresholds: 70% for short answers, 50% for code logic
-    threshold = 50 if question_type.lower() == "coding" else 70
+    threshold = 70
 
     if similarity_score >= threshold:
         return True, {
@@ -2101,3 +2145,40 @@ def change_password(request):
         'title': 'Change Password'
     }
     return render(request, 'partials/users/change_password.html', context)
+
+@login_required
+def export_test_report_csv(request, registration_id):
+    """Exports a specific user's test result to a CSV file."""
+    registration = get_object_or_404(TestRegistration, id=registration_id)
+    user_responses = UserResponse.objects.filter(registration=registration).select_related("question")
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="test_report_{registration.email}.csv"'
+
+    writer = csv.writer(response)
+    # Write header
+    writer.writerow(['Question', 'Question Type', 'Candidate Answer', 'Correct Answer', 'Is Correct', 'Status', 'AI Evaluation Reason'])
+
+    total_questions = registration.question_paper.total_questions
+    score = 0
+    
+    for ur in user_responses:
+        status = "Correct" if ur.is_correct else "Incorrect"
+        if ur.is_correct:
+            score += 1
+        
+        q_text = ur.question.text
+        q_type = ur.question.get_question_type_display()
+        user_ans = ur.user_answer if ur.user_answer else "Not Attempted"
+        correct_ans = ur.question.answer
+        is_corr = "Yes" if ur.is_correct else "No"
+        reason = ur.evaluation_reason if ur.evaluation_reason else "N/A"
+        
+        writer.writerow([q_text, q_type, user_ans, correct_ans, is_corr, status, reason])
+        
+    percentage = round((score / total_questions) * 100) if total_questions > 0 else 0
+    writer.writerow([])
+    writer.writerow(['Total Score', f'{percentage}% ({score}/{total_questions})'])
+    writer.writerow(['Pass/Fail Status', 'Pass' if percentage >= registration.question_paper.cutoff_score else 'Fail'])
+    
+    return response

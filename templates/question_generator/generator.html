@@ -596,6 +596,30 @@
         </div>
     </div>
 
+    <!-- --- CUSTOM REUSABLE MODAL (Alert/Confirm) --- -->
+    <div id="generic-modal"
+        class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center p-4 z-[100] hidden">
+        <div id="generic-modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all border border-slate-100 overflow-hidden">
+            <div class="p-8">
+                <div class="flex flex-col items-center text-center">
+                    <div id="modal-icon-container" class="w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                        <!-- Icon will be inserted here -->
+                    </div>
+                    <h3 id="modal-title" class="text-2xl font-extrabold text-slate-800 mb-2">Title</h3>
+                    <p id="modal-message" class="text-slate-500 leading-relaxed text-sm sm:text-base">Message goes here.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 p-6 bg-slate-50 border-t border-slate-100">
+                <button id="modal-cancel-btn"
+                    class="flex-1 px-5 py-3 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all hidden">
+                    Cancel
+                </button>
+                <button id="modal-ok-btn"
+                    class="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-[#736b8e] hover:bg-[#5f5778] shadow-md shadow-purple-100 transition-all">
+                    OK
+                </button>
+            </div>
+        </div>
     </div>
     <div id="toast-notification"
         class="fixed top-5 right-5 z-50 w-full max-w-xs p-4 text-gray-900 bg-white border border-gray-200 rounded-lg shadow-lg hidden transition-all duration-300 transform opacity-0 translate-y-2"
@@ -2129,7 +2153,124 @@
             return cookieValue;
         }
 
+        // --- Modal Helper Functions ---
+        function showModal({ title, message, type = 'info', confirmText = 'OK', cancelText = 'Cancel', onConfirm = null }) {
+            const modal = document.getElementById('generic-modal');
+            const titleEl = document.getElementById('modal-title');
+            const messageEl = document.getElementById('modal-message');
+            const iconContainer = document.getElementById('modal-icon-container');
+            const okBtn = document.getElementById('modal-ok-btn');
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+
+            titleEl.textContent = title;
+            messageEl.innerHTML = message;
+            okBtn.textContent = confirmText;
+            cancelBtn.textContent = cancelText;
+
+            // Theme-based Styles
+            iconContainer.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm ';
+            let iconHtml = '';
+            
+            if (type === 'error') {
+                iconContainer.classList.add('bg-red-50', 'text-red-500');
+                iconHtml = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+            } else if (type === 'warning') {
+                iconContainer.classList.add('bg-amber-50', 'text-amber-500');
+                iconHtml = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+            } else {
+                iconContainer.classList.add('bg-purple-50', 'text-[#736b8e]');
+                iconHtml = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+            }
+            iconContainer.innerHTML = iconHtml;
+
+            // Button visibility
+            if (onConfirm) {
+                cancelBtn.classList.remove('hidden');
+            } else {
+                cancelBtn.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+
+            // Click Handlers
+            okBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onConfirm) onConfirm();
+            };
+            cancelBtn.onclick = () => {
+                modal.classList.add('hidden');
+            };
+        }
+
         async function savePaper() {
+            // --- Added Validation Check ---
+            const defaultStrings = [
+                "[Enter Question Text]",
+                "[Enter Correct Answer]",
+                "[Enter Option Text]",
+                "<em>Write your new multiple choice question here...</em>",
+                "<em>Write your new short answer question here...</em>",
+                "<em>Write your new coding challenge prompt here...</em>",
+                "Sample correct answer text.",
+                "def solution(): \n    pass"
+            ];
+
+            let hasEmptyFields = false;
+            let hasDefaultContent = false;
+
+            if (fullPaperPayload && fullPaperPayload.sections) {
+                fullPaperPayload.sections.forEach(section => {
+                    if (section.questions) {
+                        section.questions.forEach(q => {
+                            const text = (q.text || "").replace(/<[^>]*>/g, "").trim();
+                            const answer = (q.answer || "").replace(/<[^>]*>/g, "").trim();
+
+                            if (!text || !answer) {
+                                hasEmptyFields = true;
+                            }
+
+                            if (defaultStrings.some(ds => q.text.includes(ds) || q.answer.includes(ds))) {
+                                hasDefaultContent = true;
+                            }
+                            
+                            if (q.type === "MCQ" && q.options) {
+                                q.options.forEach(opt => {
+                                    if (!opt.trim()) hasEmptyFields = true;
+                                    if (defaultStrings.includes(opt.trim())) hasDefaultContent = true;
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+
+            if (hasEmptyFields) {
+                showModal({
+                    title: 'Incomplete Fields',
+                    message: 'Please fill in all questions, answers, and options before saving.',
+                    type: 'error'
+                });
+                return;
+            }
+
+            if (hasDefaultContent) {
+                showModal({
+                    title: 'Update Default Content',
+                    message: 'Some questions still have default placeholder text (e.g., "[Enter Question Text]"). Do you still want to save, or would you like to update them first?',
+                    type: 'warning',
+                    confirmText: 'Save Anyway',
+                    cancelText: 'Update Now',
+                    onConfirm: () => {
+                        proceedToSave();
+                    }
+                });
+                return;
+            }
+
+            proceedToSave();
+        }
+
+        async function proceedToSave() {
             const saveButtons = document.querySelectorAll(
                 'button[onclick^="savePaper"]'
             );
@@ -2491,26 +2632,26 @@
             let newQuestionTemplate;
             if (type === "MCQ") {
                 newQuestionTemplate = {
-                    text: "<em>Write your new multiple choice question here...</em>",
+                    text: "[Enter Question Text]",
                     type: "MCQ",
-                    options: ["", ""], // Initially empty options
-                    answer: "",          // Answer also initially empty
+                    options: ["[Enter Option Text]", "[Enter Option Text]"], 
+                    answer: "[Enter Correct Answer]",
                     required: false,
                 };
             } else if (type === "Short Answer") {
                 newQuestionTemplate = {
-                    text: "<em>Write your new short answer question here...</em>",
+                    text: "[Enter Question Text]",
                     type: "Short Answer",
                     options: [],
-                    answer: "Sample correct answer text.",
+                    answer: "[Enter Correct Answer]",
                     required: false,
                 };
             } else if (type === "CODE") {
                 newQuestionTemplate = {
-                    text: "<em>Write your new coding challenge prompt here...</em>",
+                    text: "[Enter Question Text]",
                     type: "CODE",
                     options: [],
-                    answer: "def solution(): \n    pass",
+                    answer: "[Enter Correct Answer]",
                     required: true,
                 };
             } else {

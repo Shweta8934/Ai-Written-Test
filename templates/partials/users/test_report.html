@@ -7,6 +7,7 @@
   <title>{{ title }}</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -42,6 +43,28 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #64748b;
     }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printable-report, #printable-report * {
+        visibility: visible;
+      }
+      #printable-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: white !important;
+      }
+      /* Hide the print button when printing */
+      #print-btn {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 
@@ -53,15 +76,23 @@
       {% include 'partials/header.html' with page_title="Test Report" %}
 
       <main class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50">
-        <div class="container mx-auto px-6 py-8">
-          <header class="mb-6">
-            <h6 class="text-2xl font-bold text-slate-800">
-              {{ registration.question_paper.title }} Report
-            </h6>
-            <p class="text-sm text-slate-500 mt-1">
-              Detailed report for <strong>{{ registration.email }}</strong>'s
-              attempt on {{ registration.start_time }}.
-            </p>
+        <div class="container mx-auto px-6 py-8" id="printable-report">
+          <header class="mb-6 flex justify-between items-center">
+            <div>
+              <h6 class="text-2xl font-bold text-slate-800">
+                {{ registration.question_paper.title }} Report
+              </h6>
+              <p class="text-sm text-slate-500 mt-1">
+                Detailed report for <strong>{{ registration.email }}</strong>'s
+                attempt on {{ registration.start_time }}.
+              </p>
+            </div>
+            <div>
+                <button onclick="downloadPDF()" id="print-btn" class="bg-theme-primary hover:bg-theme-dark text-white font-medium py-2 px-4 rounded-lg flex items-center shadow-sm transition-colors duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Save as PDF
+                </button>
+            </div>
           </header>
 
           <section class="bg-white p-6 rounded-xl shadow-lg">
@@ -160,6 +191,81 @@
               </div>
             </div>
           </section>
+
+          <!-- NEW: ASSESSMENT INTEGRITY SECTION -->
+          <section class="mt-8">
+            <div class="flex items-center gap-2 mb-4">
+                <h2 class="text-lg font-semibold text-slate-800">Assessment Integrity</h2>
+                <span class="px-2 py-0.5 bg-theme-light text-theme-dark text-[10px] font-bold uppercase rounded-full">AI Proctored</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Trust Score Card -->
+                <div class="md:col-span-1 bg-white p-6 rounded-xl shadow-md border-t-4 
+                    {% if registration.proctoring_score >= 80 %}border-emerald-500{% elif registration.proctoring_score >= 50 %}border-amber-500{% else %}border-rose-500{% endif %}">
+                    <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Trust Score</p>
+                    <div class="mt-4 w-full flex flex-col items-center">
+                        <div class="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
+                            <div class="h-full transition-all duration-1000 
+                                {% if registration.proctoring_score >= 80 %}bg-emerald-500{% elif registration.proctoring_score >= 50 %}bg-amber-500{% else %}bg-rose-500{% endif %}"
+                                style="width: {{ registration.proctoring_score|floatformat:0 }}%"></div>
+                        </div>
+                        <div class="mt-2 text-2xl font-bold text-slate-800">{{ registration.proctoring_score|floatformat:0 }}% Trust</div>
+                        <p class="mt-2 text-xs text-center text-slate-500">
+                            {% if registration.proctoring_score >= 80 %}
+                                High trust level. No significant suspicious activity detected.
+                            {% elif registration.proctoring_score >= 50 %}
+                                Moderate trust. Multiple violations recorded.
+                            {% else %}
+                                Low trust. High volume of security violations.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Violation Timeline -->
+                <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-md overflow-hidden flex flex-col">
+                    <p class="text-sm font-medium text-slate-500 uppercase tracking-wider mb-4">Security Timeline</p>
+                    <div class="flex-1 overflow-y-auto max-h-[300px] pr-2 space-y-4">
+                        {% for v in violations %}
+                        <div class="flex gap-4 items-start border-l-2 border-slate-200 pl-4 relative">
+                            <div class="absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white 
+                                {% if v.violation_type == 'PERIODIC_CHECK' %}bg-blue-400{% else %}bg-rose-500{% endif %}"></div>
+                            
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <h5 class="text-sm font-bold text-slate-800">{{ v.get_violation_type_display }}</h5>
+                                    <span class="text-[10px] text-slate-400">{{ v.timestamp|time:"H:i:s" }}</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">{{ v.description }}</p>
+                                
+                                {% if v.snapshot %}
+                                <div class="mt-2 group relative inline-block">
+                                    <img src="{{ v.snapshot.url }}" class="w-24 h-18 rounded border border-slate-200 cursor-zoom-in hover:scale-105 transition-transform" onclick="window.open(this.src)" />
+                                    <span class="absolute bottom-1 right-1 bg-black/50 text-[8px] text-white px-1 rounded">Snapshot</span>
+                                </div>
+                                {% endif %}
+
+                                {% if v.video_clip %}
+                                <div class="mt-2">
+                                    <video controls class="w-48 h-24 rounded border border-slate-200">
+                                        <source src="{{ v.video_clip.url }}" type="video/webm">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="flex flex-col items-center justify-center h-full text-slate-400 italic">
+                            <svg class="w-12 h-12 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <p class="text-sm">No violations recorded</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+          </section>
           <section class="mt-8">
             <h2 class="text-lg font-semibold text-slate-800 mb-4">
               Questions & Answers
@@ -167,8 +273,7 @@
 
             <div class="space-y-4">
               {% for result in results %}
-              <div
-                class="bg-white p-5 rounded-xl shadow-md border-l-4 {% if result.is_correct %}border-green-400{% else %}border-red-400{% endif %}">
+              <div class="bg-white p-5 rounded-xl shadow-md border-l-4 {% if result.is_correct %}border-green-400{% else %}border-red-400{% endif %}" style="page-break-inside: avoid; break-inside: avoid; margin-bottom: 20px;">
                 <div class="flex justify-between items-start gap-4">
                   <p class="text-base font-semibold text-slate-800">
                     {{ forloop.counter }}. {{ result.question_text|safe }}
@@ -301,6 +406,26 @@
         });
       }
     });
+
+    function downloadPDF() {
+      const element = document.getElementById('printable-report');
+      const opt = {
+          margin:       [10, 10, 10, 10], // Top, Right, Bottom, Left margins
+          filename:     '{{ registration.question_paper.title|escapejs }}_Report.pdf',
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+      
+      const btn = document.getElementById('print-btn');
+      const originalDisplay = btn.style.display;
+      btn.style.display = 'none'; // Hide button during PDF generation
+      
+      html2pdf().set(opt).from(element).save().then(() => {
+          btn.style.display = originalDisplay; // Restore button
+      });
+    }
   </script>
 </body>
 

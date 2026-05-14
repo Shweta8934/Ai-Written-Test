@@ -12,24 +12,37 @@
       user-select: none !important;
       -webkit-user-drag: none !important;
     }
+
     /* Specifically block selection in prose sections where questions live */
-    .prose, .prose *, .question-block, .question-block * {
+    .prose,
+    .prose *,
+    .question-block,
+    .question-block * {
       -webkit-user-select: none !important;
       -moz-user-select: none !important;
       -ms-user-select: none !important;
       user-select: none !important;
     }
+
     /* Only allow text interaction in specific areas, but our JS will still block copy/paste */
-    input, textarea, [contenteditable="true"], .monaco-editor, .monaco-editor * {
+    input,
+    textarea,
+    [contenteditable="true"],
+    .monaco-editor,
+    .monaco-editor * {
       -webkit-user-select: text !important;
       -moz-user-select: text !important;
       -ms-user-select: text !important;
       user-select: text !important;
     }
+
     /* Hide content when printing */
     @media print {
-      body { display: none !important; }
+      body {
+        display: none !important;
+      }
     }
+
     /* Anti-screenshot blur effect when focus is lost */
     .focus-lost-overlay {
       position: fixed;
@@ -45,8 +58,9 @@
     }
   </style>
   <script>
+    window.isTrustedUiFlow = false;
 
-    (function() {
+    (function () {
       function blockEvent(e) {
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -59,22 +73,22 @@
       document.addEventListener('copy', blockEvent, true);
       document.addEventListener('paste', blockEvent, true);
       document.addEventListener('cut', blockEvent, true);
-      document.addEventListener('contextmenu', function(e) {
+      document.addEventListener('contextmenu', function (e) {
         e.stopImmediatePropagation();
         e.preventDefault();
         return false;
       }, true);
-      
+
       // Prevent dragging text to copy
-      document.addEventListener('dragstart', function(e) {
-          e.preventDefault();
-          return false;
+      document.addEventListener('dragstart', function (e) {
+        e.preventDefault();
+        return false;
       }, true);
 
-      document.addEventListener('keydown', function(e) {
+      document.addEventListener('keydown', function (e) {
         const isMeta = e.ctrlKey || e.metaKey;
         const key = e.key ? e.key.toLowerCase() : '';
-        
+
         // Block Ctrl/Cmd + C, V, X, U, S, P (Print)
         if (isMeta && ['c', 'v', 'x', 'u', 's', 'p'].includes(key)) {
           e.stopImmediatePropagation();
@@ -90,7 +104,7 @@
           alert("⚠️ Developer Tools are disabled.");
           return false;
         }
-        
+
         // Block PrintScreen and other capture keys
         if (key === "printscreen" || e.keyCode === 44 || key === "snapshot" || (isMeta && e.shiftKey && (key === '3' || key === '4' || key === '5'))) {
           e.preventDefault();
@@ -100,27 +114,6 @@
         }
       }, true);
 
-      // Focus loss protection
-      window.addEventListener('blur', function() {
-        if (submissionLocked) return;
-        const overlay = document.createElement('div');
-        overlay.id = 'security-overlay';
-        overlay.className = 'focus-lost-overlay';
-        overlay.innerHTML = `
-          <div class="p-8 bg-white rounded-2xl shadow-xl border border-gray-100">
-            <i class="fas fa-eye-slash fa-3x text-red-500 mb-4"></i>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Content Hidden</h2>
-            <p class="text-gray-600 mb-4">Focus lost. Please return to the test window.</p>
-            <span class="text-xs text-gray-400">Repeated focus loss may lead to auto-submission.</span>
-          </div>
-        `;
-        document.body.appendChild(overlay);
-      });
-
-      window.addEventListener('focus', function() {
-        const overlay = document.getElementById('security-overlay');
-        if (overlay) overlay.remove();
-      });
     })();
   </script>
 
@@ -198,13 +191,15 @@
   </script>
   <script>
     let editorInstances = {};
-    let tabChangeCount = 0;
-    const MAX_TAB_CHANGES = 3;
     let submissionLocked = false;
+    window.submissionLocked = false;
+    window.isNavigating = false;
 
     function lockAndAutoSubmit(reason) {
       if (submissionLocked) return;
       submissionLocked = true;
+      window.submissionLocked = true;
+      window.isTrustedUiFlow = true;
 
       if (window.pollingInterval) clearInterval(window.pollingInterval);
 
@@ -252,37 +247,6 @@
       form.submit();
     }
 
-    function handleVisibilityChange() {
-      if (window.isNavigating || submissionLocked) {
-        return;
-      }
-
-      const originalTitle = "Online Test - {{ paper.title }}";
-
-      if (document.hidden) {
-        document.title = "⚠️ Warning: Focus Lost";
-
-        tabChangeCount++;
-
-        if (tabChangeCount <= MAX_TAB_CHANGES) {
-          alert(
-            `⚠️ WARNING! Tab Switched. You have ${MAX_TAB_CHANGES - tabChangeCount
-            } warnings remaining.`
-          );
-        } else {
-          lockAndAutoSubmit("tab_switch");
-        }
-      } else {
-        document.title = "Focus Regained";
-        setTimeout(() => {
-          if (!submissionLocked) {
-            document.title = originalTitle;
-          }
-        }, 1000);
-      }
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
   </script>
   <script>
     const OFFLINE_DIALOGUE_ID = "offline-dialogue";
@@ -386,16 +350,9 @@
     </style>
 </head>
 
-<body class="text-slate-800 bg-slate-50" 
-  onload="noBack()" 
-  onpageshow="if (event.persisted) noBack();"
-  onselectstart="return false"
-  oncopy="return false"
-  onpaste="return false"
-  oncut="return false"
-  oncontextmenu="return false"
-  ondragstart="return false"
->
+<body class="text-slate-800 bg-slate-50" onload="noBack()" onpageshow="if (event.persisted) noBack();"
+  onselectstart="return false" oncopy="return false" onpaste="return false" oncut="return false"
+  oncontextmenu="return false" ondragstart="return false">
   <div id="offline-dialogue"
     class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden" role="alert"
     aria-modal="true" aria-labelledby="dialog-title">
@@ -425,6 +382,11 @@
           </h1>
 
           <div class="flex items-center space-x-4">
+            <div id="warning-badge"
+              class="hidden flex items-center gap-2 bg-rose-100 text-rose-700 font-bold py-2 px-4 rounded-lg text-sm border border-rose-200">
+              <i class="fas fa-exclamation-triangle animate-pulse"></i>
+              <span>Warnings: <span id="warning-count">0</span>/3</span>
+            </div>
             <div
               class="flex items-center gap-2 bg-slate-100 text-slate-700 font-mono font-bold py-2 px-4 rounded-lg text-lg">
               <i class="far fa-clock text-primary"></i>
@@ -669,7 +631,7 @@
       <div class="flex justify-between items-center gap-2">
         <button type="button" onclick="previousQuestion()"
           class="flex-1 text-center bg-slate-200 text-slate-700 font-semibold py-3 rounded-lg hover:bg-slate-300 transition-colors text-sm">Previous</button>
-        <button type="submit" id="mobile-submit-btn"
+        <button type="button" id="mobile-submit-btn" onclick="submitTestForm()"
           class="flex-1 text-center bg-emerald-600 text-white font-semibold py-3 rounded-lg hover:bg-emerald-700 transition-colors text-sm shadow-md shadow-emerald-500/30">Submit</button>
         <button type="button" onclick="nextQuestion()"
           class="flex-1 text-center bg-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition-colors text-sm">Next</button>
@@ -677,6 +639,29 @@
     </footer>
 
   </div>
+
+  <script>
+    // Helper: submit the assessment form from anywhere on the page
+    function submitTestForm() {
+      if (window.submissionLocked) return; // already submitted
+      const confirmed = confirm("Are you sure you want to submit the test? You cannot change your answers after submission.");
+      if (confirmed) {
+        window.isTrustedUiFlow = true;
+        document.getElementById('assessment-form').submit();
+      }
+    }
+
+    // Also override the desktop submit button to show confirmation
+    document.addEventListener('DOMContentLoaded', function () {
+      const desktopSubmitBtn = document.querySelector('#assessment-form button[type="submit"]');
+      if (desktopSubmitBtn) {
+        desktopSubmitBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          submitTestForm();
+        });
+      }
+    });
+  </script>
 
   <!-- All original script tags for functionality are preserved exactly as they were -->
   <script>
@@ -991,6 +976,7 @@
 
     // --- TIMER LOGIC VARIABLES ---
     let totalSeconds = -1;
+    let timerInitialized = false;
     const POLLING_RATE_SECONDS = 15;
     window.pollingInterval = null;
     window.editorInstances = {};
@@ -1034,6 +1020,7 @@
             return;
           }
           totalSeconds = data.remaining_seconds;
+          timerInitialized = true;
           if (data.time_up || totalSeconds <= 0) {
             if (window.pollingInterval) clearInterval(window.pollingInterval);
             lockAndAutoSubmit("time_up");
@@ -1197,11 +1184,13 @@
       updateQuestionSummary();
 
       setInterval(() => {
-        if (totalSeconds > 0 && !submissionLocked) {
+        if (!timerInitialized || submissionLocked) return;
+
+        if (totalSeconds > 0) {
           totalSeconds--;
           updateTimerDisplay(totalSeconds);
         }
-        if (totalSeconds <= 0 && !submissionLocked) {
+        if (totalSeconds <= 0) {
           clearInterval(window.pollingInterval);
           lockAndAutoSubmit("time_up");
         }
@@ -1261,6 +1250,8 @@
       }, err => console.error("Monaco Editor failed to load.", err));
 
       document.getElementById("assessment-form").addEventListener("submit", function () {
+        window.isTrustedUiFlow = true;
+        window.submissionLocked = true;
         if (window.pollingInterval) clearInterval(window.pollingInterval);
         saveAnswersToLocalStorage();
         clearLocalStorage();
@@ -1280,6 +1271,365 @@
         saveAnswersToLocalStorage();
       }
     }, 10000);
+  </script>
+
+  <!-- PROCTORING UI ELEMENTS -->
+  <div class="fixed bottom-4 left-4 z-50 flex flex-col gap-2">
+    <div id="camera-preview-container"
+      class="w-32 h-24 bg-black rounded-lg overflow-hidden border-2 border-slate-300 shadow-xl hidden">
+      <video id="proctor-video" autoplay muted playsinline class="w-full h-full object-cover scale-x-[-1]"></video>
+    </div>
+    <div id="proctoring-status"
+      class="bg-white/80 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-500 border border-slate-200 flex items-center gap-2 shadow-sm">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      AI Proctoring Active
+    </div>
+  </div>
+  <canvas id="proctor-canvas" class="hidden" width="640" height="480"></canvas>
+
+  <!-- PROCTORING SCRIPT -->
+  <script>
+    (function () {
+      let proctorStream = null;
+      let snapshotInterval = null;
+      let awayStartTime = null;
+      let awayFromUrl = "";
+      let awayFromTitle = "";
+
+      // ============================================================
+      // PROCTORING LOGGER — All events logged to console
+      // ============================================================
+      const PROC = {
+        _warningCount: 0,
+        _sessionStart: Date.now(),
+
+        ts() {
+          const elapsed = ((Date.now() - this._sessionStart) / 1000).toFixed(1);
+          return `[+${elapsed}s]`;
+        },
+
+        info(msg, data = null) {
+          if (data) console.log(`%c🔵 PROCTOR ${this.ts()} ${msg}`, 'color:#3b82f6;font-weight:bold', data);
+          else console.log(`%c🔵 PROCTOR ${this.ts()} ${msg}`, 'color:#3b82f6;font-weight:bold');
+        },
+
+        warn(msg, data = null) {
+          if (data) console.warn(`%c🟡 PROCTOR ${this.ts()} ${msg}`, 'color:#f59e0b;font-weight:bold', data);
+          else console.warn(`%c🟡 PROCTOR ${this.ts()} ${msg}`, 'color:#f59e0b;font-weight:bold');
+        },
+
+        danger(msg, data = null) {
+          if (data) console.error(`%c🔴 PROCTOR ${this.ts()} ${msg}`, 'color:#ef4444;font-weight:bold', data);
+          else console.error(`%c🔴 PROCTOR ${this.ts()} ${msg}`, 'color:#ef4444;font-weight:bold');
+        },
+
+        success(msg, data = null) {
+          if (data) console.log(`%c🟢 PROCTOR ${this.ts()} ${msg}`, 'color:#10b981;font-weight:bold', data);
+          else console.log(`%c🟢 PROCTOR ${this.ts()} ${msg}`, 'color:#10b981;font-weight:bold');
+        },
+
+        group(title) {
+          console.group(`%c📋 PROCTOR ${this.ts()} ${title}`, 'color:#8b5cf6;font-weight:bold;font-size:13px');
+        },
+
+        groupEnd() {
+          console.groupEnd();
+        },
+
+        table(data) {
+          console.table(data);
+        }
+      };
+
+      // ============================================================
+
+      // 1. INITIALIZE CAMERA
+      async function initProctoring() {
+        PROC.group('PROCTORING SESSION STARTED');
+        PROC.info('Page loaded. Initializing camera...');
+        PROC.info('Initialization guard active for 4 seconds — events blocked until page is stable.');
+        PROC.table({
+          'Session Start': new Date().toLocaleTimeString(),
+          'User Agent': navigator.userAgent.substring(0, 60) + '...',
+          'Page URL': window.location.href,
+          'Tab Visible': !document.hidden,
+        });
+        PROC.groupEnd();
+
+        const video = document.getElementById('proctor-video');
+        try {
+          proctorStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480 },
+            audio: false
+          });
+          video.srcObject = proctorStream;
+          document.getElementById('camera-preview-container').classList.remove('hidden');
+          PROC.success('Camera access GRANTED. Proctoring is live.');
+
+          startPeriodicSnapshots();
+          logViolation('CAMERA_ACTIVE', 0, "Candidate granted camera access");
+        } catch (err) {
+          PROC.danger('Camera access DENIED.', err);
+          logViolation('CAMERA_DENIED', 0, "Candidate denied camera or no camera found");
+        }
+      }
+
+      let lastViolationLogTime = 0;
+      let pageReadyTime = Date.now() + 4000;
+      let isAlertOpen = false;
+
+      // 2. LOG VIOLATION TO BACKEND
+      async function logViolation(type, duration = 0, description = "") {
+        // Block during init
+        if (Date.now() < pageReadyTime) {
+          PROC.info(`[BLOCKED DURING INIT] Type: ${type}`);
+          return null;
+        }
+
+        // Debounce TAB_SWITCH
+        const now = Date.now();
+        if (type === 'TAB_SWITCH') {
+          if (now - lastViolationLogTime < 3000) {
+            PROC.warn(`[DEBOUNCED — ignored] Duplicate TAB_SWITCH within 3s window`);
+            return null;
+          }
+          lastViolationLogTime = now;
+        }
+
+        PROC.group(`LOGGING VIOLATION: ${type}`);
+        PROC.warn(`Type: ${type} | Duration: ${duration}s`);
+        PROC.info(`Description: ${description}`);
+        PROC.groupEnd();
+
+        try {
+          const response = await fetch("{% url 'test:log_violation' %}", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+              violation_type: type,
+              duration: duration,
+              description: description
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.status === "success") {
+            const currentViolations = data.total_violations;
+            PROC.group(`SERVER RESPONSE — Total Violations: ${currentViolations}/3`);
+            PROC.table({
+              'Violation Type': type,
+              'Total Warnings': currentViolations,
+              'Proctoring Score': data.proctoring_score,
+              'Violation ID': data.violation_id,
+              'Auto-Submit at': '3 warnings',
+            });
+            PROC.groupEnd();
+
+            // Update Warning Badge
+            const warningBadge = document.getElementById('warning-badge');
+            const warningCountEl = document.getElementById('warning-count');
+            if (warningBadge && warningCountEl && currentViolations > 0) {
+              warningBadge.classList.remove('hidden');
+              warningCountEl.textContent = currentViolations;
+              PROC.info(`Warning badge updated → ${currentViolations}/3`);
+            }
+
+            // Show alert only for real tab switches
+            const alertableTypes = ['TAB_SWITCH'];
+            if (alertableTypes.includes(type) && currentViolations < 3) {
+              PROC.warn(`Showing WARNING alert to candidate. Count: ${currentViolations}/3`);
+              isAlertOpen = true;
+              alert(`⚠️ WARNING ${currentViolations}/3\n\nYou switched away from the test tab. This has been recorded.\n\nWarning ${currentViolations} of 3 — After 3 warnings, your test will be automatically submitted.`);
+              isAlertOpen = false;
+              PROC.info('Alert dismissed by candidate.');
+            }
+
+            if (currentViolations >= 3) {
+              PROC.danger('🚨 MAX WARNINGS REACHED (3/3) — AUTO-SUBMITTING TEST NOW!');
+              alert("🚨 ASSESSMENT TERMINATED!\n\nYou have exceeded the maximum warning limit (3). Your test is being automatically submitted now.");
+              const form = document.getElementById("assessment-form");
+              if (form) {
+                window.isTrustedUiFlow = true;
+                PROC.danger('Submitting form...');
+                form.submit();
+              }
+            }
+
+            return data.violation_id;
+          } else {
+            PROC.danger('Server returned non-success status:', data);
+          }
+        } catch (err) {
+          PROC.danger('FETCH ERROR — Failed to log violation to server:', err);
+        }
+        return null;
+      }
+
+      // 3. UPLOAD MEDIA
+      async function uploadMedia(blob, filename, violationId = null) {
+        PROC.info(`Uploading media: ${filename} (${(blob.size / 1024).toFixed(1)} KB) | violationId: ${violationId}`);
+        const formData = new FormData();
+        formData.append("file", blob, filename);
+        if (violationId) formData.append("violation_id", violationId);
+
+        try {
+          await fetch("{% url 'test:upload_proctoring_media' %}", {
+            method: "POST",
+            headers: { "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value },
+            body: formData
+          });
+          PROC.success(`Media uploaded: ${filename}`);
+        } catch (err) {
+          PROC.danger('Failed to upload media:', err);
+        }
+      }
+
+      // 4. PERIODIC SNAPSHOTS
+      function startPeriodicSnapshots() {
+        if (snapshotInterval) clearInterval(snapshotInterval);
+        snapshotInterval = setInterval(() => {
+          PROC.info('Periodic snapshot triggered (every 30s)');
+          takeSnapshot();
+        }, 30000);
+        PROC.success('Periodic snapshot scheduler started (every 30s).');
+      }
+
+      function takeSnapshot(violationId = null) {
+        const video = document.getElementById('proctor-video');
+        const canvas = document.getElementById('proctor-canvas');
+        if (!proctorStream) {
+          PROC.warn('takeSnapshot called but no proctorStream available. Skipping.');
+          return;
+        }
+
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const filename = `snapshot_${Date.now()}.jpg`;
+            PROC.info(`Snapshot captured: ${filename} (${(blob.size / 1024).toFixed(1)} KB)`);
+            uploadMedia(blob, filename, violationId);
+          }
+        }, 'image/jpeg');
+      }
+
+      // 5. EVENT-BASED RECORDING
+      async function recordClip(violationId) {
+        if (!proctorStream || !window.MediaRecorder) {
+          PROC.warn('recordClip: No stream or MediaRecorder not supported. Skipping.');
+          return;
+        }
+
+        try {
+          const recorder = new MediaRecorder(proctorStream, { mimeType: 'video/webm' });
+          let chunks = [];
+          recorder.ondataavailable = (e) => chunks.push(e.data);
+          recorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            PROC.info(`Video clip captured: violation_${violationId}.webm (${(blob.size / 1024).toFixed(1)} KB)`);
+            uploadMedia(blob, `violation_${violationId}.webm`, violationId);
+          };
+          recorder.start();
+          PROC.info(`Recording 5-second clip for violation ID: ${violationId}`);
+          setTimeout(() => recorder.stop(), 5000);
+        } catch (e) {
+          PROC.danger('Recording failed:', e);
+        }
+      }
+
+      // 6. VISIBILITY & FOCUS TRACKING
+      function showFocusLostOverlay() {
+        if (!document.getElementById('security-overlay')) {
+          const overlay = document.createElement('div');
+          overlay.id = 'security-overlay';
+          overlay.className = 'focus-lost-overlay';
+          overlay.innerHTML = `
+            <div class="p-8 bg-white rounded-2xl shadow-xl border border-gray-100">
+              <i class="fas fa-eye-slash fa-3x text-red-500 mb-4"></i>
+              <h2 class="text-2xl font-bold text-gray-900 mb-2">Content Hidden</h2>
+              <p class="text-gray-600 mb-4">Focus lost. Please return to the test window.</p>
+              <span class="text-xs text-rose-500 font-bold">WARNING: Tab switching is being recorded.</span>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+        }
+      }
+
+      function hideFocusLostOverlay() {
+        const overlay = document.getElementById('security-overlay');
+        if (overlay) overlay.remove();
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (window.submissionLocked || window.isTrustedUiFlow || window.isNavigating) {
+          PROC.info('visibilitychange ignored — submission locked or trusted UI flow.');
+          return;
+        }
+        if (Date.now() < pageReadyTime) {
+          PROC.info(`visibilitychange ignored — within init guard window. hidden=${document.hidden}`);
+          return;
+        }
+
+        if (document.hidden) {
+          awayStartTime = Date.now();
+          awayFromUrl = window.location.href;
+
+          PROC.group('TAB SWITCH DETECTED — Candidate LEFT test tab');
+          PROC.danger(`Left at: ${new Date().toLocaleTimeString()}`);
+          PROC.danger(`Left from URL: ${awayFromUrl}`);
+          PROC.groupEnd();
+
+          showFocusLostOverlay();
+          document.title = "⚠️ Warning: Focus Lost";
+
+          logViolation('TAB_SWITCH', 0, `User switched away. URL: ${awayFromUrl}`).then(vId => {
+            if (vId) {
+              PROC.info(`Violation ID ${vId} created. Taking snapshot + video clip.`);
+              takeSnapshot(vId);
+              recordClip(vId);
+            } else {
+              PROC.warn('Violation was debounced/blocked — no snapshot taken.');
+            }
+          });
+
+        } else {
+          hideFocusLostOverlay();
+          document.title = "Online Test - {{ paper.title }}";
+
+          if (awayStartTime) {
+            const duration = ((Date.now() - awayStartTime) / 1000).toFixed(1);
+            PROC.group('CANDIDATE RETURNED to test tab');
+            PROC.success(`Returned at: ${new Date().toLocaleTimeString()}`);
+            PROC.success(`Was away for: ${duration} seconds`);
+            PROC.success(`Returned to URL: ${window.location.href}`);
+            PROC.groupEnd();
+
+            logViolation('TAB_SWITCH_RETURN', parseFloat(duration), `User returned after ${duration}s`);
+            awayStartTime = null;
+          }
+        }
+      });
+
+      // 7. FULLSCREEN
+      function enforceFullscreen() {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(e => {
+            PROC.info('Fullscreen request blocked (normal for incognito or non-gesture context).');
+          });
+        }
+      }
+
+      window.addEventListener('load', () => {
+        PROC.success('Window load complete. Starting proctoring...');
+        initProctoring();
+        document.addEventListener('click', enforceFullscreen, { once: false });
+      });
+
+    })();
   </script>
 </body>
 

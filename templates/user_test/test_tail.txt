@@ -1,0 +1,150 @@
+        window.isTrustedUiFlow = true;
+        window.submissionLocked = true;
+        if (window.pollingInterval) clearInterval(window.pollingInterval);
+        saveAnswersToLocalStorage();
+        clearLocalStorage();
+        document.querySelectorAll(".code-editor").forEach((container) => {
+          const questionId = container.id.replace("editor-", "");
+          const textarea = document.getElementById(`textarea-${questionId}`);
+          const editor = editorInstances[questionId];
+          if (editor) textarea.value = editor.getValue();
+        });
+      });
+    });
+
+    // Auto-save progress
+    setInterval(() => {
+      if (!submissionLocked) {
+        saveStatesToLocalStorage();
+        saveAnswersToLocalStorage();
+      }
+    }, 10000);
+  </script>
+
+  <!-- PROCTORING UI ELEMENTS -->
+  <div class="fixed bottom-4 left-4 z-50 flex flex-col gap-2">
+    <div id="camera-preview-container"
+      class="w-32 h-24 bg-black rounded-lg overflow-hidden border-2 border-slate-300 shadow-xl hidden">
+      <video id="proctor-video" autoplay muted playsinline class="w-full h-full object-cover scale-x-[-1]"></video>
+    </div>
+    <div id="proctoring-status"
+      class="bg-white/80 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-500 border border-slate-200 flex items-center gap-2 shadow-sm">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      AI Proctoring Active
+    </div>
+  </div>
+  <canvas id="proctor-canvas" class="hidden" width="640" height="480"></canvas>
+
+  <!-- PROCTORING SCRIPT -->
+  <script>
+    (functi    let procto rStre      l;
+      let snapshotInter      ll;
+      let awayStartTime =           let awayFromUrl = "";      et awayFromTitle = "";      // 1. INITIALIZE CAMERA
+       nc function initProctori             const video = document.getE        proctor-video');
+        try {
+          proctorStream =        ator.m          serMedia({
+            video: { width: 640, height: 480 },
+             se
+          });
+          video.src            am;
+                   entB          iew-container').classList.remove(                // Start periodic snapshots (every 30s)
+          startPeriodicSnapshots()N          at camera is active
+          logViolati          E', 0, "Candidate granted 
+           (err) {
+          console.error("Camera          , err);
+          logViolation('CAMERA_DENIED', 0, "Candidate denied          und");
+        }          // 2. LOG VIOLATION TO BACKEND
+      async fu          ion(type, duration = 0, description = "") {
+        try {
+          const response = aw        %       t:l      tion' %}", {
+            method      ,
+            headers: {
+              "Content-Type": "application/                        : document.querySelector('[name=csrfmiddlewaretoken]').value
+                   body: JSON.st                violati                   duration: duration,
+                         ion
+            })
+          });
+          const data = await response.jso            --             -
+          if (data.to                         alert("Asse              Violation: Maximum w              est will now be automatic                         of s          unction') {
+              submitTest}                  return data.violation          atch (err) {
+          console.err            olation:", err);
+        }
+      }
+
+      // 3. UPLOAD MEDIA
+      async function uploadMedia(blob, filename, violationId =            st formData = new FormData();
+        fo              ob, filename);            on          en,                  try {
+          aw        % url 'test:uplo          dia' %}", {
+            method: "POST",
+                 {      Tok      ument.querySelector      csrfmiddlewaretoken]').value },
+            body: formData
+                  } catch (err) {
+          con        Failed to upload media:", err);
+        }            // 4. PERIODIC SNAPSHOTS
+      function startPeriodicSnapsho           if           l) clearInterval(snapshotInterval);
+        snapshotInterv            eSnapshot, 30000               }
+
+      function takeSnapshot(violationId = null) {
+        const video = document.g            or-video');
+             s =         ElementById('pro                 if (!proctorStream) return;
+
+        con         c      tCo      d');
+        context.draw      deo, 0, 0, canvas.width, canvas.heig          canvas.toBlob((blob) => {
+          if (blob) {
+              filename = `snapshot_${Date.now()}.jpg`;
+            uploadMedia(b      ena      ationId);
+          }
+        }, 'image/jpeg           }
+
+      // 5. EVENT-BASED RECORDING (5s Clip)
+              ordClip(violationId) {
+        if (!proctorStream || !wind        rder) return;
+
+        try {
+        nst recorder = new MediaRecorder(proctorS        eType: 'video/webm' });
+          let chunks = [];
+          a        = (e) => chunks.push(e.dat          corder.onsto                const blob = new Blob(chunks, { type: 'vide                uploadMedia(blob, `violation_${violati          la               };
+
+          re      tar             setTimeout(() => recorder.stop(      ; // Record for 5 seconds
+        }        
+          console.error("Recording failed:", e);
+            6. ENH           CHANGE
+      const originalHandleVisibilityChange = window.handleVisibilityCha          ow.handleVisibili           function () {
+        if (document.hidden) {
+                    Date.now();
+          awa            cation.href;
+          awayFromTitle = document.title;
+            = await logViolation(
+            'TAB_SWITCH',
+            0,
+            lefU          l} | Title: ${away                );
+          if (vId) {
+            takeSnapshot(vId);
+            rdClip(vId);
+              } else {
+          if (awayStartTime                dur      (Date.now() - awayStartTime) / 10              const returnUrl = window.location.href;
+            logViolati        'TAB_SWITCH_RETURN',
+              duration,
+              er returned after ${dur          }s | Left from: ${awayFromUr          | Returned to: ${returnUrl} | Previo          FromTitle || "unknown"}`
+                     awayStartTime = null;
+                  "";
+                      ;
+             
+
+        if (typeof originalHandleVisibilityChange === 'function') {
+            Han          nge();
+                  // 7. FULLSCREEN             nction enforceFul                    ent.fulls                    document.do            tFullscreen().catch(e => {
+            console.info("F            ocked");
+          });
+        }
+      }            entListener('l              itProctoring();
+                   istener("v              alHandleVisibilityChange);
+        document.addEventListener("visibilitychange", window.handleVisibilityChange);
+        document.addEventListener('click', enforce            true });
+      });
+
+    })();
+  </script>
+</body>
+
+</html>

@@ -12,5 +12,7 @@ urlpatterns = [
     path("already-submitted/", views.user_already_submitted_view, name="user_already_submitted"),
     path('<str:link_id>/time/', views.get_time_remaining_api, name='get_time_remaining_api'),
     path('run-code/', views.run_code_ai, name='run_code_ai'),
-
+    path('log-cheating-event/', views.log_cheating_event, name='log_cheating_event'),
+    path('log-violation/', views.log_violation, name='log_violation'),
+    path('upload-proctoring-media/', views.upload_proctoring_media, name='upload_proctoring_media'),
 ]
